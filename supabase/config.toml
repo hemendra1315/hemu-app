@@ -1,0 +1,30 @@
+[auth]
+enabled = true
+site_url = "https://cricos08.vercel.app"
+additional_redirect_urls = [
+  "https://cricos08.vercel.app/auth/callback",
+  "https://cricos08.vercel.app/sign-in",
+  "http://localhost:5173/auth/callback",
+  "com.hemu.cricketacademy://auth/callback"
+]
+
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+redirect_uri = "https://jslilwvtribrszzzqcez.supabase.co/auth/v1/callback"
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[analytics]
+enabled = false

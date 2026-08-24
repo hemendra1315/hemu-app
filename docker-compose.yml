@@ -1,0 +1,18 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: cam-web
+    ports:
+      - '5173:5173'
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      # keep container-installed node_modules (native bindings differ from host)
+      - cam_node_modules:/app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  cam_node_modules:

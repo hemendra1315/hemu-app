@@ -1,0 +1,65 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dependencies & build output
+node_modules
+dist
+dist-ssr
+dev-dist
+coverage
+*.local
+
+# Environment (only the example is committed)
+.env
+.env.*
+!.env.example
+
+# Tests
+playwright-report
+test-results
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Supabase CLI local state
+supabase/.temp
+supabase/.branches
+.vercel
+.env*
+
+.git_disabled/
+
+.git_disabled/
+
+# Scratch/debug artifacts from agent-session testing (root-level only)
+# SQL scratch queries used during direct-database testing
+/_q_*.sql
+/test_query.sql
+
+# Scratch/patch/fix scripts from agent sessions
+/patch*.cjs
+/patch*.py
+/fix*.cjs
+/fix*.py
+/test-*.cjs
+/test-*.mjs
+/update_*.py
+/rewrite_*.py
+/final_*.py
+/get_*.py
+
+# Misc scratch files
+/structure.txt
