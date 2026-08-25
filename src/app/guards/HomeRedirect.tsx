@@ -22,6 +22,7 @@ export function HomeRedirect() {
     if (testModeRole === 'student') return <Navigate to="/player" replace />;
     if (testModeRole === 'coach') return <Navigate to="/coach" replace />;
     if (testModeRole === 'academy_owner') return <Navigate to="/dashboard" replace />;
+    if (testModeRole === 'parent') return <Navigate to="/parent/dashboard" replace />;
   }
 
   // General Profile & Phone OTP Onboarding check

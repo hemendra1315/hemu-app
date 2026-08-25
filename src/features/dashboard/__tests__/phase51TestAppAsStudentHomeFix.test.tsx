@@ -31,6 +31,7 @@ vi.mock('../hooks/useDashboardAnalytics', async () => {
         recentAwards: [],
         careerHighlights: [],
         runsTrend: [],
+        attendanceTrend: [],
       },
       isPending: false,
       isError: false,

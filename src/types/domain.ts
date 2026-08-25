@@ -12,6 +12,12 @@ export type Profile = {
   email: string;
   avatarUrl: string | null;
   phone: string | null;
+  /**
+   * Mirrors `profiles.phone_verified`. Nothing in the app currently sets this:
+   * onboarding verifies the user's *email* via OTP, not their phone number, so
+   * a phone captured at onboarding is unverified. Treat this as false unless a
+   * real SMS verification flow writes it. Do not infer it from `phone`.
+   */
   phoneVerified?: boolean;
   dateOfBirth: string | null;
   locale: string;

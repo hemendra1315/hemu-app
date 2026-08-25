@@ -1,6 +1,6 @@
 import { useState, useId } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, UserCheck, Building2, ChevronRight } from 'lucide-react';
+import { GraduationCap, UserCheck, Building2, ChevronRight, Users } from 'lucide-react';
 
 import { Modal, Select } from '@/components/ui';
 import { useAcademyStore, useAuthStore, useTestModeStore, useUiStore } from '@/stores';
@@ -8,6 +8,23 @@ import { useMemberships } from '@/features/academies';
 import { usePlatformAcademies } from '@/features/admin/hooks/useAdmin';
 import type { PlatformAcademy } from '@/features/admin/api/adminApi';
 import type { TestModeRole } from '@/stores/testModeStore';
+
+type SelectableTestRole = Exclude<TestModeRole, null>;
+
+const ROLE_LABELS: Record<SelectableTestRole, string> = {
+  student: 'Student',
+  coach: 'Coach',
+  academy_owner: 'Academy Owner',
+  parent: 'Parent',
+};
+
+/** Must stay in step with ROLE_HOME / HomeRedirect's test-mode branch. */
+const ROLE_PATHS: Record<SelectableTestRole, string> = {
+  student: '/player',
+  coach: '/coach',
+  academy_owner: '/dashboard',
+  parent: '/parent/dashboard',
+};
 
 interface TestAppAsModalProps {
   open: boolean;
@@ -53,8 +70,8 @@ export function TestAppAsModal({ open, onClose }: TestAppAsModalProps) {
     setTestMode(role, currentSelectedId);
     onClose();
 
-    const roleLabel = role === 'student' ? 'Student' : role === 'coach' ? 'Coach' : 'Academy Owner';
-    const targetPath = role === 'student' ? '/player' : role === 'coach' ? '/coach' : '/dashboard';
+    const roleLabel = ROLE_LABELS[role];
+    const targetPath = ROLE_PATHS[role];
 
     pushToast({
       title: '🧪 Test Mode Active',
@@ -153,6 +170,26 @@ export function TestAppAsModal({ open, onClose }: TestAppAsModalProps) {
                 <p className="text-fg text-sm font-bold">Academy Owner</p>
                 <p className="text-fg-muted truncate text-xs">
                   See the complete academy management experience and squad performance.
+                </p>
+              </div>
+            </div>
+            <ChevronRight className="text-fg-muted h-5 w-5 shrink-0" />
+          </button>
+
+          {/* Parent Role */}
+          <button
+            type="button"
+            onClick={() => handleSelectRole('parent')}
+            className="border-border-subtle bg-surface flex min-h-[60px] w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition-all hover:border-purple-500/50 hover:bg-purple-500/5"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
+                <Users className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-fg text-sm font-bold">Parent</p>
+                <p className="text-fg-muted truncate text-xs">
+                  See the family dashboard: a child&apos;s sessions, attendance and results.
                 </p>
               </div>
             </div>

@@ -21,6 +21,7 @@ export function useActiveRoles(): AppRole[] {
       if (testModeRole === 'student') return ['player'];
       if (testModeRole === 'coach') return ['coach'];
       if (testModeRole === 'academy_owner') return ['academy_owner'];
+      if (testModeRole === 'parent') return ['parent'];
     }
 
     const activeMemberships = memberships.filter((m) => m.status === 'active');

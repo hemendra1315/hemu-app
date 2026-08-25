@@ -9,6 +9,7 @@ import {
 import { markAttendance } from '../api/attendanceApi';
 import { queryClient } from '@/lib/query/queryClient';
 import { queryKeys } from '@/lib/query/keys';
+import { logger } from '@/lib/logger';
 import { useUiStore } from '@/stores';
 import type { UUID } from '@/types';
 import type { AttendanceStatus } from '@/types/enums';
@@ -114,7 +115,7 @@ export async function syncOfflineAttendanceQueue(
       }
     }
   } catch (e) {
-    console.error('Error processing offline attendance sync:', e);
+    logger.error('offline_attendance_sync_failed', { error: String(e) });
   } finally {
     isSyncInProgress = false;
   }
@@ -122,32 +123,64 @@ export async function syncOfflineAttendanceQueue(
   return { syncedCount, failedCount };
 }
 
-// Background sync triggers: online event, visibility change, periodic interval
-if (typeof window !== 'undefined') {
+/**
+ * Safety-net sweep interval. Coming back online and returning to the tab both
+ * trigger a sync immediately via events, and the attendance screen flushes its
+ * own queue on mount — so this only exists to catch a queue left behind on a
+ * screen that never revisits attendance. It is deliberately infrequent: every
+ * tick opens IndexedDB, so a short interval burns battery and I/O all day for
+ * a queue that is empty virtually all of the time.
+ */
+const BACKGROUND_SYNC_INTERVAL_MS = 60_000;
+
+/**
+ * Guards against stacking listeners and intervals when this module is evaluated
+ * more than once (dev-server hot reload). The flag lives on `window` rather than
+ * in module scope precisely because module scope is what gets re-created.
+ */
+type BackgroundSyncHost = { __camOfflineAttendanceSyncStarted__?: boolean };
+
+/**
+ * Wires the background sync triggers exactly once per page: the `online` and
+ * `visibilitychange` events (immediate), a slow periodic sweep, and one attempt
+ * on load, since neither event fires on a normal page load.
+ */
+function startBackgroundAttendanceSync(): void {
+  if (typeof window === 'undefined') return;
+
+  const host = window as unknown as BackgroundSyncHost;
+  if (host.__camOfflineAttendanceSyncStarted__) return;
+  host.__camOfflineAttendanceSyncStarted__ = true;
+
   const triggerAutoSync = () => {
-    if (navigator.onLine) {
-      void syncOfflineAttendanceQueue(
-        (msg) => {
-          useUiStore.getState().pushToast({ title: msg, variant: 'success' });
-        },
-        (title, msg) => {
-          useUiStore.getState().pushToast({ title, description: msg, variant: 'error' });
-        },
-      );
-    }
+    if (!navigator.onLine) return;
+    void syncOfflineAttendanceQueue(
+      (msg) => {
+        useUiStore.getState().pushToast({ title: msg, variant: 'success' });
+      },
+      (title, msg) => {
+        useUiStore.getState().pushToast({ title, description: msg, variant: 'error' });
+      },
+    );
   };
 
   window.addEventListener('online', triggerAutoSync);
   window.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') triggerAutoSync();
   });
-  setInterval(triggerAutoSync, 2000);
 
-  // Expose global helper for testing/debugging
+  const backgroundSyncTimer = setInterval(triggerAutoSync, BACKGROUND_SYNC_INTERVAL_MS);
+  window.addEventListener('pagehide', () => clearInterval(backgroundSyncTimer), { once: true });
+
+  triggerAutoSync();
+
+  // Expose global helper for testing/debugging.
   (
     window as unknown as { __syncOfflineAttendanceQueue__: typeof syncOfflineAttendanceQueue }
   ).__syncOfflineAttendanceQueue__ = syncOfflineAttendanceQueue;
 }
+
+startBackgroundAttendanceSync();
 
 export function useOfflineAttendanceQueue(sessionId: UUID | null, academyId: UUID | null) {
   const [queuedItems, setQueuedItems] = useState<QueuedAttendanceItem[]>([]);

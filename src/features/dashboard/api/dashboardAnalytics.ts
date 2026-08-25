@@ -670,5 +670,7 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
     recentAwards,
     careerHighlights,
     runsTrend,
+    /** Last six months of attendance as a percentage, oldest first. */
+    attendanceTrend: chartData.attendanceTrend,
   };
 }

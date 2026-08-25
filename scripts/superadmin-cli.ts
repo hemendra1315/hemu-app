@@ -3,14 +3,31 @@ import { Command } from 'commander';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import * as crypto from 'node:crypto';
-import { config } from 'dotenv';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-config({ path: [resolve(__dirname, '../.env'), resolve(__dirname, '../.env.local')] });
+/**
+ * Load .env then .env.local using Node's built-in loader (Node >= 20.12, and
+ * .nvmrc pins 22.12). Using `process.loadEnvFile` keeps this script free of a
+ * `dotenv` dependency that was never declared in package.json.
+ *
+ * Precedence matches the previous dotenv call exactly: a variable already set
+ * in the real environment wins, and otherwise the first file to define it wins
+ * (so `.env` takes precedence over `.env.local`). Missing files are skipped.
+ */
+for (const envFile of ['../.env', '../.env.local']) {
+  const path = resolve(__dirname, envFile);
+  if (!existsSync(path)) continue;
+  try {
+    process.loadEnvFile(path);
+  } catch {
+    console.warn(`⚠️  Could not read ${path}; continuing with the current environment.`);
+  }
+}
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;

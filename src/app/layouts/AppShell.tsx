@@ -2,7 +2,6 @@ import {
   CalendarDays,
   FlaskConical,
   LayoutDashboard,
-  LogOut,
   Menu,
   ShieldCheck,
   Trophy,
@@ -12,20 +11,28 @@ import {
   BarChart2,
   Settings,
 } from 'lucide-react';
-import { Suspense, useState, type ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { LoadingScreen } from '@/components/feedback';
-import { Avatar, Button, Modal, ThemeToggle } from '@/components/ui';
+import { Avatar, Button, ThemeToggle } from '@/components/ui';
 import { AcademySwitcher, useActiveAcademy } from '@/features/academies';
 import { useAuth } from '@/features/auth';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
-import { InstallAppButton } from '@/features/pwa/components/InstallAppButton';
 import { useOnlineStatus } from '@/hooks';
 import { hasCapability, useActiveRoles, useCan, type Capability } from '@/lib/rbac';
 import { useAcademyStore, useTestModeStore } from '@/stores';
+import type { TestModeRole } from '@/stores/testModeStore';
 import { cn } from '@/lib/utils/cn';
 import { MobileBottomNav, MobileFab } from '@/components/mobile';
+
+/** Display names for the Super Admin "Test App As" banner. */
+const TEST_MODE_LABELS: Record<Exclude<TestModeRole, null>, string> = {
+  student: 'Student',
+  coach: 'Coach',
+  academy_owner: 'Academy Owner',
+  parent: 'Parent',
+};
 
 interface NavItemDef {
   to: string;
@@ -141,8 +148,6 @@ export function AppShell() {
   const isSuperAdmin = profile?.isSuperAdmin === true;
   const displayName = profile?.fullName ?? profile?.email ?? 'User';
 
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-
   const isSuperAdminMode =
     isSuperAdmin && !testModeRole && Boolean(activeAcademyId) && location.pathname !== '/admin';
 
@@ -215,13 +220,7 @@ export function AppShell() {
             <FlaskConical className="h-4 w-4 shrink-0 text-purple-500" />
             <span className="truncate">
               <strong className="font-bold">TEST MODE</strong> · Viewing as{' '}
-              <span className="font-semibold">
-                {testModeRole === 'student'
-                  ? 'Student'
-                  : testModeRole === 'coach'
-                    ? 'Coach'
-                    : 'Academy Owner'}
-              </span>
+              <span className="font-semibold">{TEST_MODE_LABELS[testModeRole]}</span>
             </span>
           </div>
           <Button
@@ -299,153 +298,10 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* MOBILE FIXED BOTTOM NAVIGATION & FAB */}
+      {/* MOBILE FIXED BOTTOM NAVIGATION & FAB. The overflow menu behind the
+          nav's "More" entry is the routed /more page (src/pages/MorePage.tsx). */}
       <MobileFab />
       <MobileBottomNav />
-
-      {/* MORE MENU SHEET MODAL (< 768px / md) */}
-      <Modal
-        open={isMoreMenuOpen}
-        onClose={() => setIsMoreMenuOpen(false)}
-        title="More & Account"
-        size="sm"
-      >
-        <div className="space-y-5 py-2">
-          {/* Academy Group */}
-          <div className="space-y-1">
-            <p className="text-fg-muted mb-1 px-2 text-xs font-bold tracking-wider uppercase">
-              Academy
-            </p>
-            <NavLink
-              to="/batches"
-              onClick={() => setIsMoreMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
-                )
-              }
-            >
-              <Menu className="h-5 w-5" />
-              <span>Batches</span>
-            </NavLink>
-            <NavLink
-              to="/sessions"
-              onClick={() => setIsMoreMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
-                )
-              }
-            >
-              <CalendarDays className="h-5 w-5" />
-              <span>Sessions</span>
-            </NavLink>
-          </div>
-
-          {/* Management Group */}
-          <div className="border-border-subtle space-y-1 border-t pt-3">
-            <p className="text-fg-muted mb-1 px-2 text-xs font-bold tracking-wider uppercase">
-              Management
-            </p>
-            <NavLink
-              to="/members"
-              onClick={() => setIsMoreMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
-                )
-              }
-            >
-              <Users className="h-5 w-5" />
-              <span>Members & Roster</span>
-            </NavLink>
-            <NavLink
-              to="/matches"
-              onClick={() => setIsMoreMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
-                )
-              }
-            >
-              <Trophy className="h-5 w-5" />
-              <span>Matches</span>
-            </NavLink>
-          </div>
-
-          {/* Account Group */}
-          <div className="border-border-subtle space-y-1 border-t pt-3">
-            <p className="text-fg-muted mb-1 px-2 text-xs font-bold tracking-wider uppercase">
-              Account
-            </p>
-            <NavLink
-              to="/profile"
-              onClick={() => setIsMoreMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-fg-muted hover:bg-surface-muted hover:text-fg',
-                )
-              }
-            >
-              <User className="h-5 w-5" />
-              <span>My Profile</span>
-            </NavLink>
-            <div className="px-2 pt-1">
-              <InstallAppButton />
-            </div>
-            <Button
-              variant="secondary"
-              className="min-h-[48px] w-full justify-start gap-3 text-red-500 hover:text-red-600"
-              onClick={async () => {
-                setIsMoreMenuOpen(false);
-                await logout();
-                navigate('/sign-in', { replace: true });
-              }}
-            >
-              <LogOut className="h-5 w-5" /> Sign out
-            </Button>
-          </div>
-
-          {/* Platform / Super Admin Group */}
-          {isSuperAdmin ? (
-            <div className="border-border-subtle space-y-1 border-t pt-3">
-              <p className="mb-1 px-2 text-xs font-bold tracking-wider text-amber-500 uppercase">
-                Platform
-              </p>
-              <NavLink
-                to="/admin"
-                onClick={() => setIsMoreMenuOpen(false)}
-                className={({ isActive }) =>
-                  cn(
-                    'flex min-h-[48px] items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors',
-                    isActive
-                      ? 'bg-amber-500/10 font-semibold text-amber-500'
-                      : 'text-amber-500/80 hover:bg-amber-500/10 hover:text-amber-500',
-                  )
-                }
-              >
-                <ShieldCheck className="h-5 w-5" />
-                <span>Super Admin Panel</span>
-              </NavLink>
-            </div>
-          ) : null}
-        </div>
-      </Modal>
     </div>
   );
 }

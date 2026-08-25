@@ -12,6 +12,16 @@ import { useTestModeStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
 import { isUUID } from '@/lib/validators';
 
+/** Turns the `YYYY-MM` keys produced by the attendance summary into "Mar 26". */
+function formatMonthLabel(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  if (!year || !monthNumber) return month;
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString(undefined, {
+    month: 'short',
+    year: '2-digit',
+  });
+}
+
 export default function PlayerDashboardPage() {
   const { academyId, membership } = useActiveAcademy();
   const testModeRole = useTestModeStore((s) => s.activeRole);
@@ -322,19 +332,21 @@ export default function PlayerDashboardPage() {
                   height={200}
                 />
               </div>
-              <div>
-                <h4 className="text-fg-muted mb-2 text-sm font-medium">Attendance Trend</h4>
-                <SimpleLineChart
-                  data={[
-                    { label: 'Jan', value: 85 },
-                    { label: 'Feb', value: 78 },
-                    { label: 'Mar', value: 92 },
-                    { label: 'Apr', value: 88 },
-                    { label: 'May', value: 95 },
-                  ]}
-                  height={200}
-                />
-              </div>
+              {/* Optional-chained: the query cache is persisted to IndexedDB for
+                  24h, so a returning user can rehydrate a payload saved before
+                  `attendanceTrend` existed. */}
+              {analytics.attendanceTrend?.length ? (
+                <div>
+                  <h4 className="text-fg-muted mb-2 text-sm font-medium">Attendance Trend</h4>
+                  <SimpleLineChart
+                    data={analytics.attendanceTrend.map((m) => ({
+                      label: formatMonthLabel(m.month),
+                      value: m.percentage,
+                    }))}
+                    height={200}
+                  />
+                </div>
+              ) : null}
             </div>
           </CardBody>
         </Card>

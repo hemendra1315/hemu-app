@@ -134,7 +134,12 @@ export default function ProfileOnboardingPage() {
 
   const fullPhoneNumber = `${countryCode}${phoneNumber.trim()}`;
 
-  // Step 1: Submit Profile details & Send Phone OTP
+  /**
+   * Step 1: save the profile details, then send an OTP to the user's EMAIL.
+   * The phone number is captured but never verified — a real SMS flow would
+   * need `signInWithOtp({ phone })` plus an SMS provider configured in Supabase.
+   * Until then `profiles.phone_verified` stays false for new users.
+   */
   const handleProceedToOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -332,7 +337,7 @@ export default function ProfileOnboardingPage() {
       setProfile(updatedProfile);
 
       pushToast({
-        title: 'Profile verified!',
+        title: 'Email verified!',
         description: 'Your profile has been set up successfully.',
         variant: 'success',
       });
@@ -655,7 +660,7 @@ export default function ProfileOnboardingPage() {
                     }}
                     className="text-fg-muted hover:text-primary flex items-center font-medium transition"
                   >
-                    <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Change email address
+                    <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to details
                   </button>
 
                   <button
