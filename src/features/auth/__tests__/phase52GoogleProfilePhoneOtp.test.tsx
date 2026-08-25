@@ -11,6 +11,20 @@ import { createQueryClient } from '@/lib/query/queryClient';
 import { act } from '@testing-library/react';
 import * as mediaModule from '@/lib/media';
 import type { Profile } from '@/types';
+vi.mock('@/lib/supabase/client', () => ({
+  supabase: {
+    auth: {
+      signInWithOtp: vi.fn().mockResolvedValue({ data: {}, error: null }),
+      verifyOtp: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    },
+    from: vi.fn(() => ({
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: {}, error: null }),
+    })),
+  },
+}));
 
 describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () => {
   const queryWrapper = ({ children }: { children: React.ReactNode }) =>
@@ -59,7 +73,6 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
         email: 'test@cricket.app',
         fullName: 'Rahul Test',
         phone: null,
-        phoneVerified: false,
         avatarUrl: null,
         dateOfBirth: null,
         locale: 'en',
@@ -71,16 +84,14 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const missing = getMissingProfileFields(incompleteProfile);
       expect(missing).toContain('dateOfBirth');
       expect(missing).toContain('phone');
-      expect(missing).toContain('phoneVerified');
     });
 
-    it('returns true for complete profiles with verified phone', () => {
+    it('returns true for complete profiles', () => {
       const completeProfile: Profile = {
         id: 'p-2',
         email: 'complete@cricket.app',
         fullName: 'Complete User',
         phone: '+919876543210',
-        phoneVerified: true,
         avatarUrl: 'https://example.com/photo.jpg',
         dateOfBirth: '1998-05-15',
         locale: 'en',
@@ -119,7 +130,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const nameInput = screen.getByPlaceholderText(/enter your full name/i);
       fireEvent.change(nameInput, { target: { value: '' } });
 
-      const submitButton = screen.getByRole('button', { name: /continue to phone verification/i });
+      const submitButton = screen.getByRole('button', { name: /continue to email verification/i });
       fireEvent.click(submitButton);
 
       expect(await screen.findByText(/please enter your full name/i)).toBeInTheDocument();
@@ -139,14 +150,14 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const phoneInput = screen.getByPlaceholderText(/98765 43210/i);
       fireEvent.change(phoneInput, { target: { value: '9876543210' } });
 
-      const submitButton = screen.getByRole('button', { name: /continue to phone verification/i });
+      const submitButton = screen.getByRole('button', { name: /continue to email verification/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /verify your phone/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
       });
 
-      expect(screen.getByText(/\+919876543210/i)).toBeInTheDocument();
+      expect(screen.getByText(/googleuser@cricket.app/i)).toBeInTheDocument();
     });
 
     it('allows user to return to edit phone number from OTP step', async () => {
@@ -163,15 +174,15 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const phoneInput = screen.getByPlaceholderText(/98765 43210/i);
       fireEvent.change(phoneInput, { target: { value: '9876543210' } });
 
-      const submitButton = screen.getByRole('button', { name: /continue to phone verification/i });
+      const submitButton = screen.getByRole('button', { name: /continue to email verification/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /verify your phone/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
       });
 
-      const changePhoneBtn = screen.getByRole('button', { name: /change phone number/i });
-      fireEvent.click(changePhoneBtn);
+      const changeEmailBtn = screen.getByRole('button', { name: /change email address/i });
+      fireEvent.click(changeEmailBtn);
 
       expect(screen.getByRole('heading', { name: /complete your profile/i })).toBeInTheDocument();
     });
@@ -303,7 +314,6 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
         email: 'googleuser@cricket.app',
         fullName: 'Rahul Google User',
         phone: '+919876543210',
-        phoneVerified: true,
         avatarUrl: mockUploadedUrl,
         dateOfBirth: '2000-01-15',
         locale: 'en',
@@ -332,12 +342,12 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const phoneInput = screen.getByPlaceholderText(/98765 43210/i);
       fireEvent.change(phoneInput, { target: { value: '9876543210' } });
 
-      const submitButton = screen.getByRole('button', { name: /continue to phone verification/i });
+      const submitButton = screen.getByRole('button', { name: /continue to email verification/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
         expect(uploadSpy).toHaveBeenCalledWith('user-google-uuid-52', validFile);
-        expect(screen.getByRole('heading', { name: /verify your phone/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
       });
 
       // Enter OTP
@@ -354,7 +364,6 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
           'user-google-uuid-52',
           expect.objectContaining({
             avatarUrl: mockUploadedUrl,
-            phoneVerified: true,
           }),
         );
       });
@@ -389,7 +398,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const phoneInput = screen.getByPlaceholderText(/98765 43210/i);
       fireEvent.change(phoneInput, { target: { value: '9876543210' } });
 
-      const submitButton = screen.getByRole('button', { name: /continue to phone verification/i });
+      const submitButton = screen.getByRole('button', { name: /continue to email verification/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -401,7 +410,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
 
       // Verify user remains on profile details form and did not progress to OTP step
       expect(screen.getByRole('heading', { name: /complete your profile/i })).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: /verify your phone/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /verify your email/i })).not.toBeInTheDocument();
 
       uploadSpy.mockRestore();
     });
@@ -422,11 +431,11 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       const phoneInput = screen.getByPlaceholderText(/98765 43210/i);
       fireEvent.change(phoneInput, { target: { value: '9876543210' } });
 
-      const submitButton = screen.getByRole('button', { name: /continue to phone verification/i });
+      const submitButton = screen.getByRole('button', { name: /continue to email verification/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /verify your phone/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
       });
 
       return screen.getAllByRole('textbox');
@@ -466,7 +475,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       await waitFor(() => {
         expect(updateProfileSpy).toHaveBeenCalledWith(
           'user-google-uuid-52',
-          expect.objectContaining({ phoneVerified: true }),
+          expect.objectContaining({ fullName: 'Rahul Google User' }),
         );
       });
 
@@ -494,7 +503,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       await waitFor(() => {
         expect(updateProfileSpy).toHaveBeenCalledWith(
           'user-google-uuid-52',
-          expect.objectContaining({ phoneVerified: true }),
+          expect.objectContaining({ fullName: 'Rahul Google User' }),
         );
       });
 
@@ -518,7 +527,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       await waitFor(() => {
         expect(updateProfileSpy).toHaveBeenCalledWith(
           'user-google-uuid-52',
-          expect.objectContaining({ phoneVerified: true }),
+          expect.objectContaining({ fullName: 'Rahul Google User' }),
         );
       });
 
@@ -549,7 +558,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
       await waitFor(() => {
         expect(updateProfileSpy).toHaveBeenCalledWith(
           'user-google-uuid-52',
-          expect.objectContaining({ phoneVerified: true }),
+          expect.objectContaining({ fullName: 'Rahul Google User' }),
         );
       });
 

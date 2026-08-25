@@ -16,6 +16,10 @@ enable_signup = true
 enable_signup = true
 enable_confirmations = false
 
+[auth.email.template.magic_link]
+subject = "Confirm your signup"
+content_path = "./templates/magic_link.html"
+
 [auth.external.google]
 enabled = true
 client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
