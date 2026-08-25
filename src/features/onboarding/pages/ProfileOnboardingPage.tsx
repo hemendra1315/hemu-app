@@ -162,10 +162,12 @@ export default function ProfileOnboardingPage() {
     }
 
     // Upload avatar if a new file was chosen
+    let finalAvatarUrl = avatarUrl;
     if (avatarFile && user?.id) {
       setIsUploadingAvatar(true);
       try {
         const uploadedUrl = await uploadAvatar(user.id, avatarFile);
+        finalAvatarUrl = uploadedUrl;
         setAvatarUrl(uploadedUrl);
         setAvatarFile(null);
       } catch (err) {
@@ -178,11 +180,54 @@ export default function ProfileOnboardingPage() {
       }
     }
 
+    if (!user?.id) {
+      setErrorMessage('User session expired. Please sign in again.');
+      return;
+    }
+
+    // If email is already verified, skip OTP send/verify step entirely
+    if (user.email_confirmed_at) {
+      setIsSendingOtp(true);
+      try {
+        const updatedProfile = await updateMyProfile(user.id, {
+          fullName: fullName.trim(),
+          dateOfBirth,
+          phone: fullPhoneNumber,
+          avatarUrl: finalAvatarUrl.trim() || null,
+        });
+
+        if (profile?.avatarUrl && profile.avatarUrl !== updatedProfile.avatarUrl) {
+          removeAvatar(user.id, profile.avatarUrl).catch(() => {});
+        }
+
+        setProfile(updatedProfile);
+
+        pushToast({
+          title: 'Profile onboarding complete!',
+          description: 'Your profile has been set up successfully.',
+          variant: 'success',
+        });
+
+        const pendingInviteToken = sessionStorage.getItem('pending_owner_invite_token');
+        if (pendingInviteToken) {
+          navigate(`/academy/invite/${pendingInviteToken}`, { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
+      } catch (err: unknown) {
+        console.error('[PFP] profile update result: Failed', err);
+        setErrorMessage(errorMessageText(err));
+      } finally {
+        setIsSendingOtp(false);
+      }
+      return;
+    }
+
     setIsSendingOtp(true);
     try {
       // Trigger Supabase Email OTP send
       const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: user?.email || '',
+        email: user.email || '',
       });
 
       if (otpError) {
@@ -195,7 +240,7 @@ export default function ProfileOnboardingPage() {
       setCountdown(30);
       pushToast({
         title: 'Verification code sent',
-        description: `6-digit code sent to ${user?.email || ''}`,
+        description: `6-digit code sent to ${user.email || ''}`,
         variant: 'info',
       });
     } catch (err: unknown) {
@@ -536,7 +581,15 @@ export default function ProfileOnboardingPage() {
                 disabled={isSendingOtp || isUploadingAvatar}
                 className="w-full font-bold shadow-2xs"
               >
-                <Mail className="mr-2 h-4 w-4" /> Continue to Email Verification
+                {user?.email_confirmed_at ? (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" /> Complete Profile
+                  </>
+                ) : (
+                  <>
+                    <Mail className="mr-2 h-4 w-4" /> Continue to Email Verification
+                  </>
+                )}
               </Button>
             </form>
           ) : (
