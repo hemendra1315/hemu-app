@@ -47,6 +47,19 @@ export async function signInWithPassword(email: string, password: string): Promi
   if (error) throw toApiError(error);
 }
 
+export async function signUpWithPassword(
+  email: string,
+  password: string,
+): Promise<{ session: import('@supabase/supabase-js').Session | null }> {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) throw toApiError(error);
+  return { session: data.session };
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) throw toApiError(error);
