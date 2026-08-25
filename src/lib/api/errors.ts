@@ -44,7 +44,14 @@ export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
 
   if (isPostgrestError(error)) {
-    const code = PG_CODE_MAP[error.code] ?? ApiErrorCode.UNKNOWN;
+    let code = PG_CODE_MAP[error.code];
+    if (!code) {
+      if (error.code.startsWith('PGRST1') || error.code.startsWith('PGRST2')) {
+        code = ApiErrorCode.VALIDATION;
+      } else {
+        code = ApiErrorCode.UNKNOWN;
+      }
+    }
     return new ApiError(code, error.message, { details: error.details });
   }
 

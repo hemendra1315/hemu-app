@@ -177,7 +177,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
     unwrap<any[]>(
       (supabase as any)
@@ -192,7 +192,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
     unwrap<any[]>(
       (supabase as any)
@@ -207,7 +207,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
     unwrap<any[]>(
       (supabase as any)
@@ -224,7 +224,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .or(
           `player_of_match_id.eq.${playerId},best_batter_id.eq.${playerId},best_bowler_id.eq.${playerId},best_fielder_id.eq.${playerId}`,
         )
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
   ]);
 
@@ -381,7 +381,7 @@ export async function fetchPlayerAwards(academyId: UUID, playerId: UUID): Promis
       .or(
         `player_of_match_id.eq.${playerId},best_batter_id.eq.${playerId},best_bowler_id.eq.${playerId},best_fielder_id.eq.${playerId}`,
       )
-      .order('matches.match_date', { ascending: false }),
+      .order('match_date', { foreignTable: 'matches', ascending: false }),
   );
 
   return rows.map((row: any) => {
