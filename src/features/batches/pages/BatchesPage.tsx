@@ -250,7 +250,14 @@ export default function BatchesPage() {
                   <label className="text-fg block text-sm font-medium">Batch name</label>
                   <Input
                     className="h-12 min-h-[44px]"
-                    {...register('name', { required: 'Batch name is required' })}
+                    {...register('name', {
+                      required: 'Batch name is required',
+                      minLength: { value: 2, message: 'Batch name must be at least 2 characters' },
+                      maxLength: {
+                        value: 80,
+                        message: 'Batch name must be 80 characters or fewer',
+                      },
+                    })}
                     hasError={Boolean(errors.name)}
                   />
                   {errors.name ? (
@@ -261,7 +268,10 @@ export default function BatchesPage() {
                   <label className="text-fg block text-sm font-medium">Age group</label>
                   <Input
                     className="h-12 min-h-[44px]"
-                    {...register('ageGroup', { required: 'Age group is required' })}
+                    {...register('ageGroup', {
+                      required: 'Age group is required',
+                      maxLength: { value: 20, message: 'Age group must be 20 characters or fewer' },
+                    })}
                     hasError={Boolean(errors.ageGroup)}
                   />
                   {errors.ageGroup ? (

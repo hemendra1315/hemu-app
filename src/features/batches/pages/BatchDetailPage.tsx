@@ -18,6 +18,7 @@ import {
 import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { useAcademyMembers } from '@/features/members';
+import { errorMessage } from '@/lib/api/errors';
 import { useCan } from '@/lib/rbac';
 import { isUUID } from '@/lib/validators';
 import { useUiStore } from '@/stores';
@@ -212,8 +213,13 @@ export default function BatchDetailPage() {
           {showEditForm && canManage ? (
             <BatchEditForm
               batch={batch}
-              coaches={membersQuery.data?.filter((member) => member.role === 'coach') ?? []}
+              coaches={
+                membersQuery.data?.filter(
+                  (member) => member.role === 'coach' || member.role === 'academy_owner',
+                ) ?? []
+              }
               updateBatch={updateBatch}
+              pushToast={pushToast}
               onSuccess={() => {
                 setShowEditForm(false);
                 pushToast({ title: 'Batch updated', variant: 'success' });
@@ -372,11 +378,17 @@ function BatchEditForm({
   batch,
   coaches,
   updateBatch,
+  pushToast,
   onSuccess,
 }: {
   batch: Batch;
   coaches: Array<{ id: string; fullName: string | null; email: string }>;
   updateBatch: ReturnType<typeof useUpdateBatch>;
+  pushToast: (toast: {
+    title: string;
+    description?: string;
+    variant: 'info' | 'success' | 'warning' | 'error';
+  }) => string;
   onSuccess: () => void;
 }) {
   const initialDays = (batch.trainingDays ?? '')
@@ -407,7 +419,12 @@ function BatchEditForm({
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   };
 
-  const { register, handleSubmit, setValue } = useForm<BatchFormValues>({
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<BatchFormValues>({
     defaultValues: {
       name: batch.name,
       ageGroup: batch.ageGroup,
@@ -442,18 +459,26 @@ function BatchEditForm({
     const formattedDays = selectedDays.join(', ');
     const formattedTime =
       startTime && endTime ? `${formatTimeStr(startTime)} - ${formatTimeStr(endTime)}` : '';
-    await updateBatch.mutateAsync({
-      batchId: batch.id,
-      input: {
-        name: value.name,
-        ageGroup: value.ageGroup,
-        description: value.description || null,
-        trainingDays: formattedDays || null,
-        trainingTime: formattedTime || null,
-        coachId: value.coachId || null,
-      },
-    });
-    onSuccess();
+    try {
+      await updateBatch.mutateAsync({
+        batchId: batch.id,
+        input: {
+          name: value.name,
+          ageGroup: value.ageGroup,
+          description: value.description || null,
+          trainingDays: formattedDays || null,
+          trainingTime: formattedTime || null,
+          coachId: value.coachId || null,
+        },
+      });
+      onSuccess();
+    } catch (error) {
+      pushToast({
+        title: 'Failed to update batch',
+        description: errorMessage(error),
+        variant: 'error',
+      });
+    }
   });
 
   return (
@@ -468,8 +493,14 @@ function BatchEditForm({
                 className="h-12 min-h-[44px]"
                 {...register('name', {
                   required: 'Batch name is required',
+                  minLength: { value: 2, message: 'Batch name must be at least 2 characters' },
+                  maxLength: { value: 80, message: 'Batch name must be 80 characters or fewer' },
                 })}
+                hasError={Boolean(errors.name)}
               />
+              {errors.name ? (
+                <p className="text-danger mt-1 text-xs">{errors.name.message}</p>
+              ) : null}
             </div>
             <div>
               <label className="text-fg block text-sm font-medium">Age group</label>
@@ -477,8 +508,13 @@ function BatchEditForm({
                 className="h-12 min-h-[44px]"
                 {...register('ageGroup', {
                   required: 'Age group is required',
+                  maxLength: { value: 20, message: 'Age group must be 20 characters or fewer' },
                 })}
+                hasError={Boolean(errors.ageGroup)}
               />
+              {errors.ageGroup ? (
+                <p className="text-danger mt-1 text-xs">{errors.ageGroup.message}</p>
+              ) : null}
             </div>
           </div>
 
