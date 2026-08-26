@@ -37,6 +37,22 @@ export function normalizeTrainingDays(value: unknown): string | null {
   return text === '' ? null : text;
 }
 
+/**
+ * `training_days` is a real Postgres `text[]` column, but the create/edit
+ * forms build it as a comma-joined string (e.g. `"Mon, Wed, Fri"`) for
+ * display. Sending that string straight to PostgREST fails with
+ * `malformed array literal` — the column needs an actual array. This
+ * converts the display string back into the array the write path needs.
+ */
+function trainingDaysToArray(value: string | null | undefined): string[] | null {
+  if (!value) return null;
+  const days = value
+    .split(',')
+    .map((day) => day.trim())
+    .filter(Boolean);
+  return days.length > 0 ? days : null;
+}
+
 function toBatch(row: any): Batch {
   return {
     id: row.id,
@@ -105,8 +121,7 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
     name: input.name,
     age_group: input.ageGroup,
     description: input.description && input.description.trim() !== '' ? input.description : null,
-    training_days:
-      input.trainingDays && input.trainingDays.trim() !== '' ? input.trainingDays : null,
+    training_days: trainingDaysToArray(input.trainingDays),
     training_time:
       input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime : null,
     coach_id: input.coachId && input.coachId.trim() !== '' ? input.coachId : null,
@@ -169,8 +184,7 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
     name: input.name,
     age_group: input.ageGroup,
     description: input.description && input.description.trim() !== '' ? input.description : null,
-    training_days:
-      input.trainingDays && input.trainingDays.trim() !== '' ? input.trainingDays : null,
+    training_days: trainingDaysToArray(input.trainingDays),
     training_time:
       input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime : null,
     coach_id: input.coachId && input.coachId.trim() !== '' ? input.coachId : null,
