@@ -9,6 +9,34 @@ import type { Batch, BatchPlayer, CreateBatchInput, UpdateBatchInput } from './b
 // inner `profiles` embed must use `academy_members_user_id_fkey` explicitly.
 const BATCH_COLUMNS = `id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at, coach:academy_members!batches_coach_id_fkey(id, role, status, profiles!academy_members_user_id_fkey(full_name, email, avatar_url))`;
 
+/**
+ * `batches.training_days` is a comma-separated string per migration 0005, and
+ * the `Batch` type promises `string | null`. Reality disagrees in two ways:
+ * the demo-data seeder inserts `ARRAY['Mon','Wed','Fri']`, and a database whose
+ * column is `text[]` hands PostgREST a real JS array. Either way, consumers
+ * calling `.split(',')` — the Batch detail page and its edit form — throw
+ * `trainingDays.split is not a function` and take the whole screen down.
+ *
+ * Normalising here, at the single mapping boundary, means every consumer gets
+ * the string the type advertises whichever shape the column actually holds.
+ */
+export function normalizeTrainingDays(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+
+  const join = (parts: string[]) => {
+    const cleaned = parts.map((part) => part.replace(/^"|"$/g, '').trim()).filter(Boolean);
+    return cleaned.length > 0 ? cleaned.join(', ') : null;
+  };
+
+  if (Array.isArray(value)) return join(value.map((part) => String(part)));
+
+  const text = String(value).trim();
+  // A text[] coerced into a text column stores the literal `{Mon,Wed,Fri}`.
+  if (text.startsWith('{') && text.endsWith('}')) return join(text.slice(1, -1).split(','));
+
+  return text === '' ? null : text;
+}
+
 function toBatch(row: any): Batch {
   return {
     id: row.id,
@@ -16,7 +44,7 @@ function toBatch(row: any): Batch {
     name: row.name,
     ageGroup: row.age_group,
     description: row.description,
-    trainingDays: row.training_days,
+    trainingDays: normalizeTrainingDays(row.training_days),
     trainingTime: row.training_time,
     coachId: row.coach_id,
     createdAt: row.created_at,
@@ -126,7 +154,7 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
     name: insertedRow.name,
     ageGroup: insertedRow.age_group,
     description: insertedRow.description ?? null,
-    trainingDays: insertedRow.training_days ?? null,
+    trainingDays: normalizeTrainingDays(insertedRow.training_days),
     trainingTime: insertedRow.training_time ?? null,
     coachId: insertedRow.coach_id ?? null,
     createdAt: insertedRow.created_at,
@@ -191,7 +219,7 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
     name: updatedRow.name,
     ageGroup: updatedRow.age_group,
     description: updatedRow.description ?? null,
-    trainingDays: updatedRow.training_days ?? null,
+    trainingDays: normalizeTrainingDays(updatedRow.training_days),
     trainingTime: updatedRow.training_time ?? null,
     coachId: updatedRow.coach_id ?? null,
     createdAt: updatedRow.created_at,

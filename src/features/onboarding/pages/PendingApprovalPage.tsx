@@ -1,4 +1,5 @@
 import { Clock, RefreshCw } from 'lucide-react';
+import { useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 
 import { EmptyState } from '@/components/feedback';
@@ -13,6 +14,17 @@ export default function PendingApprovalPage() {
   const { pendingRequests, pending, hasAnyAcademy, active } = useMemberships();
   const { profile } = useAuth();
   const identity = useIdentity();
+
+  /**
+   * Poll while the user sits here. Approval happens on someone else's screen,
+   * so without this the only way out is to press a button or restart the app —
+   * and a person waiting on someone else has no idea when to press it.
+   */
+  const { refetch } = identity;
+  useEffect(() => {
+    const timer = setInterval(() => void refetch(), 10_000);
+    return () => clearInterval(timer);
+  }, [refetch]);
 
   const activeMembership = active[0];
   if (hasAnyAcademy && activeMembership)

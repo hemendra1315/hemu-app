@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { unwrap } from '@/lib/api';
+import { normalizeTrainingDays } from '@/features/batches';
 import { supabase } from '@/lib/supabase/client';
 import type { UUID } from '@/types';
 import {
@@ -422,7 +423,8 @@ export async function fetchCoachDashboardAnalytics(academyId: UUID, coachId: UUI
     name: batch.name,
     ageGroup: batch.age_group,
     playerCount: batch.player_count?.[0]?.count ?? 0,
-    trainingDays: batch.training_days,
+    // Same column-shape hazard as the batches feature — see normalizeTrainingDays.
+    trainingDays: normalizeTrainingDays(batch.training_days),
     trainingTime: batch.training_time,
   }));
 

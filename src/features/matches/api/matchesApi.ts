@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { unwrap, unwrapVoid } from '@/lib/api';
+import { rpc, unwrap, unwrapVoid } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import type { UUID } from '@/types';
 import type {
@@ -581,6 +581,66 @@ export async function fetchMatchCoachNotes(matchId: UUID): Promise<MatchCoachNot
   );
 
   return rows.map(toMatchCoachNote);
+}
+
+/**
+ * Coach notes are written outside `save_match_result` on purpose: a coach
+ * often adds these days after the match, and they should never block or
+ * complicate the score-entry transaction. `match_coach_notes` already has a
+ * unique (match_id, academy_member_id) constraint and an RLS policy that
+ * only lets staff of the match's academy write here, so a plain upsert is
+ * enough — no RPC required. An empty note deletes the row rather than
+ * storing a blank string.
+ */
+export async function saveMatchCoachNote(
+  matchId: UUID,
+  academyId: UUID,
+  academyMemberId: UUID,
+  notes: string,
+): Promise<MatchCoachNote | null> {
+  const trimmed = notes.trim();
+
+  if (!trimmed) {
+    await unwrapVoid(
+      (supabase as any)
+        .from('match_coach_notes')
+        .delete()
+        .eq('match_id', matchId)
+        .eq('academy_member_id', academyMemberId),
+    );
+    return null;
+  }
+
+  // `coach_id` records who wrote the note; `my_player_id` resolves the
+  // caller's own academy_members row for this academy (same helper the stats
+  // RPCs use for "which member am I").
+  const coachId = await rpc<string>('my_player_id', { p_academy: academyId });
+
+  const row = await unwrap<any>(
+    (supabase as any)
+      .from('match_coach_notes')
+      .upsert(
+        {
+          match_id: matchId,
+          academy_member_id: academyMemberId,
+          coach_id: coachId,
+          notes: trimmed,
+        },
+        { onConflict: 'match_id,academy_member_id' },
+      )
+      .select(
+        `
+        id, match_id, academy_member_id, coach_id, notes,
+        coach:coach_id(
+          id,
+          profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url)
+        )
+      `,
+      )
+      .single(),
+  );
+
+  return toMatchCoachNote(row);
 }
 
 // ============================================================

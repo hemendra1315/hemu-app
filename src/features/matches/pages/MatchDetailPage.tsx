@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui';
 import { ErrorState, EmptyState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { isUUID } from '@/lib/validators';
+import { MatchCoachNotesCard } from '../components/MatchCoachNotesCard';
 import {
   useMatch,
   useMatchLineups,
@@ -368,6 +369,14 @@ export default function MatchDetailPage() {
           )}
         </CardBody>
       </Card>
+
+      {academyId && (
+        <MatchCoachNotesCard
+          matchId={matchId}
+          academyId={academyId}
+          lineups={lineupsQuery.data ?? []}
+        />
+      )}
     </div>
   );
 }

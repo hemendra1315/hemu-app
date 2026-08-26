@@ -35,9 +35,25 @@ vi.mock('@/lib/supabase/client', () => {
     return {};
   });
 
+  const rpcMock = vi.fn().mockResolvedValue({
+    data: {
+      id: 'ann-123',
+      academy_id: 'acad-123',
+      title: 'Test Announcement',
+      message: 'This is a test.',
+      audience: 'all',
+      batch_id: null,
+      created_by: 'user-owner-123',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    error: null,
+  });
+
   return {
     supabase: {
       from: fromMock,
+      rpc: rpcMock,
     },
   };
 });
@@ -74,7 +90,15 @@ describe('Announcements & Notifications Architecture', () => {
     const result = await announcementsApi.createAnnouncement(payload);
 
     expect(result.id).toBe('ann-123');
-    expect(supabase.from).toHaveBeenCalledWith('announcements');
+    expect(supabase.rpc).toHaveBeenCalledWith('create_announcement_with_targets', {
+      p_academy_id: 'acad-123',
+      p_title: 'Ground closed tomorrow',
+      p_message: 'Due to rain, no session tomorrow.',
+      p_audience: 'all',
+      p_batch_id: null,
+      p_batch_ids: [],
+      p_member_ids: [],
+    });
   });
 
   it('verifies that the API throws error if tenant ID is spoofed (architecture check)', async () => {
@@ -96,14 +120,8 @@ describe('Announcements & Notifications Architecture', () => {
       },
     });
 
-    // Temporarily mock it to simulate RLS failure
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementationOnce(() => ({
-      insert: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: mockRpcFail,
-        }),
-      }),
-    }));
+    // Temporarily mock rpc to simulate RLS failure
+    (supabase.rpc as ReturnType<typeof vi.fn>).mockImplementationOnce(mockRpcFail);
 
     await expect(announcementsApi.createAnnouncement(payload)).rejects.toThrow(
       'new row violates row-level security policy for table "announcements"',

@@ -31,7 +31,17 @@ export function useIdentity() {
 
   const query = useQuery<Identity>({
     queryKey: queryKeys.identity(userId ?? 'anonymous'),
-    enabled: Boolean(userId && email) && useAuthStore.getState().identityStatus !== 'ready',
+    /**
+     * Enabled for as long as someone is signed in.
+     *
+     * This used to switch off the moment `identityStatus` reached 'ready',
+     * which froze identity for the rest of the session: a join request approved
+     * after sign-in, a role changed by an owner, or an academy added could never
+     * reach the running app. "Check again" on the pending screen had nothing
+     * left to call. Logout safety does not depend on this — `reset()` clears the
+     * user, which disables the query through `userId` below.
+     */
+    enabled: Boolean(userId && email),
     staleTime: 30_000,
     queryFn: async () => {
       // Non-null: the query is disabled until both are present.
@@ -57,7 +67,13 @@ export function useIdentity() {
 
   useEffect(() => {
     if (!userId) return;
-    if (useAuthStore.getState().identityStatus === 'ready') return;
+    // No early return once 'ready': every successful load, including a refetch
+    // triggered by "Check again", must reach the store. Bailing here was the
+    // second half of the frozen-identity bug — even when the query did run, the
+    // fresh memberships were thrown away.
+    //
+    // `isPending` is only true when there is no data at all, so a background
+    // refetch cannot flash the app back to a loading screen mid-session.
     if (isPending) {
       setIdentityStatus('loading');
       return;

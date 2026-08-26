@@ -137,7 +137,7 @@ export default function MembersPage() {
             onClick={() => setIsAddModalOpen(true)}
             className="min-h-[44px] shrink-0 rounded-[10px] px-4 text-xs font-bold shadow-2xs"
           >
-            <Plus className="mr-1.5 h-4 w-4" /> Add Player
+            <Plus className="mr-1.5 h-4 w-4" /> Add People
           </Button>
         )}
       </div>
@@ -330,15 +330,20 @@ export default function MembersPage() {
         )}
       </div>
 
-      {/* ADD PLAYER MODAL */}
+      {/* ADD PEOPLE MODAL */}
       {isAddModalOpen && (
-        <Modal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add Player">
-          <div className="space-y-4 p-1">
-            <p className="text-fg-muted font-sans text-sm">
-              Share this Join Code with your players. When they sign up or enter this code in the
-              app, they will be automatically assigned to this academy.
-            </p>
-            <JoinCodeCard academyId={academyId} />
+        <Modal open={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add People">
+          <div className="space-y-5 p-1">
+            {JOINABLE_ROLES.map((role) => (
+              <div key={role} className="space-y-2">
+                <p className="text-fg-muted font-sans text-sm">
+                  {role === 'coach'
+                    ? "Share this code with a coach. When they sign up or enter it in the app, they'll get a coach join request for you to approve."
+                    : 'Share this Join Code with your players. When they sign up or enter this code in the app, they will be automatically assigned to this academy.'}
+                </p>
+                <JoinCodeCard academyId={academyId} role={role} />
+              </div>
+            ))}
             <div className="flex justify-end pt-2">
               <Button
                 variant="secondary"

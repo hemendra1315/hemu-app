@@ -36,6 +36,7 @@ import {
   fetchPlayerStatistics,
   fetchPlayerStatisticsById,
   refreshAcademyRecords,
+  saveMatchCoachNote,
   saveMatchResult,
   updateMatch,
 } from '../api/matchesApi';
@@ -146,6 +147,18 @@ export function useMatchCoachNotes(matchId: UUID | null) {
     queryKey: queryKeys.academy.matchCoachNotes(matchId ?? 'none'),
     enabled: Boolean(matchId) && isUUID(matchId ?? ''),
     queryFn: () => fetchMatchCoachNotes(matchId as UUID),
+  });
+}
+
+/** Upserts (or, on a blank note, deletes) one player's coach note for a match. */
+export function useSaveMatchCoachNote(matchId: UUID, academyId: UUID) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ academyMemberId, notes }: { academyMemberId: UUID; notes: string }) =>
+      saveMatchCoachNote(matchId, academyId, academyMemberId, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.academy.matchCoachNotes(matchId) });
+    },
   });
 }
 
