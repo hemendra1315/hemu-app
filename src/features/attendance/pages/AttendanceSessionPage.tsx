@@ -318,6 +318,7 @@ export default function AttendanceSessionPage() {
       ) : (
         <div className="border-border-subtle bg-surface divide-border-subtle/60 divide-y overflow-hidden rounded-xl border shadow-2xs">
           {batchPlayersQuery.data?.map((player) => {
+            const hasRecordedStatus = attendanceByPlayer.has(player.academyMemberId);
             const currentStatus = attendanceByPlayer.get(player.academyMemberId) ?? 'absent';
             const queuedItem = queuedByPlayer.get(player.academyMemberId);
             const isPlayerSaving =
@@ -382,7 +383,7 @@ export default function AttendanceSessionPage() {
                         key={option.value}
                         disabled={isPlayerSaving}
                         onClick={async () => {
-                          if (isSelected || isPlayerSaving) return;
+                          if ((hasRecordedStatus && isSelected) || isPlayerSaving) return;
                           await handleMark(player.academyMemberId, option.value);
                         }}
                         className={`border-border-subtle flex h-11 min-h-[44px] min-w-[70px] shrink-0 items-center justify-center rounded-[10px] border px-3 text-xs font-bold transition-all ${btnStyle}`}
