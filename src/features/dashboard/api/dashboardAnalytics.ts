@@ -2,6 +2,7 @@
 import { unwrap } from '@/lib/api';
 import { normalizeTrainingDays } from '@/features/batches';
 import { supabase } from '@/lib/supabase/client';
+import { toIsoDate } from '@/lib/utils/date';
 import type { UUID } from '@/types';
 import {
   fetchPlayerStatistics,
@@ -31,8 +32,13 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
     topBattersResult,
     topBowlersResult,
     topFieldersResult,
-    academyRecordsResult,
+    // NOTE: these two must stay in this order — the Promise.all below resolves
+    // "Today's Sessions" *before* "Academy records". They were previously
+    // swapped here, which silently fed academy_records rows into todaySessions
+    // (and vice versa), so the owner dashboard's "Today's Sessions" KPI, its
+    // "Players Expected" total and its session list were always empty.
     todaySessionsResult,
+    academyRecordsResult,
   ] = await Promise.all([
     // Total active players
     unwrap<any[]>(
@@ -64,9 +70,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .gte(
           'training_sessions.session_date',
-          new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1)
-            .toISOString()
-            .split('T')[0],
+          toIsoDate(new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1)),
         ),
     ),
     // Sessions this week
@@ -75,14 +79,8 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .from('training_sessions')
         .select('id')
         .eq('academy_id', academyId)
-        .gte(
-          'session_date',
-          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        )
-        .lte(
-          'session_date',
-          new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        ),
+        .gte('session_date', toIsoDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)))
+        .lte('session_date', toIsoDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))),
     ),
     // Recent matches
     unwrap<any[]>(
@@ -102,7 +100,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         )
         .eq('academy_id', academyId)
         .eq('status', 'scheduled')
-        .gte('session_date', new Date().toISOString().split('T')[0])
+        .gte('session_date', toIsoDate(new Date()))
         .order('session_date', { ascending: true })
         .limit(5),
     ),
@@ -156,7 +154,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
           'id, title, session_date, start_at, end_at, batch_id, coach_id, status, batches (name, player_count:batch_members(count)), academy_members!training_sessions_coach_id_fkey(id, profiles!academy_members_user_id_fkey(full_name)), attendance_count:attendance(count)',
         )
         .eq('academy_id', academyId)
-        .eq('session_date', new Date().toISOString().split('T')[0])
+        .eq('session_date', toIsoDate(new Date()))
         .neq('status', 'cancelled')
         .order('start_at', { ascending: true }),
     ),
@@ -360,7 +358,7 @@ export async function fetchCoachDashboardAnalytics(academyId: UUID, coachId: UUI
         .select('id, title, start_at, end_at, batch_id, batches(name)')
         .eq('academy_id', academyId)
         .eq('coach_id', coachId)
-        .eq('session_date', new Date().toISOString().split('T')[0])
+        .eq('session_date', toIsoDate(new Date()))
         .neq('status', 'cancelled')
         .order('start_at', { ascending: true })
         .limit(1),
@@ -566,7 +564,7 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
         )
         .eq('academy_id', academyId)
         .eq('status', 'scheduled')
-        .gte('session_date', new Date().toISOString().split('T')[0])
+        .gte('session_date', toIsoDate(new Date()))
         .order('session_date', { ascending: true })
         .limit(3),
     ),

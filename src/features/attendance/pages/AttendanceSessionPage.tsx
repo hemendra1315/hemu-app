@@ -147,14 +147,16 @@ export default function AttendanceSessionPage() {
   const counts = useMemo(() => {
     let present = 0;
     let absent = 0;
+    let unmarked = 0;
     if (batchPlayersQuery.data) {
       for (const p of batchPlayersQuery.data) {
-        const status = attendanceByPlayer.get(p.academyMemberId) ?? 'absent';
+        const status = attendanceByPlayer.get(p.academyMemberId);
         if (status === 'present') present++;
-        else absent++;
+        else if (status === 'absent') absent++;
+        else unmarked++;
       }
     }
-    return { present, absent, total: totalPlayers };
+    return { present, absent, unmarked, total: totalPlayers };
   }, [batchPlayersQuery.data, attendanceByPlayer, totalPlayers]);
 
   if (!academyId || !sessionId) {
@@ -268,8 +270,8 @@ export default function AttendanceSessionPage() {
         </div>
       )}
 
-      {/* 2. Summary Strip (3 columns scorecard) */}
-      <div className="border-border-subtle bg-surface divide-border-subtle grid grid-cols-3 divide-x overflow-hidden rounded-xl border shadow-2xs">
+      {/* 2. Summary Strip (4 columns scorecard) */}
+      <div className="border-border-subtle bg-surface divide-border-subtle grid grid-cols-4 divide-x overflow-hidden rounded-xl border shadow-2xs">
         <div className="flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
           <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
             Present
@@ -284,6 +286,14 @@ export default function AttendanceSessionPage() {
           </span>
           <span className="text-error mt-0.5 font-mono text-base font-extrabold">
             {counts.absent}
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
+          <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
+            Unmarked
+          </span>
+          <span className="text-fg-muted mt-0.5 font-mono text-base font-extrabold">
+            {counts.unmarked}
           </span>
         </div>
         <div className="bg-surface-muted/30 flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
@@ -319,7 +329,7 @@ export default function AttendanceSessionPage() {
         <div className="border-border-subtle bg-surface divide-border-subtle/60 divide-y overflow-hidden rounded-xl border shadow-2xs">
           {batchPlayersQuery.data?.map((player) => {
             const hasRecordedStatus = attendanceByPlayer.has(player.academyMemberId);
-            const currentStatus = attendanceByPlayer.get(player.academyMemberId) ?? 'absent';
+            const currentStatus = attendanceByPlayer.get(player.academyMemberId);
             const queuedItem = queuedByPlayer.get(player.academyMemberId);
             const isPlayerSaving =
               markAttendance.isPending &&

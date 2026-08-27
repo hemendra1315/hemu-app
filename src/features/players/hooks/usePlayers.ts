@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/keys';
 import { supabase } from '@/lib/supabase/client';
 import { isUUID } from '@/lib/validators';
+import { toIsoDate } from '@/lib/utils/date';
 import type { UUID } from '@/types';
 import type {
   PlayerCareerHighlight,
@@ -218,7 +219,7 @@ export function usePlayerUpcomingSessions(playerId: UUID | null, academyId: UUID
         )
         .eq('academy_id', academyId)
         .eq('status', 'scheduled')
-        .gte('session_date', new Date().toISOString().split('T')[0])
+        .gte('session_date', toIsoDate(new Date()))
         .order('session_date', { ascending: true })
         .limit(5);
 

@@ -1,5 +1,6 @@
 import type { MatchFormat, MatchResult, MatchType } from '@/types/enums';
 import type { ExtractedInnings, ExtractedMatchData } from './cricheroesPdfTypes';
+import { toIsoDate } from '@/lib/utils/date';
 
 /**
  * Text-based CricHeroes PDF parser.
@@ -14,7 +15,7 @@ export function parseCricHeroesText(text: string): ExtractedMatchData {
   // Bug 2 fix: initialize to '' so the firstLine fallback can run.
   // The final return uses `matchName || 'CricHeroes Match'` as the ultimate default.
   let matchName = '';
-  let matchDate = new Date().toISOString().split('T')[0] ?? '';
+  let matchDate = toIsoDate(new Date());
   const venue = '';
   const tournament = '';
   let format: MatchFormat = 't20';
@@ -41,7 +42,13 @@ export function parseCricHeroesText(text: string): ExtractedMatchData {
     try {
       const d = new Date(dateMatch[0]);
       if (!isNaN(d.getTime())) {
-        const formatted = d.toISOString().split('T')[0];
+        // toIsoDate reads the date back in the academy's local timezone rather
+        // than UTC: `new Date('15-Aug-2024')` parses as *local* midnight, so
+        // anchoring the formatted string to UTC (the old `.toISOString()...`
+        // here) rolled it back to the previous day for anyone east of UTC
+        // (all of India). toIsoDate gives the same calendar day back for both
+        // this local-midnight case and the UTC-midnight ISO-date-string case.
+        const formatted = toIsoDate(d);
         if (formatted) matchDate = formatted;
       }
     } catch {

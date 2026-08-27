@@ -1,5 +1,6 @@
 import type { UUID } from '@/types';
 import type { MatchFormat, MatchResult, MatchType } from '@/types/enums';
+import { toIsoDate } from '@/lib/utils/date';
 
 /** Sentinel batting_order value meaning "Opening" */
 export const BATTING_ORDER_OPENING = 0;
@@ -87,7 +88,7 @@ export type WizardState = {
 
 export const INITIAL_WIZARD_STATE: WizardState = {
   matchName: '',
-  matchDate: new Date().toISOString().split('T')[0] ?? '',
+  matchDate: toIsoDate(new Date()),
   opponentName: '',
   venue: '',
   matchType: 'friendly',

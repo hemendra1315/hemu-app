@@ -4,7 +4,7 @@ import { GraduationCap, UserCheck, Building2, ChevronRight, Users } from 'lucide
 
 import { Modal, Select } from '@/components/ui';
 import { useAcademyStore, useAuthStore, useTestModeStore, useUiStore } from '@/stores';
-import { useMemberships } from '@/features/academies';
+import { useActiveAcademy, useMemberships } from '@/features/academies';
 import { usePlatformAcademies } from '@/features/admin/hooks/useAdmin';
 import type { PlatformAcademy } from '@/features/admin/api/adminApi';
 import type { TestModeRole } from '@/stores/testModeStore';
@@ -35,7 +35,12 @@ export function TestAppAsModal({ open, onClose }: TestAppAsModalProps) {
   const navigate = useNavigate();
   const selectId = useId();
   const pushToast = useUiStore((state) => state.pushToast);
-  const activeAcademyId = useAcademyStore((state) => state.activeAcademyId);
+  // Resolved (not the raw store value): `academyStore.activeAcademyId` is null
+  // until the user explicitly switches academies, while the dashboards fall back
+  // to the first active membership. Reading the store directly made this modal
+  // default to the first *platform* academy rather than the one actually being
+  // viewed, so a preview silently targeted the wrong academy.
+  const { academyId: activeAcademyId } = useActiveAcademy();
   const setActiveAcademy = useAcademyStore((state) => state.setActiveAcademy);
   const setTestMode = useTestModeStore((state) => state.setTestMode);
   const isSuperAdmin = useAuthStore((state) => state.profile?.isSuperAdmin === true);
@@ -67,19 +72,37 @@ export function TestAppAsModal({ open, onClose }: TestAppAsModalProps) {
       setActiveAcademy(currentSelectedId);
     }
 
-    setTestMode(role, currentSelectedId);
     onClose();
 
     const roleLabel = ROLE_LABELS[role];
     const targetPath = ROLE_PATHS[role];
+
+    /**
+     * Navigate BEFORE flipping the role — the order matters and is not
+     * cosmetic.
+     *
+     * The route change and the role change are not applied in one commit, so
+     * there is an intermediate render, and whichever guard is mounted for it
+     * decides whether we survive. Setting the role first meant the page being
+     * left re-evaluated *itself* against the new role: leaving the owner
+     * dashboard as "coach" failed its own `RequireRole allow={['academy_owner',
+     * 'super_admin']}`, which fired `<Navigate to="/forbidden" replace />` and
+     * clobbered this navigation. Test App As therefore landed on 403 for every
+     * role except the one whose home you already happened to be on.
+     *
+     * Going to the destination first makes the intermediate state "super admin,
+     * test mode off", which every route permits (`effectiveSuperAdmin`), and
+     * the final state is the test role on its own home route, which that route
+     * permits by definition. Neither intermediate can fail.
+     */
+    navigate(targetPath);
+    setTestMode(role, currentSelectedId);
 
     pushToast({
       title: '🧪 Test Mode Active',
       description: `Now viewing application as ${roleLabel}`,
       variant: 'info',
     });
-
-    navigate(targetPath);
   };
 
   return (

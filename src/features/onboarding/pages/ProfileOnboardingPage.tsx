@@ -8,6 +8,7 @@ import { isProfileComplete } from '@/features/auth/utils/profileCompletion';
 import { pickImageFile } from '@/lib/media';
 import { supabase } from '@/lib/supabase/client';
 import { errorMessage as errorMessageText } from '@/lib/api/errors';
+import { toIsoDate } from '@/lib/utils/date';
 import { useAuthStore, useUiStore } from '@/stores';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
@@ -65,7 +66,7 @@ export default function ProfileOnboardingPage() {
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   // Max DOB is today, min DOB is 100 years ago
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = toIsoDate(new Date());
 
   // File picker handler
   const handlePickPhoto = async () => {

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { UserPlus, Sparkles, UserCheck, Settings, Building2, FlaskConical } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
-import { useAcademyStore, useAuthStore, useTestModeStore } from '@/stores';
+import { useAuthStore, useTestModeStore } from '@/stores';
+import { useActiveAcademy } from '@/features/academies';
 import { AddMemberModal } from './AddMemberModal';
 import { AddCoachModal } from './AddCoachModal';
 import { SeedDemoDataModal } from './SeedDemoDataModal';
@@ -9,7 +10,12 @@ import { TestAppAsModal } from './TestAppAsModal';
 
 export function SuperAdminAcademyActions() {
   const isSuperAdmin = useAuthStore((s) => s.profile?.isSuperAdmin === true);
-  const activeAcademyId = useAcademyStore((s) => s.activeAcademyId);
+  // Resolve through useActiveAcademy, not the raw `academyStore.activeAcademyId`.
+  // The store stays null until the user explicitly switches academies, while the
+  // dashboards themselves fall back to the first active membership — so reading
+  // the store directly hid this whole panel (Add Member / Add Coach / Seed Demo
+  // Data / Test App As) from any super admin who never touched the switcher.
+  const { academyId: activeAcademyId } = useActiveAcademy();
   const testModeRole = useTestModeStore((s) => s.activeRole);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -107,7 +113,7 @@ export function SuperAdminAcademyActions() {
                   🧪 Test App As
                 </p>
                 <p className="text-xs text-purple-600/80 dark:text-purple-300/80">
-                  Preview as Student, Coach, or Academy Owner
+                  Preview as Student, Coach, Academy Owner, or Parent
                 </p>
               </div>
             </button>

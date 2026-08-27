@@ -5,6 +5,7 @@ import { Badge, Button } from '@/components/ui';
 import { EmptyState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { isUUID } from '@/lib/validators';
+import { formatDate, formatTime } from '@/lib/utils/date';
 import {
   usePlayerProfile,
   usePlayerStatistics,
@@ -404,8 +405,8 @@ function OverviewTab({
                 <div key={session.id} className="p-3.5">
                   <p className="text-fg text-xs font-bold">{session.title}</p>
                   <p className="text-fg-muted mt-0.5 font-mono text-[11px]">
-                    {new Date(session.sessionDate).toLocaleDateString()} • {session.startAt} -{' '}
-                    {session.endAt}
+                    {formatDate(session.sessionDate)} • {formatTime(session.startAt)} -{' '}
+                    {formatTime(session.endAt)}
                   </p>
                   {session.ground && (
                     <p className="text-fg-muted mt-0.5 text-[11px]">Ground: {session.ground}</p>
