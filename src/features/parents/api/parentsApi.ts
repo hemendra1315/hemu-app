@@ -16,12 +16,13 @@ export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[
   if (!isUUID(academyId)) return [];
 
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('parent_player_links')
       .select('id, relationship_type, player_user_id, academy_members!inner(id)')
       .eq('academy_id', academyId)
       .eq('status', 'active')
-      .eq('academy_members.academy_id', academyId),
+      .eq('academy_members.academy_id', academyId)
+      .returns<any[]>(),
   );
 
   const children: LinkedChild[] = [];

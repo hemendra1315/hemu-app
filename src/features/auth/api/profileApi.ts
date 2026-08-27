@@ -83,8 +83,7 @@ export type UpdateProfileInput = {
 
 export async function updateMyProfile(userId: UUID, input: UpdateProfileInput): Promise<Profile> {
   const row = await unwrap<ProfileRow>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    supabase
       .from('profiles')
       .update({
         ...(input.fullName === undefined ? null : { full_name: input.fullName }),
@@ -97,7 +96,8 @@ export async function updateMyProfile(userId: UUID, input: UpdateProfileInput): 
       })
       .eq('id', userId)
       .select(PROFILE_COLUMNS)
-      .single(),
+      .single()
+      .returns<ProfileRow>(),
   );
   return toProfile(row);
 }

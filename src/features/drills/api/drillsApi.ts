@@ -95,11 +95,12 @@ function toDrillAssignment(row: any): DrillAssignment {
 
 export async function fetchAcademyDrills(academyId: UUID): Promise<Drill[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('drills')
       .select(DRILL_COLUMNS)
       .eq('academy_id', academyId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .returns<any[]>(),
   );
   return rows.map(toDrill);
 }
@@ -109,7 +110,7 @@ export async function createDrill(input: CreateDrillInput): Promise<Drill> {
     data: { user },
   } = await supabase.auth.getUser();
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('drills')
       .insert({
         academy_id: input.academyId,
@@ -121,14 +122,15 @@ export async function createDrill(input: CreateDrillInput): Promise<Drill> {
         created_by: user?.id ?? null,
       })
       .select(DRILL_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toDrill(row);
 }
 
 export async function updateDrill(drillId: UUID, input: UpdateDrillInput): Promise<Drill> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('drills')
       .update({
         name: input.name,
@@ -139,22 +141,24 @@ export async function updateDrill(drillId: UUID, input: UpdateDrillInput): Promi
       })
       .eq('id', drillId)
       .select(DRILL_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toDrill(row);
 }
 
 export async function deleteDrill(drillId: UUID): Promise<void> {
-  await unwrapVoid((supabase as any).from('drills').delete().eq('id', drillId));
+  await unwrapVoid(supabase.from('drills').delete().eq('id', drillId));
 }
 
 export async function fetchDrillAssignments(academyId: UUID): Promise<DrillAssignment[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('drill_assignments')
       .select(ASSIGNMENT_COLUMNS)
       .eq('academy_id', academyId)
-      .order('assigned_at', { ascending: false }),
+      .order('assigned_at', { ascending: false })
+      .returns<any[]>(),
   );
   return rows.map(toDrillAssignment);
 }
@@ -164,12 +168,13 @@ export async function fetchPlayerDrillAssignments(
   academyId: UUID,
 ): Promise<DrillAssignment[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('drill_assignments')
       .select(ASSIGNMENT_COLUMNS)
       .eq('academy_id', academyId)
       .eq('player_id', playerId)
-      .order('assigned_at', { ascending: false }),
+      .order('assigned_at', { ascending: false })
+      .returns<any[]>(),
   );
   return rows.map(toDrillAssignment);
 }
@@ -179,7 +184,7 @@ export async function assignDrill(input: CreateDrillAssignmentInput): Promise<Dr
     data: { user },
   } = await supabase.auth.getUser();
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('drill_assignments')
       .insert({
         academy_id: input.academyId,
@@ -192,7 +197,8 @@ export async function assignDrill(input: CreateDrillAssignmentInput): Promise<Dr
         created_by: user?.id ?? null,
       })
       .select(ASSIGNMENT_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toDrillAssignment(row);
 }
@@ -202,7 +208,7 @@ export async function updateDrillAssignment(
   input: UpdateDrillAssignmentInput,
 ): Promise<DrillAssignment> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('drill_assignments')
       .update({
         status: input.status,
@@ -210,11 +216,12 @@ export async function updateDrillAssignment(
       })
       .eq('id', assignmentId)
       .select(ASSIGNMENT_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toDrillAssignment(row);
 }
 
 export async function deleteDrillAssignment(assignmentId: UUID): Promise<void> {
-  await unwrapVoid((supabase as any).from('drill_assignments').delete().eq('id', assignmentId));
+  await unwrapVoid(supabase.from('drill_assignments').delete().eq('id', assignmentId));
 }

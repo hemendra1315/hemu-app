@@ -25,11 +25,11 @@ export async function fetchPlayerProfile(academyId: UUID, playerId: UUID): Promi
     throw new Error('Player not found');
   }
   const row = await unwrapMaybe<any>(
-    (supabase as any)
+    supabase
       .from('academy_members')
       .select(
         `
-        id, academy_id, user_id, role, status, joined_at, 
+        id, academy_id, user_id, role, status, joined_at,
         player_code, batting_style, bowling_style, player_role, jersey_number, bio,
         profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url, phone),
         batch_members!left(batch_id, joined_at, batches!inner(id, name)),
@@ -39,7 +39,8 @@ export async function fetchPlayerProfile(academyId: UUID, playerId: UUID): Promi
       .eq('academy_id', academyId)
       .eq('id', playerId)
       .order('joined_at', { foreignTable: 'batch_members', ascending: false })
-      .maybeSingle(),
+      .maybeSingle()
+      .returns<any>(),
   );
 
   if (!row) {
@@ -97,11 +98,7 @@ export async function updateCricketProfile(
   if (Object.keys(payload).length === 0) return;
 
   await unwrap(
-    (supabase as any)
-      .from('academy_members')
-      .update(payload)
-      .eq('academy_id', academyId)
-      .eq('id', playerId),
+    supabase.from('academy_members').update(payload).eq('academy_id', academyId).eq('id', playerId),
   );
 }
 
@@ -114,12 +111,13 @@ export async function fetchPlayerStatistics(
   playerId: UUID,
 ): Promise<PlayerStatistics | null> {
   const row = await unwrapMaybe<any>(
-    (supabase as any)
+    supabase
       .from('player_statistics')
       .select('*')
       .eq('academy_id', academyId)
       .eq('player_id', playerId)
-      .maybeSingle(),
+      .maybeSingle()
+      .returns<any>(),
   );
 
   if (!row) return null;
@@ -165,7 +163,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
 
   const [battingRows, bowlingRows, fieldingRows, awardsRows] = await Promise.all([
     unwrap<any[]>(
-      (supabase as any)
+      supabase
         .from('match_batting')
         .select(
           `
@@ -177,10 +175,11 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('match_date', { foreignTable: 'matches', ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false })
+        .returns<any[]>(),
     ),
     unwrap<any[]>(
-      (supabase as any)
+      supabase
         .from('match_bowling')
         .select(
           `
@@ -192,10 +191,11 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('match_date', { foreignTable: 'matches', ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false })
+        .returns<any[]>(),
     ),
     unwrap<any[]>(
-      (supabase as any)
+      supabase
         .from('match_fielding')
         .select(
           `
@@ -207,10 +207,11 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('match_date', { foreignTable: 'matches', ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false })
+        .returns<any[]>(),
     ),
     unwrap<any[]>(
-      (supabase as any)
+      supabase
         .from('match_awards')
         .select(
           `
@@ -224,7 +225,8 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .or(
           `player_of_match_id.eq.${playerId},best_batter_id.eq.${playerId},best_bowler_id.eq.${playerId},best_fielder_id.eq.${playerId}`,
         )
-        .order('match_date', { foreignTable: 'matches', ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false })
+        .returns<any[]>(),
     ),
   ]);
 
@@ -367,7 +369,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
 
 export async function fetchPlayerAwards(academyId: UUID, playerId: UUID): Promise<PlayerAward[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_awards')
       .select(
         `
@@ -381,7 +383,8 @@ export async function fetchPlayerAwards(academyId: UUID, playerId: UUID): Promis
       .or(
         `player_of_match_id.eq.${playerId},best_batter_id.eq.${playerId},best_bowler_id.eq.${playerId},best_fielder_id.eq.${playerId}`,
       )
-      .order('match_date', { foreignTable: 'matches', ascending: false }),
+      .order('match_date', { foreignTable: 'matches', ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row: any) => {
@@ -411,12 +414,13 @@ export async function fetchPlayerMilestones(
   playerId: UUID,
 ): Promise<PlayerMilestone[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('player_milestones')
       .select('id, milestone_type, achieved_at, match_id')
       .eq('academy_id', academyId)
       .eq('player_id', playerId)
-      .order('achieved_at', { ascending: false }),
+      .order('achieved_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row: any) => ({
@@ -436,7 +440,7 @@ export async function fetchPlayerCoachNotes(
   playerId: UUID,
 ): Promise<PlayerCoachNote[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_coach_notes')
       .select(
         `
@@ -447,7 +451,8 @@ export async function fetchPlayerCoachNotes(
       )
       .eq('matches.academy_id', academyId)
       .eq('academy_member_id', playerId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row: any) => ({
@@ -470,7 +475,7 @@ export async function fetchPlayerAttendanceSummary(
   academyId: UUID,
   playerId: UUID,
 ): Promise<PlayerAttendanceSummary> {
-  const { data: records, error } = await (supabase as any)
+  const { data: records, error } = await supabase
     .from('attendance')
     .select('status, session:training_sessions(session_date)')
     .eq('academy_id', academyId)
@@ -516,7 +521,7 @@ export async function fetchPlayerDrillSummary(
   playerId: UUID,
 ): Promise<PlayerDrillSummary> {
   const assignments = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('drill_assignments')
       .select(
         `
@@ -526,7 +531,8 @@ export async function fetchPlayerDrillSummary(
       )
       .eq('academy_id', academyId)
       .eq('player_id', playerId)
-      .order('assigned_at', { ascending: false }),
+      .order('assigned_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   const assigned = assignments.length;

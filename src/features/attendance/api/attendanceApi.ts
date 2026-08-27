@@ -11,11 +11,12 @@ import type {
 
 export async function fetchSessionAttendance(sessionId: UUID): Promise<AttendanceRecord[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('attendance')
       .select('id, academy_id, session_id, player_id, status, marked_by, created_at, updated_at')
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row) => ({
@@ -40,7 +41,7 @@ export async function markAllPresent(
     data: { user },
   } = await supabase.auth.getUser();
   await unwrapVoid(
-    (supabase as any)
+    supabase
       .from('attendance')
       .upsert(
         playerIds.map((playerId) => ({
@@ -50,7 +51,7 @@ export async function markAllPresent(
           status: 'present' as AttendanceStatus,
           marked_by: user?.id ?? null,
         })),
-        { onConflict: ['session_id', 'player_id'] },
+        { onConflict: 'session_id,player_id' },
       )
       .select('id'),
   );
@@ -66,7 +67,7 @@ export async function markAttendance(
     data: { user },
   } = await supabase.auth.getUser();
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('attendance')
       .upsert(
         {
@@ -76,10 +77,11 @@ export async function markAttendance(
           status,
           marked_by: user?.id ?? null,
         },
-        { onConflict: ['session_id', 'player_id'] },
+        { onConflict: 'session_id,player_id' },
       )
       .select('id, academy_id, session_id, player_id, status, marked_by, created_at, updated_at')
-      .single(),
+      .single()
+      .returns<any>(),
   );
 
   return {
@@ -96,13 +98,14 @@ export async function markAttendance(
 
 export async function fetchPlayerAttendance(playerId: UUID): Promise<PlayerAttendanceRecord[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('attendance')
       .select(
         `id, academy_id, session_id, player_id, status, marked_by, created_at, updated_at, session:training_sessions(id, title, session_date, start_at, end_at, status)`,
       )
       .eq('player_id', playerId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row) => ({
@@ -127,13 +130,14 @@ export async function fetchPlayerAttendance(playerId: UUID): Promise<PlayerAtten
 
 export async function fetchBatchAttendance(batchId: UUID): Promise<BatchAttendanceSession[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('training_sessions')
       .select(
         'id, title, session_date, start_at, end_at, status, attendance!left(id, player_id, status)',
       )
       .eq('batch_id', batchId)
-      .order('session_date', { ascending: false }),
+      .order('session_date', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row) => ({

@@ -19,7 +19,11 @@ export async function fetchCricHeroesPlayerMappings(
   academyId: UUID,
 ): Promise<SavedPlayerMapping[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any).from('cricheroes_player_mappings').select('*').eq('academy_id', academyId),
+    supabase
+      .from('cricheroes_player_mappings')
+      .select('*')
+      .eq('academy_id', academyId)
+      .returns<any[]>(),
   );
 
   return rows.map((r) => ({
@@ -55,7 +59,7 @@ export async function saveCricHeroesPlayerMappings(
     confidence_score: m.confidenceScore ?? 100,
   }));
 
-  const { error } = await (supabase as any).rpc('upsert_cricheroes_player_mappings', {
+  const { error } = await supabase.rpc('upsert_cricheroes_player_mappings', {
     p_academy_id: academyId,
     p_mappings: payload,
   });

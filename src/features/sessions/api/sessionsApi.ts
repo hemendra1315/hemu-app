@@ -44,23 +44,25 @@ function toTrainingSession(row: any): TrainingSession {
 
 export async function fetchAcademyTrainingSessions(academyId: UUID): Promise<TrainingSession[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('training_sessions')
       .select(SESSION_COLUMNS)
       .eq('academy_id', academyId)
       .order('session_date', { ascending: false })
-      .order('start_at', { ascending: false }),
+      .order('start_at', { ascending: false })
+      .returns<any[]>(),
   );
   return rows.map(toTrainingSession);
 }
 
 export async function fetchTrainingSession(sessionId: UUID): Promise<TrainingSession> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('training_sessions')
       .select(SESSION_COLUMNS)
       .eq('id', sessionId)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toTrainingSession(row);
 }
@@ -69,7 +71,7 @@ export async function createTrainingSession(
   input: CreateTrainingSessionInput,
 ): Promise<TrainingSession> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('training_sessions')
       .insert({
         academy_id: input.academyId,
@@ -84,7 +86,8 @@ export async function createTrainingSession(
         notes: input.notes,
       })
       .select(SESSION_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toTrainingSession(row);
 }
@@ -94,7 +97,7 @@ export async function updateTrainingSession(
   input: UpdateTrainingSessionInput,
 ): Promise<TrainingSession> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('training_sessions')
       .update({
         batch_id: input.batchId,
@@ -109,11 +112,12 @@ export async function updateTrainingSession(
       })
       .eq('id', sessionId)
       .select(SESSION_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toTrainingSession(row);
 }
 
 export async function deleteTrainingSession(sessionId: UUID): Promise<void> {
-  await unwrapVoid((supabase as any).from('training_sessions').delete().eq('id', sessionId));
+  await unwrapVoid(supabase.from('training_sessions').delete().eq('id', sessionId));
 }

@@ -91,11 +91,12 @@ function toBatchPlayer(row: any): BatchPlayer {
 
 export async function fetchAcademyBatches(academyId: UUID): Promise<Batch[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('batches')
       .select(`${BATCH_COLUMNS}, batch_members(count)`)
       .eq('academy_id', academyId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map((row) => toBatch(row));
@@ -103,13 +104,14 @@ export async function fetchAcademyBatches(academyId: UUID): Promise<Batch[]> {
 
 export async function fetchBatchPlayers(batchId: UUID): Promise<BatchPlayer[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('batch_members')
       .select(
         'id, batch_id, academy_member_id, joined_at, academy_members!batch_members_academy_member_id_fkey(id, role, status, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url))',
       )
       .eq('batch_id', batchId)
-      .order('joined_at', { ascending: true }),
+      .order('joined_at', { ascending: true })
+      .returns<any[]>(),
   );
 
   return rows.map(toBatchPlayer);
@@ -128,16 +130,22 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
   };
 
   const insertedRow = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('batches')
       .insert(payload)
       .select(
         'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
       )
-      .single(),
+      .single()
+      .returns<any>(),
   );
 
-  let coachObj = {
+  let coachObj: {
+    id: string | null;
+    fullName: string | null;
+    email: string;
+    avatarUrl: string | null;
+  } = {
     id: null,
     fullName: null,
     email: 'Unassigned',
@@ -145,7 +153,7 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
   };
 
   if (insertedRow.coach_id) {
-    const { data: coachRow } = await (supabase as any)
+    const { data: coachRow } = await supabase
       .from('academy_members')
       .select(
         'id, role, status, profiles!academy_members_user_id_fkey(full_name, email, avatar_url)',
@@ -191,17 +199,23 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
   };
 
   const updatedRow = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('batches')
       .update(payload)
       .eq('id', batchId)
       .select(
         'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
       )
-      .single(),
+      .single()
+      .returns<any>(),
   );
 
-  let coachObj = {
+  let coachObj: {
+    id: string | null;
+    fullName: string | null;
+    email: string;
+    avatarUrl: string | null;
+  } = {
     id: null,
     fullName: null,
     email: 'Unassigned',
@@ -209,7 +223,7 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
   };
 
   if (updatedRow.coach_id) {
-    const { data: coachRow } = await (supabase as any)
+    const { data: coachRow } = await supabase
       .from('academy_members')
       .select(
         'id, role, status, profiles!academy_members_user_id_fkey(full_name, email, avatar_url)',
@@ -244,7 +258,7 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
 }
 
 export async function deleteBatch(batchId: UUID): Promise<void> {
-  await unwrapVoid((supabase as any).from('batches').delete().eq('id', batchId));
+  await unwrapVoid(supabase.from('batches').delete().eq('id', batchId));
 }
 
 export async function fetchBatchAvailablePlayers(academyId: UUID): Promise<AcademyMember[]> {
@@ -274,7 +288,7 @@ export async function fetchBatchAvailablePlayers(academyId: UUID): Promise<Acade
 
 export async function addPlayerToBatch(batchId: UUID, academyMemberId: UUID): Promise<void> {
   await unwrap(
-    (supabase as any)
+    supabase
       .from('batch_members')
       .insert({ batch_id: batchId, academy_member_id: academyMemberId })
       .select('id')
@@ -283,5 +297,5 @@ export async function addPlayerToBatch(batchId: UUID, academyMemberId: UUID): Pr
 }
 
 export async function removePlayerFromBatch(batchMemberId: UUID): Promise<void> {
-  await unwrapVoid((supabase as any).from('batch_members').delete().eq('id', batchMemberId));
+  await unwrapVoid(supabase.from('batch_members').delete().eq('id', batchMemberId));
 }

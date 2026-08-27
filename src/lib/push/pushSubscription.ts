@@ -34,7 +34,9 @@ export async function isPushSubscribed(): Promise<boolean> {
  *
  * @returns 'granted' | 'denied' | 'unsupported'
  */
-export async function subscribeToPush(academyId: string): Promise<'granted' | 'denied' | 'unsupported'> {
+export async function subscribeToPush(
+  academyId: string,
+): Promise<'granted' | 'denied' | 'unsupported'> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     logger.info('push_unsupported');
     return 'unsupported';
@@ -66,13 +68,14 @@ export async function subscribeToPush(academyId: string): Promise<'granted' | 'd
       });
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
     const keys = sub.toJSON().keys as { p256dh: string; auth: string };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).from('push_subscriptions').upsert(
+    const { error } = await supabase.from('push_subscriptions').upsert(
       {
         user_id: user.id,
         academy_id: academyId,
@@ -104,8 +107,7 @@ export async function unsubscribeFromPush(): Promise<void> {
     const sub = await registration.pushManager.getSubscription();
     if (!sub) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+    await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
     await sub.unsubscribe();
     logger.info('push_unsubscribed');
   } catch (err) {

@@ -209,7 +209,8 @@ export function usePlayerUpcomingSessions(playerId: UUID | null, academyId: UUID
     enabled:
       Boolean(academyId) && Boolean(playerId) && isUUID(academyId ?? '') && isUUID(playerId ?? ''),
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      if (!academyId) return [];
+      const { data, error } = await supabase
         .from('training_sessions')
         .select(
           `

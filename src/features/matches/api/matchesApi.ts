@@ -334,11 +334,12 @@ function toAcademyRecord(row: any): AcademyRecord {
 
 export async function fetchAcademyMatches(academyId: UUID): Promise<Match[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('matches')
       .select(MATCH_COLUMNS)
       .eq('academy_id', academyId)
-      .order('match_date', { ascending: false }),
+      .order('match_date', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map(toMatch);
@@ -346,14 +347,14 @@ export async function fetchAcademyMatches(academyId: UUID): Promise<Match[]> {
 
 export async function fetchMatch(matchId: UUID): Promise<Match> {
   const row = await unwrap<any>(
-    (supabase as any).from('matches').select(MATCH_COLUMNS).eq('id', matchId).single(),
+    supabase.from('matches').select(MATCH_COLUMNS).eq('id', matchId).single().returns<any>(),
   );
   return toMatch(row);
 }
 
 export async function createMatch(input: CreateMatchInput): Promise<Match> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('matches')
       .insert({
         academy_id: input.academyId,
@@ -369,14 +370,15 @@ export async function createMatch(input: CreateMatchInput): Promise<Match> {
         status: 'created',
       })
       .select(MATCH_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toMatch(row);
 }
 
 export async function updateMatch(matchId: UUID, input: UpdateMatchInput): Promise<Match> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('matches')
       .update({
         match_name: input.matchName,
@@ -391,13 +393,14 @@ export async function updateMatch(matchId: UUID, input: UpdateMatchInput): Promi
       })
       .eq('id', matchId)
       .select(MATCH_COLUMNS)
-      .single(),
+      .single()
+      .returns<any>(),
   );
   return toMatch(row);
 }
 
 export async function deleteMatch(matchId: UUID): Promise<void> {
-  await unwrapVoid((supabase as any).from('matches').delete().eq('id', matchId));
+  await unwrapVoid(supabase.from('matches').delete().eq('id', matchId));
 }
 
 // ============================================================
@@ -406,7 +409,7 @@ export async function deleteMatch(matchId: UUID): Promise<void> {
 
 export async function fetchMatchLineups(matchId: UUID): Promise<MatchLineup[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_lineups')
       .select(
         `
@@ -418,7 +421,8 @@ export async function fetchMatchLineups(matchId: UUID): Promise<MatchLineup[]> {
       `,
       )
       .eq('match_id', matchId)
-      .order('batting_order', { ascending: true, nullsFirst: true }),
+      .order('batting_order', { ascending: true, nullsFirst: true })
+      .returns<any[]>(),
   );
 
   return rows.map(toMatchLineup);
@@ -430,7 +434,7 @@ export async function fetchMatchLineups(matchId: UUID): Promise<MatchLineup[]> {
 
 export async function fetchMatchBatting(matchId: UUID): Promise<MatchBatting[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_batting')
       .select(
         `
@@ -442,7 +446,8 @@ export async function fetchMatchBatting(matchId: UUID): Promise<MatchBatting[]> 
       `,
       )
       .eq('match_id', matchId)
-      .order('batting_order', { ascending: true, nullsFirst: true }),
+      .order('batting_order', { ascending: true, nullsFirst: true })
+      .returns<any[]>(),
   );
 
   return rows.map(toMatchBatting);
@@ -454,7 +459,7 @@ export async function fetchMatchBatting(matchId: UUID): Promise<MatchBatting[]> 
 
 export async function fetchMatchBowling(matchId: UUID): Promise<MatchBowling[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_bowling')
       .select(
         `
@@ -466,7 +471,8 @@ export async function fetchMatchBowling(matchId: UUID): Promise<MatchBowling[]> 
       `,
       )
       .eq('match_id', matchId)
-      .order('wickets', { ascending: false }),
+      .order('wickets', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map(toMatchBowling);
@@ -478,7 +484,7 @@ export async function fetchMatchBowling(matchId: UUID): Promise<MatchBowling[]> 
 
 export async function fetchMatchFielding(matchId: UUID): Promise<MatchFielding[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_fielding')
       .select(
         `
@@ -490,7 +496,8 @@ export async function fetchMatchFielding(matchId: UUID): Promise<MatchFielding[]
       `,
       )
       .eq('match_id', matchId)
-      .order('catches', { ascending: false }),
+      .order('catches', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map(toMatchFielding);
@@ -502,7 +509,7 @@ export async function fetchMatchFielding(matchId: UUID): Promise<MatchFielding[]
 
 export async function fetchMatchPartnerships(matchId: UUID): Promise<MatchPartnership[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_partnerships')
       .select(
         `
@@ -518,7 +525,8 @@ export async function fetchMatchPartnerships(matchId: UUID): Promise<MatchPartne
       `,
       )
       .eq('match_id', matchId)
-      .order('runs_added', { ascending: false }),
+      .order('runs_added', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map(toMatchPartnership);
@@ -530,7 +538,7 @@ export async function fetchMatchPartnerships(matchId: UUID): Promise<MatchPartne
 
 export async function fetchMatchAwards(matchId: UUID): Promise<MatchAwards | null> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('match_awards')
       .select(
         `
@@ -554,7 +562,8 @@ export async function fetchMatchAwards(matchId: UUID): Promise<MatchAwards | nul
       `,
       )
       .eq('match_id', matchId)
-      .maybeSingle(),
+      .maybeSingle()
+      .returns<any>(),
   );
 
   return row ? toMatchAwards(row) : null;
@@ -566,7 +575,7 @@ export async function fetchMatchAwards(matchId: UUID): Promise<MatchAwards | nul
 
 export async function fetchMatchCoachNotes(matchId: UUID): Promise<MatchCoachNote[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('match_coach_notes')
       .select(
         `
@@ -577,7 +586,8 @@ export async function fetchMatchCoachNotes(matchId: UUID): Promise<MatchCoachNot
         )
       `,
       )
-      .eq('match_id', matchId),
+      .eq('match_id', matchId)
+      .returns<any[]>(),
   );
 
   return rows.map(toMatchCoachNote);
@@ -602,7 +612,7 @@ export async function saveMatchCoachNote(
 
   if (!trimmed) {
     await unwrapVoid(
-      (supabase as any)
+      supabase
         .from('match_coach_notes')
         .delete()
         .eq('match_id', matchId)
@@ -617,7 +627,7 @@ export async function saveMatchCoachNote(
   const coachId = await rpc<string>('my_player_id', { p_academy: academyId });
 
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('match_coach_notes')
       .upsert(
         {
@@ -637,7 +647,8 @@ export async function saveMatchCoachNote(
         )
       `,
       )
-      .single(),
+      .single()
+      .returns<any>(),
   );
 
   return toMatchCoachNote(row);
@@ -649,7 +660,7 @@ export async function saveMatchCoachNote(
 
 export async function fetchPlayerStatistics(academyId: UUID): Promise<PlayerStatistics[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('player_statistics')
       .select(
         `
@@ -665,7 +676,8 @@ export async function fetchPlayerStatistics(academyId: UUID): Promise<PlayerStat
       `,
       )
       .eq('academy_id', academyId)
-      .order('batting_runs', { ascending: false }),
+      .order('batting_runs', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map(toPlayerStatistics);
@@ -676,7 +688,7 @@ export async function fetchPlayerStatisticsById(
   playerId: UUID,
 ): Promise<PlayerStatistics | null> {
   const row = await unwrap<any>(
-    (supabase as any)
+    supabase
       .from('player_statistics')
       .select(
         `
@@ -693,7 +705,8 @@ export async function fetchPlayerStatisticsById(
       )
       .eq('academy_id', academyId)
       .eq('player_id', playerId)
-      .maybeSingle(),
+      .maybeSingle()
+      .returns<any>(),
   );
 
   return row ? toPlayerStatistics(row) : null;
@@ -705,7 +718,7 @@ export async function fetchPlayerStatisticsById(
 
 export async function fetchPlayerMilestones(academyId: UUID): Promise<PlayerMilestone[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('player_milestones')
       .select(
         `
@@ -717,7 +730,8 @@ export async function fetchPlayerMilestones(academyId: UUID): Promise<PlayerMile
       `,
       )
       .eq('academy_id', academyId)
-      .order('achieved_at', { ascending: false }),
+      .order('achieved_at', { ascending: false })
+      .returns<any[]>(),
   );
 
   return rows.map(toPlayerMilestone);
@@ -729,7 +743,7 @@ export async function fetchPlayerMilestones(academyId: UUID): Promise<PlayerMile
 
 export async function fetchAcademyRecords(academyId: UUID): Promise<AcademyRecord[]> {
   const rows = await unwrap<any[]>(
-    (supabase as any)
+    supabase
       .from('academy_records')
       .select(
         `
@@ -740,7 +754,8 @@ export async function fetchAcademyRecords(academyId: UUID): Promise<AcademyRecor
         )
       `,
       )
-      .eq('academy_id', academyId),
+      .eq('academy_id', academyId)
+      .returns<any[]>(),
   );
 
   return rows.map(toAcademyRecord);
@@ -829,7 +844,7 @@ export async function saveMatchResult(
       : {},
   };
 
-  const { data, error } = await (supabase as any).rpc('save_match_result', {
+  const { data, error } = await supabase.rpc('save_match_result', {
     p_payload: snakePayload,
   });
 
@@ -848,7 +863,7 @@ export async function saveMatchResult(
 // ============================================================
 
 export async function refreshAcademyRecords(academyId: UUID): Promise<void> {
-  const { error } = await (supabase as any).rpc('refresh_academy_records', {
+  const { error } = await supabase.rpc('refresh_academy_records', {
     p_academy: academyId,
   });
 
