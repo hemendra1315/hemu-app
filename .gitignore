@@ -63,3 +63,5 @@ supabase/.branches
 
 # Misc scratch files
 /structure.txt
+
+.vercel

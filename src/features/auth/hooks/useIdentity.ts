@@ -57,9 +57,10 @@ export function useIdentity() {
 
   useEffect(() => {
     if (!userId) return;
-    if (useAuthStore.getState().identityStatus === 'ready') return;
     if (isPending) {
-      setIdentityStatus('loading');
+      if (useAuthStore.getState().identityStatus !== 'ready') {
+        setIdentityStatus('loading');
+      }
       return;
     }
     if (isError) {
@@ -69,10 +70,22 @@ export function useIdentity() {
     }
     if (!data) return;
 
-    setProfile(data.profile);
-    setMemberships(data.memberships);
-    setJoinRequests(data.joinRequests);
-    setIdentityStatus('ready');
+    const store = useAuthStore.getState();
+    const isProfileSame =
+      store.profile?.id === data.profile.id &&
+      store.profile?.fullName === data.profile.fullName &&
+      store.profile?.phone === data.profile.phone &&
+      store.profile?.dateOfBirth === data.profile.dateOfBirth;
+
+    const isMembershipsSame = JSON.stringify(store.memberships) === JSON.stringify(data.memberships);
+    const isJoinRequestsSame = JSON.stringify(store.joinRequests) === JSON.stringify(data.joinRequests);
+
+    if (!isProfileSame || !isMembershipsSame || !isJoinRequestsSame || store.identityStatus !== 'ready') {
+      setProfile(data.profile);
+      setMemberships(data.memberships);
+      setJoinRequests(data.joinRequests);
+      setIdentityStatus('ready');
+    }
   }, [
     userId,
     data,

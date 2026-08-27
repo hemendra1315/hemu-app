@@ -49,7 +49,7 @@ export default function ProfileOnboardingPage() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState(
-    profile?.phone ? profile.phone.replace(/^\+\d+\s*/, '') : '',
+    profile?.phone ? profile.phone.replace(/^\+\d{1,4}\s*/, '') : '',
   );
 
   // UI Step: 'details' or 'otp'

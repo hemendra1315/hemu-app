@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -8,6 +9,8 @@ import { useCreateAnnouncement } from '../hooks/useAnnouncements';
 import { useActiveAcademy } from '@/features/academies/hooks/useAcademies';
 import { useBatches } from '@/features/batches/hooks/useBatches';
 import { useUiStore } from '@/stores';
+import { supabase } from '@/lib/supabase/client';
+import { logger } from '@/lib/logger';
 
 const schema = z
   .object({
@@ -33,10 +36,12 @@ type FormValues = z.infer<typeof schema>;
 
 export function CreateAnnouncementPage() {
   const navigate = useNavigate();
-  const { academyId } = useActiveAcademy();
+  const { academyId, membership } = useActiveAcademy();
   const createAnnouncement = useCreateAnnouncement();
   const { data: batches = [] } = useBatches(academyId || null);
   const pushToast = useUiStore((s) => s.pushToast);
+
+  const isOwner = membership?.role === 'academy_owner';
 
   const {
     register,
@@ -54,14 +59,25 @@ export function CreateAnnouncementPage() {
     },
   });
 
+  // Set default audience to batch if the user is a coach
+  useEffect(() => {
+    if (membership && membership.role !== 'academy_owner') {
+      setValue('audience', 'batch');
+    }
+  }, [membership, setValue]);
+
   // eslint-disable-next-line react-hooks/incompatible-library
   const audience = watch('audience');
+
+  const filteredBatches = isOwner
+    ? batches
+    : batches.filter((b) => b.coachId === membership?.id);
 
   const onSubmit = async (data: FormValues) => {
     if (!academyId) return;
 
     try {
-      await createAnnouncement.mutateAsync({
+      const announcement = await createAnnouncement.mutateAsync({
         academy_id: academyId,
         title: data.title,
         message: data.message,
@@ -70,7 +86,15 @@ export function CreateAnnouncementPage() {
       });
 
       pushToast({ title: 'Announcement sent successfully', variant: 'success' });
-      navigate('/academy/announcements');
+
+      // Trigger push notifications in the background (non-blocking)
+      void supabase.functions
+        .invoke('send-push-notification', { body: { announcement_id: announcement.id } })
+        .then(({ error }) => {
+          if (error) logger.warn('push_dispatch_failed', { error: String(error) });
+        });
+
+      navigate('/announcements');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to send announcement';
       pushToast({ title: message, variant: 'error' });
@@ -128,10 +152,10 @@ export function CreateAnnouncementPage() {
                   }
                 }}
               >
-                <option value="all">Entire Academy</option>
-                <option value="coaches">All Coaches</option>
-                <option value="players">All Players</option>
-                <option value="all_parents">All Parents</option>
+                {isOwner && <option value="all">Entire Academy</option>}
+                {isOwner && <option value="coaches">All Coaches</option>}
+                {isOwner && <option value="players">All Players</option>}
+                {isOwner && <option value="all_parents">All Parents</option>}
                 <option value="batch">Specific Batch</option>
               </Select>
             </div>
@@ -145,7 +169,7 @@ export function CreateAnnouncementPage() {
                   className={errors.batch_id ? 'border-danger' : ''}
                 >
                   <option value="">Select a batch...</option>
-                  {batches.map((batch) => (
+                  {filteredBatches.map((batch) => (
                     <option key={batch.id} value={batch.id}>
                       {batch.name}
                     </option>

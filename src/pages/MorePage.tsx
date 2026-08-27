@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Building2,
   BarChart2,
+  Megaphone,
 } from 'lucide-react';
 import { MobilePageHeader } from '@/components/mobile';
 import { Card, Badge } from '@/components/ui';
@@ -94,6 +95,12 @@ export function MorePage() {
       label: 'Drills & Training',
       desc: 'Drill bank and skill logs',
       icon: Activity,
+    },
+    {
+      to: '/announcements',
+      label: 'Announcements',
+      desc: 'Broadcast updates to academy members',
+      icon: Megaphone,
     },
   ];
 

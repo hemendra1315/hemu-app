@@ -6,7 +6,8 @@ import {
   removeQueuedAttendanceItem,
   type QueuedAttendanceItem,
 } from '@/lib/offline/indexedDb';
-import { markAttendance } from '../api/attendanceApi';
+import { markAttendance, fetchSessionAttendance } from '../api/attendanceApi';
+import type { AttendanceRecord } from '../api/attendanceTypes';
 import { queryClient } from '@/lib/query/queryClient';
 import { queryKeys } from '@/lib/query/keys';
 import { useUiStore } from '@/stores';
@@ -64,8 +65,36 @@ export async function syncOfflineAttendanceQueue(
     const affectedSessions = new Set<string>();
     const affectedAcademies = new Set<string>();
 
+    // Cache server attendance list by session to minimize network roundtrips
+    const serverAttendanceCache = new Map<string, AttendanceRecord[]>();
+
     for (const item of items) {
       try {
+        if (!serverAttendanceCache.has(item.sessionId)) {
+          try {
+            const records = await fetchSessionAttendance(item.sessionId);
+            serverAttendanceCache.set(item.sessionId, records);
+          } catch {
+            // Ignore fetch error, cache empty array to fallback to normal upsert
+            serverAttendanceCache.set(item.sessionId, []);
+          }
+        }
+
+        const serverRecords = serverAttendanceCache.get(item.sessionId) ?? [];
+        const existingRecord = serverRecords.find((r) => r.playerId === item.playerId);
+
+        if (existingRecord && existingRecord.updatedAt) {
+          const dbTime = new Date(existingRecord.updatedAt).getTime();
+          if (dbTime > item.timestamp) {
+            // Discard the offline change because a newer server update exists
+            await removeQueuedAttendanceItem(item.id);
+            syncedCount++;
+            affectedSessions.add(item.sessionId);
+            affectedAcademies.add(item.academyId);
+            continue;
+          }
+        }
+
         await markAttendance(item.sessionId, item.playerId, item.status, item.academyId);
         await removeQueuedAttendanceItem(item.id);
         syncedCount++;
