@@ -1,4 +1,5 @@
 import { toApiError, unwrap } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 import type { Profile, UUID } from '@/types';
 
@@ -110,7 +111,7 @@ export async function removeAvatar(userId: UUID, avatarUrl: string): Promise<voi
   if (oldPath && oldPath.startsWith(`${userId}/`)) {
     const { error } = await supabase.storage.from('avatars').remove([oldPath]);
     if (error) {
-      console.warn('[PFP] failed to remove old avatar:', error);
+      logger.warn('avatar_remove_old_failed', { error });
     }
   }
 }
@@ -140,7 +141,7 @@ export async function uploadAvatar(userId: UUID, file: File | Blob): Promise<str
       uploadBody = new Blob([arrayBuffer], { type: fileType });
     }
   } catch (err: unknown) {
-    console.warn('[PFP] ArrayBuffer conversion failed, falling back to raw file', err);
+    logger.warn('avatar_arraybuffer_conversion_failed', { error: err });
   }
 
   const { error: uploadError } = await supabase.storage

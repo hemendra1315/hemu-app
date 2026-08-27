@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { unwrap } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 import { isUUID } from '@/lib/validators';
 import type { UUID } from '@/types';
@@ -34,7 +35,7 @@ export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[
         player: profile,
       });
     } catch (err) {
-      console.error('Failed to fetch player profile for child link', err);
+      logger.error('linked_child_profile_fetch_failed', { error: err });
     }
   }
   return children;

@@ -11,6 +11,7 @@ import { Card, CardBody, CardHeader, Button, Badge } from '@/components/ui';
 import { QrCode, Trash2, Copy, Check } from 'lucide-react';
 import type { UUID } from '@/types';
 import type { ParentRelationshipType } from '@/features/parents/api/parentsTypes';
+import { formatDate, formatDateTime } from '@/lib/utils/date';
 import { useUiStore } from '@/stores';
 
 export function FamilyTab({
@@ -81,9 +82,7 @@ export function FamilyTab({
                 >
                   <div>
                     <p className="text-fg font-medium capitalize">{parent.relationshipType}</p>
-                    <p className="text-fg-muted text-sm">
-                      Linked: {new Date(parent.createdAt).toLocaleDateString()}
-                    </p>
+                    <p className="text-fg-muted text-sm">Linked: {formatDate(parent.createdAt)}</p>
                   </div>
                   {canManageMembers && (
                     <Button
@@ -147,7 +146,7 @@ export function FamilyTab({
                         </Badge>
                       </div>
                       <p className="text-fg-muted mt-1 text-xs">
-                        Expires: {new Date(code.expiresAt).toLocaleString()}
+                        Expires: {formatDateTime(code.expiresAt)}
                       </p>
                     </div>
                     <div className="flex gap-2">

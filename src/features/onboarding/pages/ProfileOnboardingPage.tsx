@@ -5,6 +5,7 @@ import { ArrowLeft, Camera, CheckCircle2, ShieldCheck, Mail, User } from 'lucide
 import { Avatar, Button, Card, CardBody, Input } from '@/components/ui';
 import { useAuth, updateMyProfile, uploadAvatar, removeAvatar } from '@/features/auth';
 import { isProfileComplete } from '@/features/auth/utils/profileCompletion';
+import { logger } from '@/lib/logger';
 import { pickImageFile } from '@/lib/media';
 import { supabase } from '@/lib/supabase/client';
 import { errorMessage as errorMessageText } from '@/lib/api/errors';
@@ -101,7 +102,7 @@ export default function ProfileOnboardingPage() {
       if (e?.message === 'Picker cancelled') {
         return;
       }
-      console.error('[AVATAR] Photo pick failed:', e);
+      logger.error('avatar_photo_pick_failed', { error: e });
       setAvatarError(e?.message || 'Failed to select photo');
     }
   };
@@ -177,7 +178,7 @@ export default function ProfileOnboardingPage() {
         setAvatarUrl(uploadedUrl);
         setAvatarFile(null);
       } catch (err) {
-        console.error('[PFP] error during upload:', err);
+        logger.error('avatar_upload_failed', { error: err });
         setIsUploadingAvatar(false);
         setAvatarError('Failed to upload profile picture. Please try again or remove it.');
         return;
@@ -221,7 +222,7 @@ export default function ProfileOnboardingPage() {
           navigate('/', { replace: true });
         }
       } catch (err: unknown) {
-        console.error('[PFP] profile update result: Failed', err);
+        logger.error('profile_update_failed', { error: err });
         setErrorMessage(errorMessageText(err));
       } finally {
         setIsSendingOtp(false);
@@ -351,7 +352,7 @@ export default function ProfileOnboardingPage() {
         navigate('/', { replace: true });
       }
     } catch (err: unknown) {
-      console.error('[PFP] profile update result: Failed', err);
+      logger.error('profile_update_failed', { error: err });
       setErrorMessage(errorMessageText(err));
     } finally {
       setIsVerifyingOtp(false);

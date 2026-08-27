@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import 'react-datepicker/dist/react-datepicker.css';
 
 import { Button, Card, CardBody, CardFooter, CardHeader, Input, Select } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
@@ -64,7 +63,6 @@ export default function MatchesPage() {
   const pushToast = useUiStore((state) => state.pushToast);
 
   const [showForm, setShowForm] = useState(false);
-  const [matchDate, setMatchDate] = useState<Date | null>(null);
 
   const {
     register,
@@ -80,7 +78,7 @@ export default function MatchesPage() {
       await createMatch.mutateAsync({
         academyId: academyId as string,
         matchName: value.matchName,
-        matchDate: matchDate?.toISOString().split('T')[0] || value.matchDate,
+        matchDate: value.matchDate,
         opponentName: value.opponentName || null,
         tournament: value.tournament || null,
         matchType: value.matchType,
@@ -95,7 +93,6 @@ export default function MatchesPage() {
       });
 
       reset(DEFAULT_MATCH_FORM);
-      setMatchDate(null);
       setShowForm(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create match';

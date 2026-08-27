@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { Card, CardBody, CardHeader } from '@/components/ui';
+import { formatDateTime } from '@/lib/utils/date';
 import type { UUID } from '@/types';
 
 export type ActivityType =
@@ -55,9 +56,7 @@ export function ActivityFeed({
                 <span className="text-xl">{ACTIVITY_ICONS[activity.type]}</span>
                 <div className="flex-1">
                   <p className="text-fg text-sm">{activity.message}</p>
-                  <p className="text-fg-muted text-xs">
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </p>
+                  <p className="text-fg-muted text-xs">{formatDateTime(activity.timestamp)}</p>
                 </div>
                 {activity.href && (
                   <Link to={activity.href} className="text-fg-muted hover:text-fg text-xs">

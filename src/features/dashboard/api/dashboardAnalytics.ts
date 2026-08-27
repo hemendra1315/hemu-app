@@ -536,6 +536,15 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
     return null;
   }
 
+  // `fetchPlayerChartData` needs the same matches/attendance data this
+  // function already fetches for `matches`/`attendance` below. Starting
+  // these two once and sharing them with `fetchPlayerChartData` (instead of
+  // letting it re-fetch its own copies) turns 2 duplicate network round
+  // trips per dashboard load into 0, with no change to overall parallelism —
+  // chartData was already effectively gated on this data being available.
+  const matchesPromise = fetchPlayerMatches(academyId, playerId);
+  const attendancePromise = fetchPlayerAttendanceSummary(academyId, playerId);
+
   const [
     statistics,
     matches,
@@ -547,11 +556,13 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
     upcomingSessionsResult,
   ] = await Promise.all([
     fetchPlayerStatistics(academyId, playerId),
-    fetchPlayerMatches(academyId, playerId),
+    matchesPromise,
     fetchPlayerAwards(academyId, playerId),
     fetchPlayerMilestones(academyId, playerId),
-    fetchPlayerChartData(academyId, playerId),
-    fetchPlayerAttendanceSummary(academyId, playerId),
+    Promise.all([matchesPromise, attendancePromise]).then(([m, a]) =>
+      fetchPlayerChartData(academyId, playerId, { matches: m, attendanceSummary: a }),
+    ),
+    attendancePromise,
     fetchPlayerDrillSummary(academyId, playerId),
     unwrap<any[]>(
       (supabase as any)

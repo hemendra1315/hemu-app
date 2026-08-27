@@ -10,6 +10,7 @@ import { SimpleBarChart, SimpleLineChart } from '@/components/charts/SimpleBarCh
 import { SessionRow } from '../components/SessionRow';
 import { useTestModeStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils/date';
 import { isUUID } from '@/lib/validators';
 
 /** Turns the `YYYY-MM` keys produced by the attendance summary into "Mar 26". */
@@ -204,7 +205,7 @@ export default function PlayerDashboardPage() {
                   <div>
                     <p className="text-fg font-medium">{match.matchName}</p>
                     <p className="text-fg-muted text-sm">
-                      {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                      {formatDate(match.matchDate)} • {match.opponentName}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -248,7 +249,7 @@ export default function PlayerDashboardPage() {
                         <p className="text-fg-muted text-sm">{assignment.drill.category}</p>
                         {assignment.dueDate && (
                           <p className="text-fg-muted text-xs">
-                            Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                            Due: {formatDate(assignment.dueDate)}
                           </p>
                         )}
                       </div>
@@ -290,7 +291,7 @@ export default function PlayerDashboardPage() {
                     <div>
                       <p className="text-fg font-medium">{award.matchName}</p>
                       <p className="text-fg-muted text-sm">
-                        {award.matchDate ? new Date(award.matchDate).toLocaleDateString() : ''}
+                        {award.matchDate ? formatDate(award.matchDate) : ''}
                       </p>
                     </div>
                     <Badge tone="success">Award</Badge>
@@ -326,7 +327,7 @@ export default function PlayerDashboardPage() {
                 <h4 className="text-fg-muted mb-2 text-sm font-medium">Runs Trend</h4>
                 <SimpleBarChart
                   data={analytics.runsTrend.map((m) => ({
-                    label: m.matchDate ? new Date(m.matchDate).toLocaleDateString() : '',
+                    label: m.matchDate ? formatDate(m.matchDate) : '',
                     value: m.runs,
                   }))}
                   height={200}

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 
 import { TimeRangePicker } from '@/components/form';
 import { isTimeRangeValid } from '@/lib/utils/date';
+import { logger } from '@/lib/logger';
 import {
   Button,
   Card,
@@ -128,7 +129,7 @@ export default function BatchesPage() {
       }
     },
     (errors) => {
-      console.error('Form errors:', errors);
+      logger.warn('batch_form_validation_failed', { errors });
 
       pushToast({
         title: 'Please fill required fields',

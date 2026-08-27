@@ -359,7 +359,7 @@ function OverviewTab({
                   <div>
                     <p className="text-fg font-sans text-xs font-bold">{match.matchName}</p>
                     <p className="text-fg-muted mt-0.5 font-mono text-[11px]">
-                      {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                      {formatDate(match.matchDate)} • {match.opponentName}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -620,7 +620,7 @@ function MatchHistoryTab({ matches }: { matches: PlayerMatch[] }) {
                 <div>
                   <p className="text-fg font-sans text-xs font-bold">{match.matchName}</p>
                   <p className="text-fg-muted mt-0.5 font-mono text-[11px]">
-                    {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                    {formatDate(match.matchDate)} • {match.opponentName}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 font-sans">
@@ -724,7 +724,7 @@ function AwardsTab({ awards }: { awards: PlayerAward[] }) {
                     <p className="text-fg-muted mt-0.5 font-sans text-[11px]">{award.matchName}</p>
                   </div>
                   <p className="text-fg-muted font-mono text-[10px] font-bold">
-                    {new Date(award.matchDate).toLocaleDateString()}
+                    {formatDate(award.matchDate)}
                   </p>
                 </Link>
               ))}
@@ -823,7 +823,7 @@ function CoachNotesTab({ notes }: { notes: PlayerCoachNote[] }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-fg text-xs font-bold">{note.matchName}</p>
                   <p className="text-fg-muted font-mono text-[10px] font-bold">
-                    {new Date(note.matchDate).toLocaleDateString()}
+                    {formatDate(note.matchDate)}
                   </p>
                 </div>
                 <p className="text-fg-muted text-[11px]">Coach: {note.coachName}</p>

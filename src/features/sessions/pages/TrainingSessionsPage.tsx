@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/feedback';
 import { MobileEmptyState } from '@/components/mobile';
 import { useActiveAcademy } from '@/features/academies';
 import { useAcademyMembers } from '@/features/members';
+import { logger } from '@/lib/logger';
 import { useCan } from '@/lib/rbac';
 import { useUiStore } from '@/stores';
 import type { UUID } from '@/types';
@@ -97,7 +98,7 @@ export default function TrainingSessionsPage() {
       setEndTime(null);
       setShowForm(false);
     } catch (error) {
-      console.error('Create session failed:', error);
+      logger.error('create_session_failed', { error });
       pushToast({ title: 'Failed to create session', variant: 'error' });
     }
   });

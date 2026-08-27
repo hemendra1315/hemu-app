@@ -1,5 +1,6 @@
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Capacitor } from '@capacitor/core';
+import { logger } from './logger';
 
 export async function pickImageFile(): Promise<File> {
   if (Capacitor.isNativePlatform()) {
@@ -41,7 +42,9 @@ export async function pickImageFile(): Promise<File> {
       ) {
         throw new Error('Picker cancelled'); // Specific string we can check for
       }
-      console.error('[MEDIA] Error picking photo:', err instanceof Error ? err.message : err);
+      logger.error('media_pick_photo_failed', {
+        message: err instanceof Error ? err.message : err,
+      });
       throw new Error(message || 'Failed to open photo picker');
     }
   } else {

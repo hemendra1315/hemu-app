@@ -635,8 +635,16 @@ export async function fetchPlayerCareerHighlights(
 export async function fetchPlayerChartData(
   academyId: UUID,
   playerId: UUID,
+  /**
+   * Callers that already have these (e.g. the player dashboard, which fetches
+   * both alongside this in the same `Promise.all`) can pass them in so this
+   * function skips its own copies. `fetchPlayerDashboardAnalytics` was firing
+   * the matches and attendance queries twice per dashboard load — once here,
+   * once for its own `matches`/`attendance` results — for identical data.
+   */
+  preFetched?: { matches?: PlayerMatch[]; attendanceSummary?: PlayerAttendanceSummary },
 ): Promise<PlayerChartData> {
-  const matches = await fetchPlayerMatches(academyId, playerId);
+  const matches = preFetched?.matches ?? (await fetchPlayerMatches(academyId, playerId));
 
   const runsByMatch = matches
     .filter((m) => m.batting)
@@ -670,7 +678,8 @@ export async function fetchPlayerChartData(
       economy: parseFloat((m.bowling!.runsConceded / m.bowling!.overs).toFixed(2)),
     }));
 
-  const attendanceSummary = await fetchPlayerAttendanceSummary(academyId, playerId);
+  const attendanceSummary =
+    preFetched?.attendanceSummary ?? (await fetchPlayerAttendanceSummary(academyId, playerId));
   const attendanceTrend = attendanceSummary.monthlyData.map(
     (md: { month: string; attended: number; total: number }) => ({
       month: md.month,

@@ -1,4 +1,5 @@
 import { rpc, toApiError, unwrap } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 import type { Academy, JoinRequest, Membership, UUID } from '@/types';
 import type { FeeMode, JoinableRole } from '@/types/enums';
@@ -219,7 +220,7 @@ export async function uploadAcademyLogo(academyId: UUID, file: File | Blob): Pro
     const arrayBuffer = await file.arrayBuffer();
     safeBlob = new Blob([arrayBuffer], { type: fileType });
   } catch (err: unknown) {
-    console.warn('[LOGO] arrayBuffer conversion failed:', err);
+    logger.warn('academy_logo_arraybuffer_conversion_failed', { error: err });
   }
 
   const { error: uploadError } = await supabase.storage
@@ -251,7 +252,7 @@ export async function removeAcademyLogo(academyId: UUID, logoUrl?: string | null
         .from('academy-logos')
         .remove([oldPath])
         .catch((err) => {
-          console.warn('[LOGO] failed to remove old logo:', err);
+          logger.warn('academy_logo_remove_old_failed', { error: err });
         });
     }
   }
