@@ -5,6 +5,7 @@ import { Badge, Button } from '@/components/ui';
 import { EmptyState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { isUUID } from '@/lib/validators';
+import { formatDate, formatTime } from '@/lib/utils/date';
 import {
   usePlayerProfile,
   usePlayerStatistics,
@@ -358,7 +359,7 @@ function OverviewTab({
                   <div>
                     <p className="text-fg font-sans text-xs font-bold">{match.matchName}</p>
                     <p className="text-fg-muted mt-0.5 font-mono text-[11px]">
-                      {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                      {formatDate(match.matchDate)} • {match.opponentName}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -404,8 +405,8 @@ function OverviewTab({
                 <div key={session.id} className="p-3.5">
                   <p className="text-fg text-xs font-bold">{session.title}</p>
                   <p className="text-fg-muted mt-0.5 font-mono text-[11px]">
-                    {new Date(session.sessionDate).toLocaleDateString()} • {session.startAt} -{' '}
-                    {session.endAt}
+                    {formatDate(session.sessionDate)} • {formatTime(session.startAt)} -{' '}
+                    {formatTime(session.endAt)}
                   </p>
                   {session.ground && (
                     <p className="text-fg-muted mt-0.5 text-[11px]">Ground: {session.ground}</p>
@@ -619,7 +620,7 @@ function MatchHistoryTab({ matches }: { matches: PlayerMatch[] }) {
                 <div>
                   <p className="text-fg font-sans text-xs font-bold">{match.matchName}</p>
                   <p className="text-fg-muted mt-0.5 font-mono text-[11px]">
-                    {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                    {formatDate(match.matchDate)} • {match.opponentName}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 font-sans">
@@ -723,7 +724,7 @@ function AwardsTab({ awards }: { awards: PlayerAward[] }) {
                     <p className="text-fg-muted mt-0.5 font-sans text-[11px]">{award.matchName}</p>
                   </div>
                   <p className="text-fg-muted font-mono text-[10px] font-bold">
-                    {new Date(award.matchDate).toLocaleDateString()}
+                    {formatDate(award.matchDate)}
                   </p>
                 </Link>
               ))}
@@ -822,7 +823,7 @@ function CoachNotesTab({ notes }: { notes: PlayerCoachNote[] }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-fg text-xs font-bold">{note.matchName}</p>
                   <p className="text-fg-muted font-mono text-[10px] font-bold">
-                    {new Date(note.matchDate).toLocaleDateString()}
+                    {formatDate(note.matchDate)}
                   </p>
                 </div>
                 <p className="text-fg-muted text-[11px]">Coach: {note.coachName}</p>

@@ -1,4 +1,5 @@
 import { toApiError, unwrap } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 import type { Profile, UUID } from '@/types';
 
@@ -24,7 +25,10 @@ export function toProfile(row: ProfileRow): Profile {
     fullName: row.full_name,
     email: row.email,
     phone: row.phone,
-    phoneVerified: row.phone_verified ?? Boolean(row.phone && row.phone.trim().length > 0),
+    // Strictly the stored column. Never infer verification from the mere
+    // presence of a phone number — a number the user typed is not a number
+    // anyone has proven they control.
+    phoneVerified: row.phone_verified ?? false,
     avatarUrl: row.avatar_url,
     dateOfBirth: row.date_of_birth,
     locale: row.locale,
@@ -107,7 +111,7 @@ export async function removeAvatar(userId: UUID, avatarUrl: string): Promise<voi
   if (oldPath && oldPath.startsWith(`${userId}/`)) {
     const { error } = await supabase.storage.from('avatars').remove([oldPath]);
     if (error) {
-      console.warn('[PFP] failed to remove old avatar:', error);
+      logger.warn('avatar_remove_old_failed', { error });
     }
   }
 }
@@ -137,7 +141,7 @@ export async function uploadAvatar(userId: UUID, file: File | Blob): Promise<str
       uploadBody = new Blob([arrayBuffer], { type: fileType });
     }
   } catch (err: unknown) {
-    console.warn('[PFP] ArrayBuffer conversion failed, falling back to raw file', err);
+    logger.warn('avatar_arraybuffer_conversion_failed', { error: err });
   }
 
   const { error: uploadError } = await supabase.storage

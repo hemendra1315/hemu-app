@@ -3,7 +3,7 @@ import { Layers, ArrowRight, CheckCircle2, ChevronRight } from 'lucide-react';
 
 import { Card, CardBody, CardHeader, Button, Badge } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
-import { formatDate, dayjs } from '@/lib/utils/date';
+import { formatDate, formatTime, dayjs } from '@/lib/utils/date';
 import { useActiveAcademy } from '@/features/academies';
 import { useAuth } from '@/features/auth';
 import { useCoachDashboardAnalytics } from '../hooks/useDashboardAnalytics';
@@ -178,9 +178,12 @@ export default function CoachDashboardPage() {
                 >
                   {/* Session Time (IBM Plex Mono) */}
                   <div className="text-fg w-24 shrink-0 font-mono text-xs font-bold">
-                    {session.startAt || 'TBD'}
+                    {session.startAt ? formatTime(session.startAt) : 'TBD'}
                     {session.endAt && (
-                      <span className="text-fg-muted font-normal"> - {session.endAt}</span>
+                      <span className="text-fg-muted font-normal">
+                        {' '}
+                        - {formatTime(session.endAt)}
+                      </span>
                     )}
                   </div>
 
@@ -270,7 +273,7 @@ export default function CoachDashboardPage() {
                       </Badge>
                     </div>
                     <p className="text-fg-muted mt-0.5 truncate text-xs">
-                      {batch.trainingDays || 'Flexible schedule'} � {batch.trainingTime || 'TBD'}
+                      {batch.trainingDays || 'Flexible schedule'} • {batch.trainingTime || 'TBD'}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">

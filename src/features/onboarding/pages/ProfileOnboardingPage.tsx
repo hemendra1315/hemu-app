@@ -5,9 +5,11 @@ import { ArrowLeft, Camera, CheckCircle2, ShieldCheck, Mail, User } from 'lucide
 import { Avatar, Button, Card, CardBody, Input } from '@/components/ui';
 import { useAuth, updateMyProfile, uploadAvatar, removeAvatar } from '@/features/auth';
 import { isProfileComplete } from '@/features/auth/utils/profileCompletion';
+import { logger } from '@/lib/logger';
 import { pickImageFile } from '@/lib/media';
 import { supabase } from '@/lib/supabase/client';
 import { errorMessage as errorMessageText } from '@/lib/api/errors';
+import { toIsoDate } from '@/lib/utils/date';
 import { useAuthStore, useUiStore } from '@/stores';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
@@ -65,7 +67,7 @@ export default function ProfileOnboardingPage() {
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   // Max DOB is today, min DOB is 100 years ago
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = toIsoDate(new Date());
 
   // File picker handler
   const handlePickPhoto = async () => {
@@ -100,7 +102,7 @@ export default function ProfileOnboardingPage() {
       if (e?.message === 'Picker cancelled') {
         return;
       }
-      console.error('[AVATAR] Photo pick failed:', e);
+      logger.error('avatar_photo_pick_failed', { error: e });
       setAvatarError(e?.message || 'Failed to select photo');
     }
   };
@@ -134,7 +136,12 @@ export default function ProfileOnboardingPage() {
 
   const fullPhoneNumber = `${countryCode}${phoneNumber.trim()}`;
 
-  // Step 1: Submit Profile details & Send Phone OTP
+  /**
+   * Step 1: save the profile details, then send an OTP to the user's EMAIL.
+   * The phone number is captured but never verified — a real SMS flow would
+   * need `signInWithOtp({ phone })` plus an SMS provider configured in Supabase.
+   * Until then `profiles.phone_verified` stays false for new users.
+   */
   const handleProceedToOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -171,7 +178,7 @@ export default function ProfileOnboardingPage() {
         setAvatarUrl(uploadedUrl);
         setAvatarFile(null);
       } catch (err) {
-        console.error('[PFP] error during upload:', err);
+        logger.error('avatar_upload_failed', { error: err });
         setIsUploadingAvatar(false);
         setAvatarError('Failed to upload profile picture. Please try again or remove it.');
         return;
@@ -215,7 +222,7 @@ export default function ProfileOnboardingPage() {
           navigate('/', { replace: true });
         }
       } catch (err: unknown) {
-        console.error('[PFP] profile update result: Failed', err);
+        logger.error('profile_update_failed', { error: err });
         setErrorMessage(errorMessageText(err));
       } finally {
         setIsSendingOtp(false);
@@ -332,7 +339,7 @@ export default function ProfileOnboardingPage() {
       setProfile(updatedProfile);
 
       pushToast({
-        title: 'Profile verified!',
+        title: 'Email verified!',
         description: 'Your profile has been set up successfully.',
         variant: 'success',
       });
@@ -345,7 +352,7 @@ export default function ProfileOnboardingPage() {
         navigate('/', { replace: true });
       }
     } catch (err: unknown) {
-      console.error('[PFP] profile update result: Failed', err);
+      logger.error('profile_update_failed', { error: err });
       setErrorMessage(errorMessageText(err));
     } finally {
       setIsVerifyingOtp(false);
@@ -655,7 +662,7 @@ export default function ProfileOnboardingPage() {
                     }}
                     className="text-fg-muted hover:text-primary flex items-center font-medium transition"
                   >
-                    <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Change email address
+                    <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to details
                   </button>
 
                   <button

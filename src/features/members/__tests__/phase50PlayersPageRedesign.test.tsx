@@ -75,7 +75,7 @@ describe('Phase 50 — Academy Owner Players Page UI Redesign Verification', () 
     });
   });
 
-  it('renders Players page header, count badge, and + Add Player action for Owner', () => {
+  it('renders Players page header, count badge, and + Add People action for Owner', () => {
     render(
       <BrowserRouter>
         <MembersPage />
@@ -86,8 +86,8 @@ describe('Phase 50 — Academy Owner Players Page UI Redesign Verification', () 
     const headers = screen.getAllByRole('heading', { name: /^players$/i });
     expect(headers.length).toBeGreaterThan(0);
 
-    const addPlayerButtons = screen.getAllByRole('button', { name: /add player/i });
-    expect(addPlayerButtons.length).toBeGreaterThan(0);
+    const addPeopleButtons = screen.getAllByRole('button', { name: /add people/i });
+    expect(addPeopleButtons.length).toBeGreaterThan(0);
   });
 
   it('renders the roster count badge and the search + status/batch/role management toolbar', () => {
@@ -123,7 +123,7 @@ describe('Phase 50 — Academy Owner Players Page UI Redesign Verification', () 
     expect(screen.getByText(/no players found matching your filters/i)).toBeInTheDocument();
   });
 
-  it('opens Add Player Modal displaying Join Code card and copy instructions when Add Player is clicked', () => {
+  it('opens Add People modal with join codes and instructions for both players and coaches', () => {
     render(
       <BrowserRouter>
         <MembersPage />
@@ -131,13 +131,18 @@ describe('Phase 50 — Academy Owner Players Page UI Redesign Verification', () 
       { wrapper: queryWrapper },
     );
 
-    const addPlayerButtons = screen.getAllByRole('button', { name: /add player/i });
-    expect(addPlayerButtons.length).toBeGreaterThan(0);
-    const targetButton = addPlayerButtons[0];
+    const addPeopleButtons = screen.getAllByRole('button', { name: /add people/i });
+    expect(addPeopleButtons.length).toBeGreaterThan(0);
+    const targetButton = addPeopleButtons[0];
     if (targetButton) {
       fireEvent.click(targetButton);
     }
 
+    // Regression cover: every join-code screen used to default to role='player',
+    // so there was no way in the UI to generate a coach join code at all.
     expect(screen.getByText(/share this join code with your players/i)).toBeInTheDocument();
+    expect(screen.getByText(/share this code with a coach/i)).toBeInTheDocument();
+    expect(screen.getByText('Join Code:')).toBeInTheDocument();
+    expect(screen.getByText('Coach Code:')).toBeInTheDocument();
   });
 });

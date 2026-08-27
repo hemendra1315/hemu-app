@@ -348,22 +348,22 @@ Parents link to child players via a link code. Parent Dashboard shows selected c
 | `batches` | `academy_id`, `name`, `age_group`, `coach_id` (nullable) | Training groups |
 | `batch_members` | `batch_id`, `academy_member_id` | Many-to-many |
 | `training_sessions` | `academy_id`, `batch_id`, `title`, `scheduled_at` | Individual sessions |
-| `attendance` | `session_id`, `academy_member_id`, `academy_id`, `status` | `present` or `absent` |
+| `attendance` | `session_id`, `player_id` (→ `academy_members.id`), `academy_id`, `status` | `present` or `absent` |
 | `drills` | `academy_id`, `name`, `category`, `difficulty`, `description`, `video_url` | Drill library |
 | `drill_assignments` | `drill_id`, `assigned_to`, `academy_id`, `status`, `due_date` | Per-player assignment |
 | `matches` | `academy_id`, `match_name`, `match_date`, `opponent_name`, `format`, `match_type`, `result`, `status` | Match header |
-| `match_lineups` | `match_id`, `member_id`, `batting_order`, `is_captain`, `is_guest`, `guest_name` | Supports guest players |
-| `match_batting` | `match_id`, `member_id`, `runs`, `balls`, `fours`, `sixes`, `is_out`, `dismissal_type` | Batting scorecard |
-| `match_bowling` | `match_id`, `member_id`, `overs`, `maidens`, `runs_conceded`, `wickets`, `wides`, `no_balls` | Bowling scorecard |
-| `match_fielding` | `match_id`, `member_id`, `catches`, `run_outs`, `stumpings` | Fielding stats |
+| `match_lineups` | `match_id`, `academy_member_id`, `batting_order`, `is_captain`, `is_guest`, `guest_name` | Supports guest players |
+| `match_batting` | `match_id`, `academy_member_id`, `runs`, `balls`, `fours`, `sixes`, `is_out`, `dismissal_type` | Batting scorecard |
+| `match_bowling` | `match_id`, `academy_member_id`, `overs`, `maidens`, `runs_conceded`, `wickets`, `wides`, `no_balls` | Bowling scorecard |
+| `match_fielding` | `match_id`, `academy_member_id`, `catches`, `run_outs`, `stumpings` | Fielding stats |
 | `match_awards` | `match_id`, `player_of_match_id`, `best_batter_id`, `best_bowler_id`, `best_fielder_id` | Match awards |
 | `player_statistics` | Aggregate batting/bowling per player | Materialised/view; drives stats pages |
-| `player_milestones` | `member_id`, `milestone_type`, `achieved_at` | Career milestone badges |
+| `player_milestones` | `player_id` (→ `academy_members.id`), `milestone_type`, `achieved_at` | Career milestone badges |
 | `academy_records` | `academy_id`, `record_type`, `value`, `holder_id` | Academy best-ever records |
 | `cricheroes_player_mappings` | `academy_id`, `cricheroes_name`, `academy_member_id`, `is_guest` | Persisted PDF import name map |
 | `notifications` | `user_id`, `academy_id`, `notification_type`, `title`, `body`, `read_at`, `metadata` | In-app notifications |
 | `announcements` | `academy_id`, `author_id`, `title`, `body`, `published_at` | Academy-wide announcements |
-| `parent_player_links` | `parent_member_id`, `player_member_id`, `academy_id` | Parent ↔ child mapping |
+| `parent_player_links` | `parent_user_id`, `player_user_id`, `academy_id`, `relationship_type`, `status` | Parent ↔ child mapping |
 | `activity_log` | `academy_id`, `actor_id`, `action`, `metadata`, `created_at` | Recent activity feed |
 
 Security: all tables use RLS with `SECURITY DEFINER` helper functions (`is_member`, `is_staff`, `is_owner`, `is_super_admin`). Multi-table writes use RPCs (`save_match_result`, `create_academy`, `request_join_by_code`, `approve_join_request`).
@@ -437,7 +437,6 @@ Security: all tables use RLS with `SECURITY DEFINER` helper functions (`is_membe
 │   │   ├── supabase/           client.ts + database.types.ts (generated)
 │   │   ├── utils/              date, money, string helpers
 │   │   └── validators.ts       isUUID, cricket overs notation
-│   ├── locales/                i18n locale files (en)
 │   ├── pages/                  MorePage, ForbiddenPage, NotFoundPage
 │   ├── stores/                 Zustand: authStore, academyStore, themeStore,
 │   │                           uiStore (toasts), testModeStore
@@ -589,8 +588,9 @@ Semantic CSS variables in `src/styles/index.css` are swapped by a `.dark` class 
 - **Billing**: capability definitions exist in the RBAC map but no billing UI or API is implemented.
 - **Reports/Export**: only a print placeholder route exists; no export logic.
 - **Coach Feedback**: defined in the capability map; no UI or API.
-- **Attendance status**: only `present` / `absent` are supported (no `late`).
-- **Attendance trend chart** in PlayerDashboardPage uses hardcoded sample data (Jan–May labels) rather than real attendance history.
+- **Attendance status**: only `present` / `absent` are supported. The Postgres `attendance_status` enum and the `ATTENDANCE_STATUSES` constant must be widened together — adding a value to one alone breaks writes at runtime.
+- **Internationalisation**: not implemented. No i18n library is installed and nothing consumes `VITE_DEFAULT_LOCALE`; the unused stub locale files were removed.
+- **Phone verification**: onboarding captures a phone number but verifies the user's *email* by OTP, not the phone. `profiles.phone_verified` is never written for new users. A real SMS flow needs an SMS provider configured in Supabase.
 
 ---
 
@@ -616,9 +616,6 @@ Semantic CSS variables in `src/styles/index.css` are swapped by a `.dark` class 
 ### Phase D — Web Push Notifications
 - Push via VAPID (`VITE_VAPID_PUBLIC_KEY` in env schema; `vite-plugin-pwa` installed)
 
-### Phase E — Attendance Trend Chart
-- Replace the hardcoded sample data in PlayerDashboardPage with real attendance history from the database
-
-### Phase F — Advanced Stats UI
+### Phase E — Advanced Stats UI
 - Academy records page (schema and RPC exist)
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { useAcademyStore, useAuthStore, useTestModeStore } from '@/stores';
 import { useActiveRoles, useCan } from '@/lib/rbac';
+import { ATTENDANCE_STATUSES } from '@/types/enums';
 import { renderHook, act } from '@testing-library/react';
 
 function calculateBattingStats({
@@ -143,11 +144,13 @@ describe('Phase 43 — Complete Real-World User Journey & Data Consistency Audit
   });
 
   describe('3. Attendance Status Consistency', () => {
-    it('supports Present, Absent, and Late attendance values consistently', () => {
-      const validStatuses = ['present', 'absent', 'late'] as const;
-      validStatuses.forEach((status) => {
-        expect(['present', 'absent', 'late']).toContain(status);
-      });
+    /**
+     * The client enum must not drift from the `attendance_status` Postgres enum
+     * (migration 0009), otherwise the UI offers statuses the database rejects.
+     * Widening this list requires an `ALTER TYPE ... ADD VALUE` migration first.
+     */
+    it('exposes exactly the attendance statuses the database enum accepts', () => {
+      expect([...ATTENDANCE_STATUSES]).toEqual(['present', 'absent']);
     });
   });
 

@@ -17,6 +17,7 @@ import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { useAcademyMembers } from '@/features/members';
 import { useCan } from '@/lib/rbac';
+import { formatDate } from '@/lib/utils/date';
 import { useUiStore } from '@/stores';
 import type { UUID } from '@/types';
 import type { CreateDrillInput } from '../api/drillsTypes';
@@ -360,13 +361,8 @@ export default function DrillsPage() {
                     </div>
                   </div>
                   <div className="text-fg-muted mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                    <p>Assigned {new Date(assignment.assignedAt).toLocaleDateString()}</p>
-                    <p>
-                      Due{' '}
-                      {assignment.dueDate
-                        ? new Date(assignment.dueDate).toLocaleDateString()
-                        : 'No due date'}
-                    </p>
+                    <p>Assigned {formatDate(assignment.assignedAt)}</p>
+                    <p>Due {assignment.dueDate ? formatDate(assignment.dueDate) : 'No due date'}</p>
                     <p>Created by {assignment.assignedBy ?? 'Coach'}</p>
                   </div>
                 </div>

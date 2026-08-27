@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { LoadingScreen } from '@/components/feedback';
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 
 import { useAuth } from '../hooks/useAuth';
@@ -23,18 +24,17 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     // Handle explicitly returned OAuth errors
     if (errorParam) {
-      console.error('[OAuth] Callback received error:', errorParam, errorDescription);
+      logger.warn('oauth_callback_error', { errorParam, errorDescription });
       navigate('/sign-in', { replace: true, state: { error: errorDescription || errorParam } });
       return;
     }
 
     if (code && !exchanged.current) {
       exchanged.current = true;
-      // eslint-disable-next-line no-console
-      console.log('[OAuth] exchanging code for session');
+      logger.debug('oauth_exchanging_code_for_session');
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
         if (error) {
-          console.error('[OAuth] Failed to exchange code for session:', error);
+          logger.error('oauth_exchange_code_failed', { error });
           navigate('/sign-in', { replace: true });
         }
       });

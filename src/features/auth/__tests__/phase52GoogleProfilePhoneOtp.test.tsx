@@ -181,7 +181,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
         expect(screen.getByRole('heading', { name: /verify your email/i })).toBeInTheDocument();
       });
 
-      const changeEmailBtn = screen.getByRole('button', { name: /change email address/i });
+      const changeEmailBtn = screen.getByRole('button', { name: /back to details/i });
       fireEvent.click(changeEmailBtn);
 
       expect(screen.getByRole('heading', { name: /complete your profile/i })).toBeInTheDocument();

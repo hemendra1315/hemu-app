@@ -9,13 +9,14 @@ import { ErrorState } from '@/components/feedback';
 import { MobileEmptyState } from '@/components/mobile';
 import { useActiveAcademy } from '@/features/academies';
 import { useAcademyMembers } from '@/features/members';
+import { logger } from '@/lib/logger';
 import { useCan } from '@/lib/rbac';
 import { useUiStore } from '@/stores';
 import type { UUID } from '@/types';
 import type { CreateTrainingSessionInput } from '../api/sessionsTypes';
 import { useBatches } from '@/features/batches';
 import { useCreateTrainingSession, useTrainingSessions } from '../hooks/useSessions';
-import { formatDate, formatTime, isTimeRangeValid } from '@/lib/utils/date';
+import { formatDate, formatTime, isTimeRangeValid, isToday } from '@/lib/utils/date';
 
 type FormValues = Omit<CreateTrainingSessionInput, 'academyId' | 'startAt' | 'endAt'>;
 
@@ -97,7 +98,7 @@ export default function TrainingSessionsPage() {
       setEndTime(null);
       setShowForm(false);
     } catch (error) {
-      console.error('Create session failed:', error);
+      logger.error('create_session_failed', { error });
       pushToast({ title: 'Failed to create session', variant: 'error' });
     }
   });
@@ -108,9 +109,8 @@ export default function TrainingSessionsPage() {
 
   const filteredSessions = useMemo(() => {
     if (!sessionsQuery.data) return [];
-    const todayStr = new Date().toISOString().split('T')[0];
     if (sessionFilter === 'today') {
-      return sessionsQuery.data.filter((s) => s.sessionDate === todayStr);
+      return sessionsQuery.data.filter((s) => isToday(s.sessionDate));
     }
     if (sessionFilter === 'upcoming') {
       return sessionsQuery.data.filter((s) => s.status === 'scheduled');
@@ -122,8 +122,6 @@ export default function TrainingSessionsPage() {
   }, [sessionsQuery.data, sessionFilter]);
 
   if (!academyId) return null;
-
-  const todayStr = new Date().toISOString().split('T')[0];
 
   return (
     <div className="space-y-4 pb-24 md:pb-6">
@@ -367,9 +365,9 @@ export default function TrainingSessionsPage() {
         ) : (
           <div className="border-border-subtle bg-surface divide-border-subtle/50 divide-y overflow-hidden rounded-xl border shadow-2xs">
             {filteredSessions.map((session) => {
-              const isToday = session.sessionDate === todayStr;
+              const isSessionToday = isToday(session.sessionDate);
               const isPast = session.status === 'completed' || session.status === 'cancelled';
-              const rowBg = isToday
+              const rowBg = isSessionToday
                 ? 'bg-saffron-pale hover:bg-saffron-pale/80'
                 : isPast
                   ? 'opacity-85 hover:bg-surface-muted/20'

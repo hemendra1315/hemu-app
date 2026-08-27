@@ -18,14 +18,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error(
-      '[AVATAR_DEBUG] ErrorBoundary caught:',
-      error.message,
-      '\nStack:',
-      error.stack,
-      '\nComponent Stack:',
-      info.componentStack,
-    );
+    // reportError -> logger.error already prints a structured payload (name,
+    // message, stack) and is the one hook where an external sink gets wired
+    // in later; a second raw console.error here was a leftover debug artifact
+    // (mislabeled "[AVATAR_DEBUG]" despite catching every render error, not
+    // just avatar-related ones).
     reportError(error, { componentStack: info.componentStack });
   }
 

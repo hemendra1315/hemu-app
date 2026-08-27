@@ -17,8 +17,6 @@ import { formatDate, formatTime } from '@/lib/utils/date';
 const ATTENDANCE_OPTIONS: Array<{ value: AttendanceStatus; label: string }> = [
   { value: 'present', label: 'Present' },
   { value: 'absent', label: 'Absent' },
-  { value: 'late', label: 'Late' },
-  { value: 'excused', label: 'Excused' },
 ];
 
 export default function AttendanceSessionPage() {
@@ -149,18 +147,16 @@ export default function AttendanceSessionPage() {
   const counts = useMemo(() => {
     let present = 0;
     let absent = 0;
-    let late = 0;
-    let excused = 0;
+    let unmarked = 0;
     if (batchPlayersQuery.data) {
       for (const p of batchPlayersQuery.data) {
-        const status = attendanceByPlayer.get(p.academyMemberId) ?? 'absent';
+        const status = attendanceByPlayer.get(p.academyMemberId);
         if (status === 'present') present++;
         else if (status === 'absent') absent++;
-        else if (status === 'late') late++;
-        else if (status === 'excused') excused++;
+        else unmarked++;
       }
     }
-    return { present, absent, late, excused, total: totalPlayers };
+    return { present, absent, unmarked, total: totalPlayers };
   }, [batchPlayersQuery.data, attendanceByPlayer, totalPlayers]);
 
   if (!academyId || !sessionId) {
@@ -274,11 +270,11 @@ export default function AttendanceSessionPage() {
         </div>
       )}
 
-      {/* 2. Summary Strip (5 columns scorecard) */}
-      <div className="border-border-subtle bg-surface divide-border-subtle grid grid-cols-5 divide-x overflow-hidden rounded-xl border shadow-2xs">
+      {/* 2. Summary Strip (4 columns scorecard) */}
+      <div className="border-border-subtle bg-surface divide-border-subtle grid grid-cols-4 divide-x overflow-hidden rounded-xl border shadow-2xs">
         <div className="flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
           <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
-            Pres
+            Present
           </span>
           <span className="text-success mt-0.5 font-mono text-base font-extrabold">
             {counts.present}
@@ -286,7 +282,7 @@ export default function AttendanceSessionPage() {
         </div>
         <div className="flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
           <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
-            Abs
+            Absent
           </span>
           <span className="text-error mt-0.5 font-mono text-base font-extrabold">
             {counts.absent}
@@ -294,18 +290,10 @@ export default function AttendanceSessionPage() {
         </div>
         <div className="flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
           <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
-            Late
-          </span>
-          <span className="text-saffron mt-0.5 font-mono text-base font-extrabold">
-            {counts.late}
-          </span>
-        </div>
-        <div className="flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
-          <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
-            Exc
+            Unmarked
           </span>
           <span className="text-fg-muted mt-0.5 font-mono text-base font-extrabold">
-            {counts.excused}
+            {counts.unmarked}
           </span>
         </div>
         <div className="bg-surface-muted/30 flex min-w-0 flex-col items-center justify-center px-1 py-2.5">
@@ -340,7 +328,8 @@ export default function AttendanceSessionPage() {
       ) : (
         <div className="border-border-subtle bg-surface divide-border-subtle/60 divide-y overflow-hidden rounded-xl border shadow-2xs">
           {batchPlayersQuery.data?.map((player) => {
-            const currentStatus = attendanceByPlayer.get(player.academyMemberId) ?? 'absent';
+            const hasRecordedStatus = attendanceByPlayer.has(player.academyMemberId);
+            const currentStatus = attendanceByPlayer.get(player.academyMemberId);
             const queuedItem = queuedByPlayer.get(player.academyMemberId);
             const isPlayerSaving =
               markAttendance.isPending &&
@@ -394,12 +383,8 @@ export default function AttendanceSessionPage() {
                     if (isSelected) {
                       if (option.value === 'present') {
                         btnStyle = 'bg-success text-white border-success hover:opacity-90';
-                      } else if (option.value === 'absent') {
+                      } else {
                         btnStyle = 'bg-error text-white border-error hover:opacity-90';
-                      } else if (option.value === 'late') {
-                        btnStyle = 'bg-saffron text-white border-saffron hover:opacity-90';
-                      } else if (option.value === 'excused') {
-                        btnStyle = 'bg-fg-muted text-white border-fg-muted hover:opacity-90';
                       }
                     }
 
@@ -408,7 +393,7 @@ export default function AttendanceSessionPage() {
                         key={option.value}
                         disabled={isPlayerSaving}
                         onClick={async () => {
-                          if (isSelected || isPlayerSaving) return;
+                          if ((hasRecordedStatus && isSelected) || isPlayerSaving) return;
                           await handleMark(player.academyMemberId, option.value);
                         }}
                         className={`border-border-subtle flex h-11 min-h-[44px] min-w-[70px] shrink-0 items-center justify-center rounded-[10px] border px-3 text-xs font-bold transition-all ${btnStyle}`}

@@ -7,3 +7,5 @@ export {
   useUpdateBatch,
   useBatchMemberships,
 } from './hooks/useBatches';
+
+export { normalizeTrainingDays } from './api/batchesApi';

@@ -23,6 +23,7 @@ import { JoinCodeCard } from '@/features/academies';
 import { SuperAdminAcademyActions } from '@/features/admin';
 import type { ActivityItem } from '../components/ActivityFeed';
 import { useCan } from '@/lib/rbac';
+import { formatTime } from '@/lib/utils/date';
 
 export default function OwnerDashboardPage() {
   const navigate = useNavigate();
@@ -71,7 +72,7 @@ export default function OwnerDashboardPage() {
               {membership?.academyName ?? 'Academy Dashboard'}
             </h1>
             <p className="text-fg-muted truncate text-xs font-medium">
-              {membership?.city ? `${membership.city} � ` : ''}Academy Operations & Performance
+              {membership?.city ? `${membership.city} • ` : ''}Academy Operations & Performance
             </p>
           </div>
         </div>
@@ -210,7 +211,8 @@ export default function OwnerDashboardPage() {
                     <div className="text-fg-muted flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       <span className="flex items-center gap-1 truncate font-medium">
                         <Clock className="text-fg-muted/80 h-3.5 w-3.5 shrink-0" />
-                        {session.startAt || 'TBD'} {session.endAt ? `- ${session.endAt}` : ''}
+                        {session.startAt ? formatTime(session.startAt) : 'TBD'}
+                        {session.endAt ? ` - ${formatTime(session.endAt)}` : ''}
                       </span>
                       {session.batchName && (
                         <span className="flex items-center gap-1 truncate font-medium">

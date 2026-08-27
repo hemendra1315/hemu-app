@@ -319,6 +319,13 @@ export type SaveMatchResultPayload = {
     bestBowlerId?: UUID | null;
     bestFielderId?: UUID | null;
   };
+  /**
+   * @deprecated Never wired up: `saveMatchResult` doesn't map this into the
+   * RPC payload, and `save_match_result` parses but never inserts it. Coach
+   * notes are now written independently via `saveMatchCoachNote`, which can
+   * run any time after the match instead of only during score entry. Kept
+   * here so the field's history is visible rather than silently deleted.
+   */
   notes?: Array<{
     academyMemberId: UUID;
     notes: string;

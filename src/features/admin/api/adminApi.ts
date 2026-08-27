@@ -1,3 +1,4 @@
+import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 import type { UUID } from '@/types';
 
@@ -103,7 +104,8 @@ type RpcErrorShape = {
 
 function throwRpcError(rpcName: string, error: unknown): never {
   const e = (error ?? {}) as RpcErrorShape;
-  console.error(`[super-admin] ${rpcName} failed`, {
+  logger.error('super_admin_rpc_failed', {
+    rpcName,
     message: e.message,
     details: e.details,
     hint: e.hint,

@@ -16,6 +16,7 @@ import {
   fetchPlayerMilestones,
   fetchPlayerStatistics,
   fetchPlayerStatisticsById,
+  saveMatchCoachNote,
   saveMatchResult,
   updateMatch,
 } from './matchesApi';
@@ -35,6 +36,7 @@ function createMockBuilder(response: { data: unknown; error: unknown }) {
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
+    upsert: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
@@ -372,6 +374,68 @@ describe('matchesApi', () => {
       expect(awards?.playerOfMatch?.fullName).toBe('Player 1');
       expect(notes).toHaveLength(1);
       expect(notes[0]!.notes).toBe('Good execution');
+    });
+  });
+
+  describe('saveMatchCoachNote', () => {
+    it('deletes the row and skips my_player_id when the note is blank', async () => {
+      const matchId = 'm-1' as UUID;
+      const academyId = 'acad-1' as UUID;
+      const memberId = 'mem-1' as UUID;
+
+      const deleteBuilder = createMockBuilder({ data: null, error: null });
+      mockedSupabase.from.mockReturnValueOnce(deleteBuilder as never);
+
+      const result = await saveMatchCoachNote(matchId, academyId, memberId, '   ');
+
+      expect(result).toBeNull();
+      expect(mockedSupabase.from).toHaveBeenCalledWith('match_coach_notes');
+      expect(deleteBuilder.delete).toHaveBeenCalled();
+      expect(deleteBuilder.eq).toHaveBeenCalledWith('match_id', matchId);
+      expect(deleteBuilder.eq).toHaveBeenCalledWith('academy_member_id', memberId);
+      // A blank note is a delete, not a write — it must never call my_player_id or upsert.
+      expect(mockedSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('stamps coach_id via my_player_id and upserts a trimmed note', async () => {
+      const matchId = 'm-1' as UUID;
+      const academyId = 'acad-1' as UUID;
+      const memberId = 'mem-1' as UUID;
+
+      mockedSupabase.rpc.mockResolvedValueOnce({ data: 'coach-mem-1', error: null } as never);
+
+      const upsertBuilder = createMockBuilder({
+        data: {
+          id: 'cn-1',
+          match_id: matchId,
+          academy_member_id: memberId,
+          coach_id: 'coach-mem-1',
+          notes: 'Great footwork today',
+          coach: { id: 'coach-mem-1', profiles: { full_name: 'Coach 1', email: 'c1@test.com' } },
+        },
+        error: null,
+      });
+      mockedSupabase.from.mockReturnValueOnce(upsertBuilder as never);
+
+      const result = await saveMatchCoachNote(
+        matchId,
+        academyId,
+        memberId,
+        '  Great footwork today  ',
+      );
+
+      expect(mockedSupabase.rpc).toHaveBeenCalledWith('my_player_id', { p_academy: academyId });
+      expect(upsertBuilder.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          match_id: matchId,
+          academy_member_id: memberId,
+          coach_id: 'coach-mem-1',
+          notes: 'Great footwork today', // whitespace trimmed before it ever reaches Postgres
+        }),
+        expect.objectContaining({ onConflict: 'match_id,academy_member_id' }),
+      );
+      expect(result?.notes).toBe('Great footwork today');
+      expect(result?.academyMemberId).toBe(memberId);
     });
   });
 

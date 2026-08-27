@@ -5,6 +5,8 @@ import { Card, CardBody, CardHeader } from '@/components/ui';
 import { ErrorState, EmptyState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { isUUID } from '@/lib/validators';
+import { formatDate } from '@/lib/utils/date';
+import { MatchCoachNotesCard } from '../components/MatchCoachNotesCard';
 import {
   useMatch,
   useMatchLineups,
@@ -67,7 +69,7 @@ export default function MatchDetailPage() {
       <Card>
         <CardHeader
           title={match.matchName}
-          description={`${new Date(match.matchDate).toLocaleDateString()} • ${match.opponentName ?? 'No opponent'} • ${match.tournament ?? ''}`.trim()}
+          description={`${formatDate(match.matchDate)} • ${match.opponentName ?? 'No opponent'} • ${match.tournament ?? ''}`.trim()}
         />
         <CardBody>
           <div className="flex flex-wrap gap-3">
@@ -368,6 +370,14 @@ export default function MatchDetailPage() {
           )}
         </CardBody>
       </Card>
+
+      {academyId && (
+        <MatchCoachNotesCard
+          matchId={matchId}
+          academyId={academyId}
+          lineups={lineupsQuery.data ?? []}
+        />
+      )}
     </div>
   );
 }

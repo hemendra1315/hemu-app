@@ -13,6 +13,7 @@ import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
 import { useTestModeStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
 import { isUUID } from '@/lib/validators';
+import { formatDate } from '@/lib/utils/date';
 
 export default function StatsPage() {
   const { academyId, membership } = useActiveAcademy();
@@ -150,7 +151,7 @@ export default function StatsPage() {
                     <div>
                       <p className="text-fg font-medium">{match.matchName}</p>
                       <p className="text-fg-muted text-xs">
-                        {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                        {formatDate(match.matchDate)} • {match.opponentName}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -178,7 +179,7 @@ export default function StatsPage() {
             <CardBody className="p-4">
               <SimpleBarChart
                 data={analytics.runsTrend.map((m) => ({
-                  label: m.matchDate ? new Date(m.matchDate).toLocaleDateString() : '',
+                  label: m.matchDate ? formatDate(m.matchDate) : '',
                   value: m.runs,
                 }))}
                 height={200}

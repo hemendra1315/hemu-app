@@ -31,7 +31,7 @@ export type DrillAssignment = {
   batchId: UUID | null;
   batchName: string | null;
   status: DrillAssignmentStatus;
-  assignedBy: UUID | null;
+  assignedBy: string | null;
   assignedAt: string;
   dueDate: string | null;
   createdBy: UUID | null;

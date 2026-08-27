@@ -30,6 +30,11 @@ const DRILL_COLUMNS = `
 // embed must use the explicit FK hint. Within `academy_members`, `profiles`
 // has two FKs (`user_id`, `invited_by`) so the `profiles` embed must use
 // `academy_members_user_id_fkey` explicitly.
+// `drill_assignments` also has two direct FKs to `profiles` (`created_by`,
+// and a vestigial unused `assigned_by`), so the `creator` embed below must
+// use the explicit `drill_assignments_created_by_fkey` hint. It is a left
+// join (no `!inner`) so RLS-blocked or legacy-null creators degrade to
+// `null` gracefully rather than hiding the whole assignment.
 const ASSIGNMENT_COLUMNS = `
   id,
   academy_id,
@@ -43,7 +48,8 @@ const ASSIGNMENT_COLUMNS = `
   updated_at,
   drill:drills(id, name, category, description, duration_minutes, difficulty),
   batch:batches(id, name),
-  player:academy_members!drill_assignments_player_id_fkey(id, user_id, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url))
+  player:academy_members!drill_assignments_player_id_fkey(id, user_id, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url)),
+  creator:profiles!drill_assignments_created_by_fkey(full_name, email)
 `;
 
 function toDrill(row: any): Drill {
@@ -79,7 +85,7 @@ function toDrillAssignment(row: any): DrillAssignment {
     batchId: row.batch_id,
     batchName: row.batch?.name ?? null,
     status: row.status,
-    assignedBy: row.created_by,
+    assignedBy: row.creator?.full_name ?? row.creator?.email ?? null,
     assignedAt: row.assigned_at,
     dueDate: row.due_date,
     createdBy: row.created_by,
@@ -169,6 +175,9 @@ export async function fetchPlayerDrillAssignments(
 }
 
 export async function assignDrill(input: CreateDrillAssignmentInput): Promise<DrillAssignment> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const row = await unwrap<any>(
     (supabase as any)
       .from('drill_assignments')
@@ -180,6 +189,7 @@ export async function assignDrill(input: CreateDrillAssignmentInput): Promise<Dr
         due_date: input.dueDate,
         status: input.status ?? 'assigned',
         assigned_at: new Date().toISOString(),
+        created_by: user?.id ?? null,
       })
       .select(ASSIGNMENT_COLUMNS)
       .single(),

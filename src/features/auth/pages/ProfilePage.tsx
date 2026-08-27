@@ -18,6 +18,7 @@ import { useMemberships, useActiveAcademy } from '@/features/academies';
 import { useLinkedChildren } from '@/features/parents';
 import { InstallAppButton, ShareAppButton } from '@/features/pwa';
 import { errorMessage } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { profileFormSchema, type ProfileFormValues } from '@/lib/validators';
 import { useUiStore } from '@/stores';
 import { ROLE_LABELS } from '@/types/enums';
@@ -108,7 +109,7 @@ export default function ProfilePage() {
 
       // Non-blocking cleanup of actual storage
       removeAvatar(user.id, oldUrl).catch((err: unknown) => {
-        console.warn('[AVATAR_DEBUG] Silent cleanup failure:', err);
+        logger.warn('avatar_cleanup_failed', { error: err });
       });
     } catch (err: unknown) {
       const e = err as Error;
@@ -154,7 +155,7 @@ export default function ProfilePage() {
       // Non-blocking cleanup
       if (oldUrl && oldUrl !== newUrl) {
         removeAvatar(user.id, oldUrl).catch((err: unknown) => {
-          console.warn('[AVATAR_DEBUG] Silent cleanup failure:', err);
+          logger.warn('avatar_cleanup_failed', { error: err });
         });
       }
     } catch (err: unknown) {
@@ -162,7 +163,7 @@ export default function ProfilePage() {
       if (e?.message === 'Picker cancelled') {
         return;
       }
-      console.error('[AVATAR] Upload failed:', e);
+      logger.error('avatar_upload_failed', { error: e });
       setAvatarError(e?.message || 'Upload failed');
     } finally {
       setIsUploadingAvatar(false);

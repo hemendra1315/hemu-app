@@ -6,6 +6,7 @@ import { Browser } from '@capacitor/browser';
 
 import { AppProviders } from '@/app/providers';
 import { router } from '@/app/router';
+import { logger } from '@/lib/logger';
 
 /** App root: providers wrap the router. */
 export default function App() {
@@ -15,16 +16,13 @@ export default function App() {
         const incomingUrl = event.url;
         const parsedUrl = new URL(incomingUrl);
 
-        /* eslint-disable no-console */
-        console.log(
-          '[OAuth] appUrlOpen:',
-          parsedUrl.protocol + '//' + parsedUrl.hostname + parsedUrl.pathname,
-        );
+        logger.debug('oauth_app_url_open', {
+          url: parsedUrl.protocol + '//' + parsedUrl.hostname + parsedUrl.pathname,
+        });
 
         const hasCode = parsedUrl.searchParams.has('code');
 
-        console.log('[OAuth] callback code present:', hasCode);
-        /* eslint-enable no-console */
+        logger.debug('oauth_callback_code_present', { hasCode });
 
         if (parsedUrl.hostname === 'auth' && parsedUrl.pathname === '/callback') {
           // Native deep link received, close the external browser
@@ -35,7 +33,7 @@ export default function App() {
           router.navigate(`/auth/callback${parsedUrl.search}${parsedUrl.hash}`);
         }
       } catch (err) {
-        console.error('[OAuth] Failed to parse appUrlOpen URL:', err);
+        logger.error('oauth_app_url_open_parse_failed', { error: err });
       }
     });
 

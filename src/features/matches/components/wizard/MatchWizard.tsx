@@ -50,6 +50,20 @@ export function MatchWizard({
   }
 
   async function handleSave() {
+    /**
+     * `match_batting.batting_order` is what the match detail scorecard renders
+     * as "Pos" (0 → "Opening") and sorts the innings by. The Batting Order step
+     * collects it, but only ever wrote it to `state.lineup` — the batting rows
+     * were built without it, so `saveMatchResult` fell back to its `0` default
+     * and every batter on a wizard-created match was stored as position 0. The
+     * whole side then displayed as "Opening" in arbitrary order, and an entire
+     * wizard step's output was silently discarded.
+     *
+     * `state.batting` is seeded from `state.lineup` and keyed by the same
+     * `memberId`, so this lookup is exact for guests and members alike.
+     */
+    const battingOrderByMember = new Map(state.lineup.map((l) => [l.memberId, l.battingOrder]));
+
     // Construct payload for save_match_result RPC
     const payload: SaveMatchResultPayload = {
       match: {
@@ -81,6 +95,7 @@ export function MatchWizard({
         sixes: b.sixes,
         isOut: b.isOut,
         dismissalType: b.dismissalType || null,
+        battingOrder: battingOrderByMember.get(b.memberId) ?? null,
         isGuest: b.isGuest ?? false,
         guestName: b.isGuest ? b.guestName || null : null,
       })),

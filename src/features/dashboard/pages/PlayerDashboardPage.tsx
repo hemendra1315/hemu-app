@@ -10,7 +10,18 @@ import { SimpleBarChart, SimpleLineChart } from '@/components/charts/SimpleBarCh
 import { SessionRow } from '../components/SessionRow';
 import { useTestModeStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
+import { formatDate } from '@/lib/utils/date';
 import { isUUID } from '@/lib/validators';
+
+/** Turns the `YYYY-MM` keys produced by the attendance summary into "Mar 26". */
+function formatMonthLabel(month: string): string {
+  const [year, monthNumber] = month.split('-').map(Number);
+  if (!year || !monthNumber) return month;
+  return new Date(year, monthNumber - 1, 1).toLocaleDateString(undefined, {
+    month: 'short',
+    year: '2-digit',
+  });
+}
 
 export default function PlayerDashboardPage() {
   const { academyId, membership } = useActiveAcademy();
@@ -194,7 +205,7 @@ export default function PlayerDashboardPage() {
                   <div>
                     <p className="text-fg font-medium">{match.matchName}</p>
                     <p className="text-fg-muted text-sm">
-                      {new Date(match.matchDate).toLocaleDateString()} • {match.opponentName}
+                      {formatDate(match.matchDate)} • {match.opponentName}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -238,7 +249,7 @@ export default function PlayerDashboardPage() {
                         <p className="text-fg-muted text-sm">{assignment.drill.category}</p>
                         {assignment.dueDate && (
                           <p className="text-fg-muted text-xs">
-                            Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                            Due: {formatDate(assignment.dueDate)}
                           </p>
                         )}
                       </div>
@@ -280,7 +291,7 @@ export default function PlayerDashboardPage() {
                     <div>
                       <p className="text-fg font-medium">{award.matchName}</p>
                       <p className="text-fg-muted text-sm">
-                        {award.matchDate ? new Date(award.matchDate).toLocaleDateString() : ''}
+                        {award.matchDate ? formatDate(award.matchDate) : ''}
                       </p>
                     </div>
                     <Badge tone="success">Award</Badge>
@@ -316,25 +327,27 @@ export default function PlayerDashboardPage() {
                 <h4 className="text-fg-muted mb-2 text-sm font-medium">Runs Trend</h4>
                 <SimpleBarChart
                   data={analytics.runsTrend.map((m) => ({
-                    label: m.matchDate ? new Date(m.matchDate).toLocaleDateString() : '',
+                    label: m.matchDate ? formatDate(m.matchDate) : '',
                     value: m.runs,
                   }))}
                   height={200}
                 />
               </div>
-              <div>
-                <h4 className="text-fg-muted mb-2 text-sm font-medium">Attendance Trend</h4>
-                <SimpleLineChart
-                  data={[
-                    { label: 'Jan', value: 85 },
-                    { label: 'Feb', value: 78 },
-                    { label: 'Mar', value: 92 },
-                    { label: 'Apr', value: 88 },
-                    { label: 'May', value: 95 },
-                  ]}
-                  height={200}
-                />
-              </div>
+              {/* Optional-chained: the query cache is persisted to IndexedDB for
+                  24h, so a returning user can rehydrate a payload saved before
+                  `attendanceTrend` existed. */}
+              {analytics.attendanceTrend?.length ? (
+                <div>
+                  <h4 className="text-fg-muted mb-2 text-sm font-medium">Attendance Trend</h4>
+                  <SimpleLineChart
+                    data={analytics.attendanceTrend.map((m) => ({
+                      label: formatMonthLabel(m.month),
+                      value: m.percentage,
+                    }))}
+                    height={200}
+                  />
+                </div>
+              ) : null}
             </div>
           </CardBody>
         </Card>

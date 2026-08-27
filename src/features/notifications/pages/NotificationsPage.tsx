@@ -7,6 +7,7 @@ import {
   useDeleteNotification,
 } from '../hooks/useNotifications';
 import { useNavigate } from 'react-router-dom';
+import { formatDateTime } from '@/lib/utils/date';
 import type { Notification } from '../api/notificationsApi';
 
 export function NotificationsPage() {
@@ -82,9 +83,7 @@ export function NotificationsPage() {
                     {notif.title}
                   </h4>
                   <p className="text-fg-muted text-sm">{notif.message}</p>
-                  <p className="text-fg-subtle text-xs">
-                    {new Date(notif.created_at).toLocaleString()}
-                  </p>
+                  <p className="text-fg-subtle text-xs">{formatDateTime(notif.created_at)}</p>
                 </div>
 
                 <div className="flex items-center">

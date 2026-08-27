@@ -150,6 +150,22 @@ describe('batchesApi', () => {
         }),
       );
     });
+
+    it('sends training_days as an array, not the display string (text[] column)', async () => {
+      const mockBuilder = createMockBuilder({ data: mockRow, error: null });
+      mockedSupabase.from.mockReturnValue(mockBuilder as any);
+
+      await createBatch({
+        academyId,
+        name: 'U16',
+        ageGroup: 'U16',
+        trainingDays: 'Mon, Wed, Fri',
+      });
+
+      expect(mockBuilder.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ training_days: ['Mon', 'Wed', 'Fri'] }),
+      );
+    });
   });
 
   describe('updateBatch', () => {
@@ -176,6 +192,33 @@ describe('batchesApi', () => {
         expect.objectContaining({ name: 'U16 Updated' }),
       );
       expect(mockBuilder.eq).toHaveBeenCalledWith('id', batchId);
+    });
+
+    it('sends training_days as an array, not the display string (text[] column)', async () => {
+      const mockRow = {
+        id: batchId,
+        academy_id: academyId,
+        name: 'U16 Updated',
+        age_group: 'U16',
+        description: null,
+        training_days: ['Mon', 'Wed', 'Fri'],
+        training_time: null,
+        coach_id: null,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      };
+      const mockBuilder = createMockBuilder({ data: mockRow, error: null });
+      mockedSupabase.from.mockReturnValue(mockBuilder as any);
+
+      await updateBatch(batchId, {
+        name: 'U16 Updated',
+        ageGroup: 'U16',
+        trainingDays: 'Mon, Wed, Fri',
+      });
+
+      expect(mockBuilder.update).toHaveBeenCalledWith(
+        expect.objectContaining({ training_days: ['Mon', 'Wed', 'Fri'] }),
+      );
     });
 
     it('throws when update returns an error', async () => {
