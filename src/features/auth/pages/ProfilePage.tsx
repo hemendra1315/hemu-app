@@ -16,7 +16,7 @@ import {
 } from '@/components/ui';
 import { useMemberships, useActiveAcademy } from '@/features/academies';
 import { useLinkedChildren } from '@/features/parents';
-import { InstallAppButton, ShareAppButton } from '@/features/pwa';
+import { InstallAppButton, PushNotificationToggle, ShareAppButton } from '@/features/pwa';
 import { errorMessage } from '@/lib/api';
 import { logger } from '@/lib/logger';
 import { profileFormSchema, type ProfileFormValues } from '@/lib/validators';
@@ -68,6 +68,7 @@ function LinkedChildrenSection() {
 export default function ProfilePage() {
   const { user, profile } = useAuth();
   const { all } = useMemberships();
+  const { academyId } = useActiveAcademy();
   const updateProfile = useUpdateProfile();
   const pushToast = useUiStore((state) => state.pushToast);
 
@@ -311,6 +312,16 @@ export default function ProfilePage() {
       </Card>
 
       {isParent && <LinkedChildrenSection />}
+
+      <Card>
+        <CardHeader
+          title="Notifications"
+          description="Get a push notification when your academy sends an announcement."
+        />
+        <CardBody>
+          <PushNotificationToggle academyId={academyId} />
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader
