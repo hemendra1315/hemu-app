@@ -2,6 +2,7 @@ import {
   CalendarDays,
   FlaskConical,
   LayoutDashboard,
+  Megaphone,
   Menu,
   ShieldCheck,
   Trophy,
@@ -87,6 +88,13 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     label: 'Members',
     icon: <Users className="h-4 w-4" aria-hidden />,
     requiresCapability: 'members:manage',
+    group: 'People',
+  },
+  {
+    to: '/announcements',
+    label: 'Announcements',
+    icon: <Megaphone className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'announcements:manage',
     group: 'People',
   },
   {
