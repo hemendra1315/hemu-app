@@ -39,6 +39,8 @@ export default function PlatformDashboardPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'academies' | 'users'>('overview');
   const [academySearch, setAcademySearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [userPage, setUserPage] = useState(1);
+  const USERS_PER_PAGE = 15;
   const [selectedAcademyId, setSelectedAcademyId] = useState<UUID | null>(null);
 
   // Create Academy Modal state
@@ -181,6 +183,12 @@ export default function PlatformDashboardPage() {
     (u) =>
       u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
       (u.fullName && u.fullName.toLowerCase().includes(userSearch.toLowerCase())),
+  );
+  const userTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const currentUserPage = Math.min(userPage, userTotalPages);
+  const pagedUsers = filteredUsers.slice(
+    (currentUserPage - 1) * USERS_PER_PAGE,
+    currentUserPage * USERS_PER_PAGE,
   );
 
   return (
@@ -533,10 +541,7 @@ export default function PlatformDashboardPage() {
                       <tr>
                         <th className="px-2 py-3">Academy</th>
                         <th className="px-2 py-3">Owner</th>
-                        <th className="px-2 py-3">Players</th>
-                        <th className="px-2 py-3">Coaches</th>
-                        <th className="px-2 py-3">Batches</th>
-                        <th className="px-2 py-3">Matches</th>
+                        <th className="px-2 py-3">Roster</th>
                         <th className="px-2 py-3">Created</th>
                         <th className="px-2 py-3 text-right">Actions</th>
                       </tr>
@@ -564,50 +569,53 @@ export default function PlatformDashboardPage() {
                             <div className="text-fg">{acad.ownerName}</div>
                             <div className="text-fg-muted text-xs">{acad.ownerEmail}</div>
                           </td>
-                          <td className="text-fg px-2 py-3">{acad.playerCount}</td>
-                          <td className="text-fg px-2 py-3">{acad.coachCount}</td>
-                          <td className="text-fg px-2 py-3">{acad.batchCount}</td>
-                          <td className="text-fg px-2 py-3">{acad.matchCount}</td>
+                          <td className="text-fg-muted px-2 py-3 text-xs whitespace-nowrap">
+                            {acad.playerCount}P · {acad.coachCount}C · {acad.batchCount}B ·{' '}
+                            {acad.matchCount}M
+                          </td>
                           <td className="text-fg-muted px-2 py-3">{formatDate(acad.createdAt)}</td>
-                          <td className="flex items-center justify-end gap-2 px-2 py-3 text-right">
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              onClick={() => handleEnterAcademy(acad)}
-                              className="min-h-[36px] gap-1"
-                            >
-                              <LogIn className="h-3.5 w-3.5" /> Enter Academy
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setInviteModalAcademy(acad);
-                                setActiveInviteToken(null);
-                              }}
-                              className="min-h-[36px] gap-1"
-                              title="Generate/Manage Owner Invite"
-                            >
-                              <Link2 className="h-3.5 w-3.5" /> Owner Invite
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setSelectedAcademyId(acad.id);
-                              }}
-                            >
-                              Details
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-600"
-                              onClick={() => setAcademyToDelete(acad)}
-                              aria-label={`Delete ${acad.name}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                          <td className="px-2 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleEnterAcademy(acad)}
+                                className="min-h-[36px] gap-1"
+                              >
+                                <LogIn className="h-3.5 w-3.5" /> Enter
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setInviteModalAcademy(acad);
+                                  setActiveInviteToken(null);
+                                }}
+                                aria-label={`Owner invite for ${acad.name}`}
+                                title="Owner invite"
+                              >
+                                <Link2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setSelectedAcademyId(acad.id)}
+                                aria-label={`Details for ${acad.name}`}
+                                title="Details"
+                              >
+                                <Building2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-600"
+                                onClick={() => setAcademyToDelete(acad)}
+                                aria-label={`Delete ${acad.name}`}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -631,7 +639,10 @@ export default function PlatformDashboardPage() {
                 <Input
                   placeholder="Search user name or email..."
                   value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
+                  onChange={(e) => {
+                    setUserSearch(e.target.value);
+                    setUserPage(1);
+                  }}
                 />
               </div>
             }
@@ -645,9 +656,14 @@ export default function PlatformDashboardPage() {
               <p className="text-fg-muted text-sm">No users found matching your search.</p>
             ) : (
               <>
+                <p className="text-fg-muted mb-3 text-xs">
+                  Showing {pagedUsers.length === 0 ? 0 : (currentUserPage - 1) * USERS_PER_PAGE + 1}
+                  –{(currentUserPage - 1) * USERS_PER_PAGE + pagedUsers.length} of{' '}
+                  {filteredUsers.length} users
+                </p>
                 {/* Mobile Cards Layout (< md) */}
                 <div className="space-y-3 md:hidden">
-                  {filteredUsers.map((u) => (
+                  {pagedUsers.map((u) => (
                     <div
                       key={u.id}
                       className="border-border-subtle bg-surface space-y-2.5 rounded-xl border p-4 shadow-2xs"
@@ -710,7 +726,7 @@ export default function PlatformDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-border-subtle divide-y">
-                      {filteredUsers.map((u) => (
+                      {pagedUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-surface-subtle/50">
                           <td className="px-2 py-3">
                             <div className="text-fg font-medium">{u.fullName ?? u.email}</div>
@@ -749,6 +765,30 @@ export default function PlatformDashboardPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {userTotalPages > 1 ? (
+                  <div className="border-border-subtle mt-4 flex items-center justify-between border-t pt-3">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={currentUserPage <= 1}
+                      onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-fg-muted text-xs font-medium">
+                      Page {currentUserPage} of {userTotalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={currentUserPage >= userTotalPages}
+                      onClick={() => setUserPage((p) => Math.min(userTotalPages, p + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                ) : null}
               </>
             )}
           </CardBody>
