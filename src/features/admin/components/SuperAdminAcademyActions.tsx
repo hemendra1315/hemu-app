@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { UserPlus, Sparkles, UserCheck, Settings, Building2, FlaskConical } from 'lucide-react';
-import { Button, Modal } from '@/components/ui';
+import { UserPlus, Sparkles, UserCheck, Settings, FlaskConical } from 'lucide-react';
+import { Modal } from '@/components/ui';
 import { useAuthStore, useTestModeStore } from '@/stores';
 import { useActiveAcademy } from '@/features/academies';
 import { AddMemberModal } from './AddMemberModal';
@@ -28,20 +28,23 @@ export function SuperAdminAcademyActions() {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-2.5">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Building2 className="h-4 w-4 shrink-0 text-amber-500" />
-          <span className="truncate text-xs font-bold text-amber-500">Super Admin Controls</span>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
+      {/*
+       * Deliberately unobtrusive: this page is meant to look and feel exactly
+       * like the academy owner's own dashboard when a super admin enters an
+       * academy. A single small icon (no banner, no "Super Admin" label,
+       * no color) keeps Add Member / Add Coach / Seed Demo Data / Test App As
+       * reachable without announcing that a super admin is looking at it.
+       */}
+      <div className="flex justify-end">
+        <button
+          type="button"
           onClick={() => setIsMenuOpen(true)}
-          className="h-9 min-h-[36px] shrink-0 border-amber-500/30 px-3 text-xs font-bold text-amber-500 hover:bg-amber-500/20"
+          title="Academy management"
+          aria-label="Academy management"
+          className="text-fg-muted hover:text-fg hover:bg-surface-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors"
         >
-          <Settings className="mr-1.5 h-3.5 w-3.5" />
-          Manage
-        </Button>
+          <Settings className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Academy Management Bottom Sheet / Menu */}
