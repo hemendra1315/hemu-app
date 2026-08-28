@@ -5,6 +5,12 @@ import { Button } from '@/components/ui';
 import { logger } from '@/lib/logger';
 import { useUiStore } from '@/stores';
 import { subscribeToPush, unsubscribeFromPush } from '@/lib/push/pushSubscription';
+import {
+  isNativePush,
+  isNativePushSubscribed,
+  subscribeToNativePush,
+  unsubscribeFromNativePush,
+} from '@/lib/push/nativePush';
 
 type Status = 'checking' | 'unsupported' | 'blocked' | 'subscribed' | 'unsubscribed';
 
@@ -22,6 +28,12 @@ export function PushNotificationToggle({ academyId }: { academyId: string | null
     let cancelled = false;
 
     async function checkStatus() {
+      if (isNativePush()) {
+        const subscribed = await isNativePushSubscribed();
+        if (!cancelled) setStatus(subscribed ? 'subscribed' : 'unsubscribed');
+        return;
+      }
+
       const supported =
         'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
       if (!supported) {
@@ -62,12 +74,17 @@ export function PushNotificationToggle({ academyId }: { academyId: string | null
     }
     setIsBusy(true);
     try {
-      const result = await subscribeToPush(academyId);
+      const result = isNativePush()
+        ? await subscribeToNativePush(academyId)
+        : await subscribeToPush(academyId);
       if (result === 'granted') {
         setStatus('subscribed');
         pushToast({ title: 'Notifications enabled', variant: 'success' });
       } else if (result === 'denied') {
-        setStatus(Notification.permission === 'denied' ? 'blocked' : 'unsubscribed');
+        // The web `Notification` API doesn't exist in the native Android
+        // WebView, so only consult it on the web path.
+        const blocked = !isNativePush() && Notification.permission === 'denied';
+        setStatus(blocked ? 'blocked' : 'unsubscribed');
         pushToast({
           title: 'Could not enable notifications',
           description: 'Permission was not granted.',
@@ -87,7 +104,11 @@ export function PushNotificationToggle({ academyId }: { academyId: string | null
   const handleDisable = async () => {
     setIsBusy(true);
     try {
-      await unsubscribeFromPush();
+      if (isNativePush()) {
+        await unsubscribeFromNativePush();
+      } else {
+        await unsubscribeFromPush();
+      }
       setStatus('unsubscribed');
       pushToast({ title: 'Notifications disabled', variant: 'success' });
     } catch (err) {

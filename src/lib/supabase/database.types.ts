@@ -2139,29 +2139,35 @@ export type Database = {
       push_subscriptions: {
         Row: {
           academy_id: string
-          auth: string
+          auth: string | null
           created_at: string
           endpoint: string
+          fcm_token: string | null
           id: string
-          p256dh: string
+          p256dh: string | null
+          platform: string
           user_id: string
         }
         Insert: {
           academy_id: string
-          auth: string
+          auth?: string | null
           created_at?: string
           endpoint: string
+          fcm_token?: string | null
           id?: string
-          p256dh: string
+          p256dh?: string | null
+          platform?: string
           user_id: string
         }
         Update: {
           academy_id?: string
-          auth?: string
+          auth?: string | null
           created_at?: string
           endpoint?: string
+          fcm_token?: string | null
           id?: string
-          p256dh?: string
+          p256dh?: string | null
+          platform?: string
           user_id?: string
         }
         Relationships: [

@@ -47,4 +47,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Android 13+ requires this to be requested at runtime before a
+         notification is shown; @capacitor/push-notifications' register()
+         call triggers that runtime prompt, but the app can't ask at all
+         without this declared here first. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

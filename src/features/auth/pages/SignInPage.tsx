@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 
 import { Button, Card, CardBody, Input } from '@/components/ui';
@@ -197,6 +197,17 @@ export default function SignInPage() {
           >
             {isSignUp ? 'Sign Up' : 'Sign In with Password'}
           </Button>
+
+          {!isSignUp && (
+            <div className="text-center">
+              <Link
+                to="/forgot-password"
+                className="text-fg-muted hover:text-fg text-sm hover:underline"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+          )}
 
           <div className="pt-2 text-center text-sm">
             <span className="text-fg-muted">

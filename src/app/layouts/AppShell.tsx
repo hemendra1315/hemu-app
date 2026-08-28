@@ -192,8 +192,15 @@ export function AppShell() {
 
   return (
     <div className="bg-bg min-h-screen">
-      {/* HEADER: Compact & Responsive */}
-      <header className="border-border-subtle bg-surface/95 sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 backdrop-blur-md">
+      {/* HEADER: Compact & Responsive.
+          `viewport-fit=cover` (index.html) lets the page draw edge to edge,
+          which in the native Android app means underneath the system status
+          bar — the clock and battery icons sat on top of the academy name.
+          The inset padding pushes the header's contents clear of it; it
+          resolves to 0px in a normal desktop browser, so this costs nothing
+          there. `h-14` becomes a min-height so the bar can grow by the inset
+          instead of clipping its own contents. */}
+      <header className="border-border-subtle bg-surface/95 sticky top-0 z-30 flex min-h-14 items-center justify-between border-b px-4 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <AcademySwitcher className="min-w-0" />
         </div>

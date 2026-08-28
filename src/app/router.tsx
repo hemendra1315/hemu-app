@@ -13,6 +13,8 @@ import { AppShell, AuthLayout, OnboardingLayout, PrintLayout } from './layouts';
 /** Route-level code splitting keeps the initial bundle small. */
 const SignInPage = lazy(() => import('@/features/auth/pages/SignInPage'));
 const AuthCallbackPage = lazy(() => import('@/features/auth/pages/AuthCallbackPage'));
+const ForgotPasswordPage = lazy(() => import('@/features/auth/pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('@/features/auth/pages/ResetPasswordPage'));
 const ProfilePage = lazy(() => import('@/features/auth/pages/ProfilePage'));
 const ProfileOnboardingPage = lazy(
   () => import('@/features/onboarding/pages/ProfileOnboardingPage'),
@@ -86,6 +88,10 @@ export const router = createBrowserRouter([
       { path: '/signin', element: <Navigate to="/sign-in" replace /> },
       { path: '/login', element: <Navigate to="/sign-in" replace /> },
       { path: '/auth/callback', element: <AuthCallbackPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      // Not under RequireAuth: the recovery link's own code is what creates
+      // the session, so this page has to be reachable while signed out.
+      { path: '/auth/reset-password', element: <ResetPasswordPage /> },
     ],
   },
   {

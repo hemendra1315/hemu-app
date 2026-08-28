@@ -24,13 +24,20 @@ export default function App() {
 
         logger.debug('oauth_callback_code_present', { hasCode });
 
-        if (parsedUrl.hostname === 'auth' && parsedUrl.pathname === '/callback') {
+        // Both auth deep links land here: OAuth sign-in (/callback) and the
+        // emailed password-recovery link (/reset-password). Each carries a
+        // one-time PKCE code that its own page exchanges for a session.
+        const isAuthDeepLink =
+          parsedUrl.hostname === 'auth' &&
+          (parsedUrl.pathname === '/callback' || parsedUrl.pathname === '/reset-password');
+
+        if (isAuthDeepLink) {
           // Native deep link received, close the external browser
           if (Capacitor.isNativePlatform()) {
             Browser.close().catch(() => {});
           }
-          // Navigate to the callback route safely via React Router
-          router.navigate(`/auth/callback${parsedUrl.search}${parsedUrl.hash}`);
+          // Navigate to the matching route safely via React Router
+          router.navigate(`/auth${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`);
         }
       } catch (err) {
         logger.error('oauth_app_url_open_parse_failed', { error: err });

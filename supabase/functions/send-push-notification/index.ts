@@ -1,20 +1,53 @@
 // Supabase Edge Function: send-push-notification
 // Triggered after an announcement is created.
-// Fans out Web Push notifications to all matching subscriptions.
+// Fans out notifications to all matching subscriptions — Web Push
+// (browser/PWA) and native Android (FCM), branching on push_subscriptions.platform.
 //
 // Environment secrets required (set in Supabase Dashboard → Edge Functions → Secrets):
-//   VAPID_PUBLIC_KEY   = <your public key>
-//   VAPID_PRIVATE_KEY  = <your private key>
-//   VAPID_SUBJECT      = mailto:admin@youracademy.com
+//   VAPID_PUBLIC_KEY   = <your public key>            (Web Push)
+//   VAPID_PRIVATE_KEY  = <your private key>            (Web Push)
+//   VAPID_SUBJECT      = mailto:admin@youracademy.com  (Web Push)
+//   FCM_SERVICE_ACCOUNT_JSON = <the whole downloaded service-account JSON,   (native Android)
+//                               from Firebase Console → Project Settings →
+//                               Service Accounts → Generate new private key>
 //   SUPABASE_URL       = (auto-injected)
 //   SUPABASE_SERVICE_ROLE_KEY = (auto-injected)
+//
+// Native Android pushes go through FCM's HTTP v1 API, which authenticates
+// with a short-lived OAuth2 token minted from the service account (the
+// legacy "server key" + `Authorization: key=...` API was shut down by
+// Google) — see getFcmAccessToken() below. Web Push subscriptions don't need
+// this at all; they authenticate with the VAPID keypair already configured.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
+// CORS. Two things here are load-bearing, and getting either wrong produces
+// the same confusing symptom — a 200 OPTIONS in the logs followed by no POST
+// at all, i.e. "the function was never called":
+//
+//  1. `Access-Control-Allow-Methods` — a JSON POST is not a CORS-safelisted
+//     request, so the browser preflights it and needs the method listed.
+//  2. `Access-Control-Allow-Headers` must cover EVERY custom header the
+//     supabase-js client attaches. Hardcoding that list is fragile: the app
+//     sets its own `x-application-name` global header, and any future one
+//     would silently break dispatch again. So we echo back exactly what the
+//     preflight asked permission for instead of maintaining a list.
+const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
+
+const FALLBACK_ALLOW_HEADERS =
+  'authorization, x-client-info, apikey, content-type, x-application-name, x-supabase-api-version';
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  return {
+    ...BASE_CORS_HEADERS,
+    'Access-Control-Allow-Headers':
+      req.headers.get('Access-Control-Request-Headers') ?? FALLBACK_ALLOW_HEADERS,
+  };
+}
 
 // ─── VAPID helpers (pure Deno / Web Crypto — no npm) ────────────────────────
 
@@ -231,14 +264,107 @@ async function encryptWebPushPayload(
   return concatBytes(header, ciphertext);
 }
 
+// ─── FCM (native Android) helpers ────────────────────────────────────────────
+
+interface FcmServiceAccount {
+  project_id: string;
+  client_email: string;
+  private_key: string;
+}
+
+function pemPrivateKeyToDer(pem: string): Uint8Array {
+  const b64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s+/g, '');
+  const binary = atob(b64);
+  return new Uint8Array([...binary].map((c) => c.charCodeAt(0)));
+}
+
+/**
+ * Exchanges the service account's private key for a short-lived OAuth2
+ * access token, by signing a JWT assertion ourselves (RS256, Web Crypto —
+ * no npm) and trading it at Google's token endpoint. One token is reused
+ * for every Android send in this invocation rather than minted per-message.
+ */
+async function getFcmAccessToken(serviceAccount: FcmServiceAccount): Promise<string> {
+  const privateKey = await crypto.subtle.importKey(
+    'pkcs8',
+    pemPrivateKeyToDer(serviceAccount.private_key),
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const claims = {
+    iss: serviceAccount.client_email,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const headerB64 = uint8ArrayToBase64url(new TextEncoder().encode(JSON.stringify(header)));
+  const claimsB64 = uint8ArrayToBase64url(new TextEncoder().encode(JSON.stringify(claims)));
+  const signingInput = `${headerB64}.${claimsB64}`;
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    privateKey,
+    new TextEncoder().encode(signingInput),
+  );
+  const assertion = `${signingInput}.${uint8ArrayToBase64url(new Uint8Array(signature))}`;
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`FCM OAuth token exchange failed: ${res.status} ${await res.text()}`);
+  }
+  const json = (await res.json()) as { access_token: string };
+  return json.access_token;
+}
+
+async function sendFcmMessage(
+  projectId: string,
+  accessToken: string,
+  fcmToken: string,
+  title: string,
+  body: string,
+): Promise<Response> {
+  return fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: {
+        token: fcmToken,
+        notification: { title, body },
+        data: { url: '/announcements' },
+        android: { priority: 'high' },
+      },
+    }),
+  });
+}
+
 // ─── Main handler ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = corsHeadersFor(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
     const { announcement_id } = (await req.json()) as { announcement_id: string };
     if (!announcement_id) return new Response('Missing announcement_id', { status: 400 });
+    console.log('push_dispatch_start', { announcement_id });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -274,79 +400,149 @@ Deno.serve(async (req: Request) => {
       ),
     ];
 
-    if (userIds.length === 0)
+    if (userIds.length === 0) {
+      console.log('push_dispatch_no_recipients');
       return new Response(JSON.stringify({ sent: 0 }), { headers: corsHeaders });
+    }
 
-    // 3. Load push subscriptions for these users
+    // 3. Load push subscriptions for these users (both platforms)
     const { data: subs } = await supabase
       .from('push_subscriptions')
-      .select('id, endpoint, p256dh, auth')
+      .select('id, platform, endpoint, p256dh, auth, fcm_token')
       .in('user_id', userIds);
 
-    if (!subs || subs.length === 0)
+    if (!subs || subs.length === 0) {
+      console.log('push_dispatch_no_subscriptions', { recipients: userIds.length });
       return new Response(JSON.stringify({ sent: 0 }), { headers: corsHeaders });
+    }
 
-    // 4. Build VAPID auth
-    const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')!;
-    const vapidPrivateKeyB64 = Deno.env.get('VAPID_PRIVATE_KEY')!;
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@cricketacademy.app';
-    const privateKey = await importVapidPrivateKey(vapidPrivateKeyB64);
+    type PushSub = {
+      id: string;
+      platform: 'web' | 'android';
+      endpoint: string;
+      p256dh: string | null;
+      auth: string | null;
+      fcm_token: string | null;
+    };
+    const allSubs = subs as PushSub[];
+    const webSubs = allSubs.filter((s) => s.platform === 'web');
+    const androidSubs = allSubs.filter((s) => s.platform === 'android');
+    console.log('push_dispatch_targets', {
+      recipients: userIds.length,
+      web: webSubs.length,
+      android: androidSubs.length,
+    });
 
-    const payloadBytes = new TextEncoder().encode(
-      JSON.stringify({
-        title: announcement.title,
-        body: announcement.message,
-        icon: '/icons/icon-192.png',
-        data: { url: '/announcements' },
-      }),
-    );
-
-    // 5. Send pushes, collect stale/undecryptable endpoints to prune
     const staleIds: string[] = [];
     let sent = 0;
 
-    type PushSub = { id: string; endpoint: string; p256dh: string; auth: string };
-    await Promise.all(
-      (subs as PushSub[]).map(async (sub) => {
-        try {
-          const origin = new URL(sub.endpoint).origin;
-          const jwt = await buildVapidJwt(origin, vapidSubject, privateKey);
-          const authHeader = `vapid t=${jwt},k=${vapidPublicKey}`;
-          const body = await encryptWebPushPayload(payloadBytes, sub.p256dh, sub.auth);
+    // 4a. Web Push — VAPID + RFC 8291 encryption
+    if (webSubs.length > 0) {
+      const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')!;
+      const vapidPrivateKeyB64 = Deno.env.get('VAPID_PRIVATE_KEY')!;
+      const vapidSubject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@cricketacademy.app';
+      const privateKey = await importVapidPrivateKey(vapidPrivateKeyB64);
 
-          const res = await fetch(sub.endpoint, {
-            method: 'POST',
-            headers: {
-              Authorization: authHeader,
-              'Content-Type': 'application/octet-stream',
-              'Content-Encoding': 'aes128gcm',
-              TTL: '86400',
-            },
-            body,
-          });
+      const payloadBytes = new TextEncoder().encode(
+        JSON.stringify({
+          title: announcement.title,
+          body: announcement.message,
+          icon: '/icons/icon-192.png',
+          data: { url: '/announcements' },
+        }),
+      );
 
-          // 400/401/403 alongside 404/410 usually means a malformed or
-          // revoked subscription (bad keys, wrong endpoint) rather than a
-          // transient failure — prune those too so they don't keep failing
-          // silently on every future announcement.
-          if ([400, 401, 403, 404, 410].includes(res.status)) {
-            staleIds.push(sub.id);
-          } else if (res.ok || res.status === 201) {
-            sent++;
+      await Promise.all(
+        webSubs.map(async (sub) => {
+          try {
+            const origin = new URL(sub.endpoint).origin;
+            const jwt = await buildVapidJwt(origin, vapidSubject, privateKey);
+            const authHeader = `vapid t=${jwt},k=${vapidPublicKey}`;
+            const body = await encryptWebPushPayload(payloadBytes, sub.p256dh!, sub.auth!);
+
+            const res = await fetch(sub.endpoint, {
+              method: 'POST',
+              headers: {
+                Authorization: authHeader,
+                'Content-Type': 'application/octet-stream',
+                'Content-Encoding': 'aes128gcm',
+                TTL: '86400',
+              },
+              body,
+            });
+
+            // 400/401/403 alongside 404/410 usually means a malformed or
+            // revoked subscription (bad keys, wrong endpoint) rather than a
+            // transient failure — prune those too so they don't keep failing
+            // silently on every future announcement.
+            if ([400, 401, 403, 404, 410].includes(res.status)) {
+              staleIds.push(sub.id);
+            } else if (res.ok || res.status === 201) {
+              sent++;
+            }
+          } catch {
+            // Network error or malformed subscription keys — skip, will retry
+            // on next announcement rather than pruning on a possibly-transient
+            // failure.
           }
-        } catch {
-          // Network error or malformed subscription keys — skip, will retry
-          // on next announcement rather than pruning on a possibly-transient
-          // failure.
-        }
-      }),
-    );
+        }),
+      );
+    }
 
-    // 6. Prune stale subscriptions
+    // 4b. Native Android — FCM HTTP v1
+    if (androidSubs.length > 0) {
+      const serviceAccountJson = Deno.env.get('FCM_SERVICE_ACCOUNT_JSON');
+      if (!serviceAccountJson) {
+        console.warn(
+          'FCM_SERVICE_ACCOUNT_JSON not set — skipping',
+          androidSubs.length,
+          'Android subscription(s)',
+        );
+      } else {
+        try {
+          const serviceAccount = JSON.parse(serviceAccountJson) as FcmServiceAccount;
+          const accessToken = await getFcmAccessToken(serviceAccount);
+
+          await Promise.all(
+            androidSubs.map(async (sub) => {
+              try {
+                const res = await sendFcmMessage(
+                  serviceAccount.project_id,
+                  accessToken,
+                  sub.fcm_token!,
+                  announcement.title,
+                  announcement.message,
+                );
+
+                if (res.ok) {
+                  sent++;
+                  console.log('fcm_send_ok');
+                } else if (res.status === 404 || res.status === 400) {
+                  console.warn('fcm_send_rejected', res.status, await res.text());
+                  // UNREGISTERED / INVALID_ARGUMENT — the token is dead
+                  // (uninstalled app, expired, malformed); stop sending to it.
+                  staleIds.push(sub.id);
+                } else {
+                  console.warn('fcm_send_failed', res.status, await res.text());
+                }
+              } catch (err) {
+                // Network error — skip, will retry on next announcement.
+                console.warn('fcm_send_threw', String(err));
+              }
+            }),
+          );
+        } catch (err) {
+          console.error('FCM send failed:', err);
+        }
+      }
+    }
+
+    // 5. Prune stale subscriptions
     if (staleIds.length > 0) {
       await supabase.from('push_subscriptions').delete().in('id', staleIds);
     }
 
+    console.log('push_dispatch_done', { sent, pruned: staleIds.length });
     return new Response(JSON.stringify({ sent, pruned: staleIds.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

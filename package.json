@@ -34,6 +34,7 @@
     "@capacitor/camera": "^8.2.2",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/push-notifications": "^8.0.2",
     "@hookform/resolvers": "^5.7.1",
     "@supabase/supabase-js": "^2.109.0",
     "@tanstack/react-query": "^5.101.4",

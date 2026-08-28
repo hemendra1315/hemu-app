@@ -49,6 +49,15 @@ export default tseslint.config(
     rules: { 'no-console': 'off' },
   },
   {
+    // Supabase Edge Functions run on Deno, not in the browser bundle that
+    // `no-console` exists to keep clean, and `console` is the only logging
+    // mechanism the Supabase log viewer reads. Restricting them to warn/error
+    // would force normal dispatch tracing to masquerade as warnings.
+    files: ['supabase/functions/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: { 'no-console': 'off' },
+  },
+  {
     // The route tree intentionally exports only route configuration.
     files: ['src/app/router.tsx'],
     rules: { 'react-refresh/only-export-components': 'off' },

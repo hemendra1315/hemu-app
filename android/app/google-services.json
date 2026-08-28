@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1046492866035",
+    "project_id": "cricket-academy-manager-9ade4",
+    "storage_bucket": "cricket-academy-manager-9ade4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1046492866035:android:63fdeee890a34d2d081e86",
+        "android_client_info": {
+          "package_name": "com.hemu.cricketacademy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAdPc3qahve9JQEj4jJx5dKdYmcP0xztmo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

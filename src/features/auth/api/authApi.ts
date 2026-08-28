@@ -60,6 +60,40 @@ export async function signUpWithPassword(
   return { session: data.session };
 }
 
+/**
+ * Sends the "reset your password" email. Deliberately does NOT report whether
+ * the address exists — Supabase returns success either way, and surfacing the
+ * difference would turn this form into a way to test which emails have
+ * accounts here. The UI says "if that address has an account" for the same
+ * reason.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  // Same native/web split as Google sign-in: inside the Android app the
+  // recovery link has to come back through the app's own URL scheme, not the
+  // website, or the user ends up resetting their password in a browser that
+  // the app knows nothing about.
+  const isNative =
+    Capacitor.isNativePlatform() ||
+    (typeof window !== 'undefined' &&
+      !!(window as unknown as { Capacitor?: { isNative?: boolean } }).Capacitor?.isNative);
+
+  const redirectTo = isNative
+    ? 'com.hemu.cricketacademy://auth/reset-password'
+    : `${window.location.origin}/auth/reset-password`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) throw toApiError(error);
+}
+
+/**
+ * Sets a new password for the currently-authenticated user. The recovery link
+ * signs the user in temporarily, which is what authorises this call.
+ */
+export async function updatePassword(newPassword: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw toApiError(error);
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) throw toApiError(error);
