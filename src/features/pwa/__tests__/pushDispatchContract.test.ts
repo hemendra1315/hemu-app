@@ -49,9 +49,10 @@ describe('send-push-notification CORS contract (bug #46)', () => {
     const globalHeaders = clientSource.match(/global:\s*\{\s*headers:\s*\{([^}]*)\}/s);
     expect(globalHeaders, 'could not locate global headers on the Supabase client').not.toBeNull();
 
-    const headerNames = [...globalHeaders![1].matchAll(/'([\w-]+)'\s*:/g)].map((m) =>
-      m[1].toLowerCase(),
-    );
+    const headerBlock = globalHeaders?.[1] ?? '';
+    const headerNames = [...headerBlock.matchAll(/'([\w-]+)'\s*:/g)]
+      .map((m) => m[1]?.toLowerCase())
+      .filter((name): name is string => Boolean(name));
     expect(headerNames.length).toBeGreaterThan(0);
 
     for (const name of headerNames) {

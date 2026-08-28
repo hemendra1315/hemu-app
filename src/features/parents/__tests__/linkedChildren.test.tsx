@@ -111,8 +111,9 @@ describe('fetchLinkedChildren — query shape (bug #42)', () => {
     }
 
     expect(children).toHaveLength(1);
-    expect(children[0].linkId).toBe(PARENT_LINK_ID);
-    expect(children[0].relationshipType).toBe('father');
+    const [child] = children;
+    expect(child?.linkId).toBe(PARENT_LINK_ID);
+    expect(child?.relationshipType).toBe('father');
   });
 
   it('returns an empty list without a second query when there are no links', async () => {

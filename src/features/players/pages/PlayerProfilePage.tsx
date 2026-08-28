@@ -659,6 +659,17 @@ function MatchHistoryTab({ matches }: { matches: PlayerMatch[] }) {
                       {match.bowling.wickets}/{match.bowling.runsConceded}
                     </span>
                   )}
+                  {/* Selected but with nothing recorded: the player was in the
+                      XI and simply never got to bat or bowl. Saying so beats a
+                      row with no figures at all, which reads as missing data. */}
+                  {!match.batting && !match.bowling && (
+                    <span
+                      className="bg-surface-muted border-border-subtle/40 text-fg-muted rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold"
+                      title="Selected, but did not bat or bowl"
+                    >
+                      DNB
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}

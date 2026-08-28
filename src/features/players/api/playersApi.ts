@@ -161,7 +161,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
     id, match_name, match_date, opponent_name, tournament, match_type, format, result, winning_margin, status
   `;
 
-  const [battingRows, bowlingRows, fieldingRows, awardsRows] = await Promise.all([
+  const [battingRows, bowlingRows, fieldingRows, awardsRows, lineupRows] = await Promise.all([
     unwrap<any[]>(
       supabase
         .from('match_batting')
@@ -228,41 +228,75 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .order('match_date', { foreignTable: 'matches', ascending: false })
         .returns<any[]>(),
     ),
+    // A player selected for a match who did not bat, bowl, field, or win an
+    // award has no row in any of the four tables above -- so the match used to
+    // disappear from their history entirely, while the headline "matches
+    // played" (which counts lineup appearances) still included it. That
+    // mismatch showed on the profile as "MATCHES 2" above a list of one.
+    // Selection is the real record of having played, so the lineup seeds the
+    // list and the performance tables fill it in.
+    unwrap<any[]>(
+      supabase
+        .from('match_lineups')
+        .select(
+          `
+          match_id, batting_order,
+          matches!inner(${matchSelect})
+        `,
+        )
+        .eq('academy_member_id', playerId)
+        .eq('matches.academy_id', academyId)
+        .eq('matches.status', 'completed')
+        .order('match_date', { foreignTable: 'matches', ascending: false })
+        .returns<any[]>(),
+    ),
   ]);
 
   const map = new Map<string, any>();
 
+  const baseEntry = (match: any) => ({
+    id: match.id,
+    matchName: match.match_name,
+    matchDate: match.match_date,
+    opponentName: match.opponent_name,
+    tournament: match.tournament,
+    matchType: match.match_type,
+    format: match.format,
+    result: match.result,
+    winningMargin: match.winning_margin,
+    status: match.status,
+    battingOrder: null,
+    batting: null,
+    bowling: null,
+    fielding: null,
+    awards: {
+      playerOfMatch: false,
+      bestBatter: false,
+      bestBowler: false,
+      bestFielder: false,
+    },
+  });
+
+  for (const row of lineupRows) {
+    const match = row.matches;
+    const entry = map.get(match.id) ?? baseEntry(match);
+    if (row.batting_order != null) entry.battingOrder = row.batting_order;
+    map.set(match.id, entry);
+  }
+
   for (const row of battingRows) {
     const match = row.matches;
-    map.set(match.id, {
-      id: match.id,
-      matchName: match.match_name,
-      matchDate: match.match_date,
-      opponentName: match.opponent_name,
-      tournament: match.tournament,
-      matchType: match.match_type,
-      format: match.format,
-      result: match.result,
-      winningMargin: match.winning_margin,
-      status: match.status,
-      battingOrder: row.batting_order ?? null,
-      batting: {
-        runs: row.runs,
-        balls: row.balls,
-        fours: row.fours,
-        sixes: row.sixes,
-        isOut: row.is_out,
-        dismissalType: row.dismissal_type,
-      },
-      bowling: null,
-      fielding: null,
-      awards: {
-        playerOfMatch: false,
-        bestBatter: false,
-        bestBowler: false,
-        bestFielder: false,
-      },
-    });
+    const entry = map.get(match.id) ?? baseEntry(match);
+    entry.battingOrder = row.batting_order ?? entry.battingOrder ?? null;
+    entry.batting = {
+      runs: row.runs,
+      balls: row.balls,
+      fours: row.fours,
+      sixes: row.sixes,
+      isOut: row.is_out,
+      dismissalType: row.dismissal_type,
+    };
+    map.set(match.id, entry);
   }
 
   for (const row of bowlingRows) {
