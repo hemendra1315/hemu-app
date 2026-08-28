@@ -989,6 +989,7 @@ CREATE OR REPLACE FUNCTION public.batch_member_count(p_batch_id uuid)
  RETURNS integer
  LANGUAGE sql
  STABLE
+ SET search_path TO 'public'
 AS $function$
   select count(*) from batch_members where batch_id = p_batch_id;
 $function$
@@ -1157,6 +1158,7 @@ $function$
 CREATE OR REPLACE FUNCTION public.generate_join_code(p_length integer DEFAULT 6)
  RETURNS text
  LANGUAGE plpgsql
+ SET search_path TO 'public'
 AS $function$
 declare
   alphabet constant text := '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -2959,6 +2961,7 @@ end $function$
 CREATE OR REPLACE FUNCTION public.set_updated_at()
  RETURNS trigger
  LANGUAGE plpgsql
+ SET search_path TO 'public'
 AS $function$
 begin
   new.updated_at := now();
@@ -2989,6 +2992,7 @@ CREATE OR REPLACE FUNCTION public.slugify(p_value text)
  RETURNS text
  LANGUAGE sql
  IMMUTABLE
+ SET search_path TO 'public'
 AS $function$
   select trim(both '-' from regexp_replace(lower(p_value), '[^a-z0-9]+', '-', 'g'));
 $function$
@@ -3678,7 +3682,6 @@ BEGIN
   );
 END $function$
 ;
-
 -- ----------------------------------------------------------------------------
 -- Enable Row Level Security
 -- ----------------------------------------------------------------------------
