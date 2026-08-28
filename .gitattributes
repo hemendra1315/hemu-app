@@ -1,0 +1,9 @@
+# Migration files can contain function bodies whose source was captured
+# byte-for-byte from the live database (see supabase/migrations/20260827120000_baseline_from_live.sql).
+# Some of those bodies have Windows-style line endings (\r\n) embedded
+# literally inside them, because that's what's actually stored in the
+# database. Without this rule, git's automatic line-ending conversion
+# (the same one that prints "LF will be replaced by CRLF" on Windows)
+# would silently strip those out on commit, reintroducing drift between
+# this repo and the live database every time the file is touched.
+supabase/migrations/*.sql -text
