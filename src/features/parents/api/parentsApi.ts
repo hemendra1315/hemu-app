@@ -15,21 +15,39 @@ import { fetchPlayerProfile } from '@/features/players/api/playersApi';
 export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[]> {
   if (!isUUID(academyId)) return [];
 
-  const rows = await unwrap<any[]>(
+  const links = await unwrap<any[]>(
     supabase
       .from('parent_player_links')
-      .select('id, relationship_type, player_user_id, academy_members!inner(id)')
+      .select('id, relationship_type, player_user_id')
       .eq('academy_id', academyId)
       .eq('status', 'active')
-      .eq('academy_members.academy_id', academyId)
       .returns<any[]>(),
   );
 
+  if (links.length === 0) return [];
+
+  // parent_player_links has no foreign key to academy_members (it links to
+  // profiles), so the two can't be embedded in one PostgREST select. Resolve
+  // each linked player's academy_members row separately instead.
+  const memberRows = await unwrap<any[]>(
+    supabase
+      .from('academy_members')
+      .select('id, user_id')
+      .eq('academy_id', academyId)
+      .in(
+        'user_id',
+        links.map((row) => row.player_user_id),
+      )
+      .returns<any[]>(),
+  );
+  const memberIdByUserId = new Map(memberRows.map((m) => [m.user_id, m.id]));
+
   const children: LinkedChild[] = [];
-  for (const row of rows) {
-    if (!row.academy_members?.[0]?.id) continue;
+  for (const row of links) {
+    const memberId = memberIdByUserId.get(row.player_user_id);
+    if (!memberId) continue;
     try {
-      const profile = await fetchPlayerProfile(academyId, row.academy_members[0].id);
+      const profile = await fetchPlayerProfile(academyId, memberId);
       children.push({
         linkId: row.id,
         relationshipType: row.relationship_type,

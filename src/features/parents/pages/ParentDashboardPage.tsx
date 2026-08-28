@@ -14,7 +14,13 @@ import { format, isAfter } from 'date-fns';
 
 export default function ParentDashboardPage() {
   const { academyId, membership } = useActiveAcademy();
-  const { data: children = [], isLoading } = useLinkedChildren(academyId || undefined);
+  const {
+    data: children = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useLinkedChildren(academyId || undefined);
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
 
   const activeChild = children.find((c) => c.player.id === selectedChildId) || children[0];
@@ -42,6 +48,8 @@ export default function ParentDashboardPage() {
 
       {isLoading ? (
         <div className="flex justify-center p-8">Loading dashboard...</div>
+      ) : isError ? (
+        <ErrorState error={error} onRetry={() => void refetch()} />
       ) : children.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-12 text-center">
           <div className="bg-surface-muted mb-4 rounded-full p-4">
