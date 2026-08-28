@@ -1,0 +1,51 @@
+name: Database drift check
+
+# Catches the exact class of bug that broke the match wizard and the parent
+# linking codes earlier: the live Supabase database silently ending up
+# different from what the migration files in this repo say it should be.
+#
+# Runs the Supabase CLI's own diff tool, which computes what the database
+# *should* look like from the migration files and compares that against what
+# the live, linked database actually looks like. If they differ, the job
+# fails and prints exactly what's different.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to the live Supabase project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Compare migrations against the live database
+        run: |
+          supabase db diff --linked --schema public > drift.sql
+          if [ -s drift.sql ]; then
+            echo "::error::The live database has drifted from the migration files. Diff below:"
+            cat drift.sql
+            echo ""
+            echo "This means something changed the live database directly (e.g. through"
+            echo "the Supabase dashboard or a raw SQL run) without a matching migration"
+            echo "file being added to this repo. Either write a migration that captures"
+            echo "the live change, or fix the live database to match the migrations."
+            exit 1
+          else
+            echo "No drift — the live database matches the migration files."
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
