@@ -43,4 +43,99 @@ describe('CricHeroes PDF Text Parser', () => {
     expect(b2?.name).toBe('Arjun Verma');
     expect(b2?.isOut).toBe(false);
   });
+
+  /**
+   * The suite above feeds the parser text in a shape CricHeroes does not
+   * produce, which is how a parser that could not read a single real
+   * scorecard went on passing. This fixture is verbatim from an actual
+   * CricHeroes PDF export (trimmed to two batters and two bowlers per
+   * innings), so a regression against the real format fails here.
+   */
+  const REAL_CRICHEROES_EXPORT = `
+ERS CHAMPIONS VS CHAMPIONS (League Matches)
+Match Details Match Result
+Jeppiaar Cbse Jeppiaar Cbse opt to bat Toss vs
+JEPPIAAR ERS FLOODLIGHT GROUND, Ground
+Jeppiaar Cbse won by 62 runs Result
+2026-07-29, 03:27 AM UTC Date
+8/10/26, 7:52 AM cricheroes.com 1 of 4
+
+Jeppiaar Cbse 264/10 (46.0 Ov) Kabilan (Jeppiaar Cbse)
+(1st Innings)
+No Batsman Status R B M 4s 6s SR
+1 Naraindra run out Riswanth / Moulish 51 70 107 8 0 72.86 (RHB)
+4 Kabilan (c) lbw b Charan Abishek. M. R 75 73 91 10 2 102.74 (RHB)
+9 Koushik S not out 18 13 19 1 1 138.46 (RHB)
+Total: Overs 46.0, Wickets 10 264 (CRR: 5.74)
+No Bowler O M R W 0s 4s 6s WD NB Eco
+1 M. Rohith 4 0 28 0 15 6 0 0 0 7.00
+5 Moulish 7 0 53 4 18 5 2 2 0 7.57
+
+Jeppiaar Matric 202/10 (45.4 Ov)
+(1st Innings)
+No Batsman Status R B M 4s 6s SR
+1 Cheran c Kabilan b Koushik S 14 15 34 2 0 93.33 (RHB)
+3 Sakthivel .R (wk) run out Naraindra / † Ajay 14 22 26 2 0 63.64 (LHB)
+Total: Overs 45.4, Wickets 10 202 (CRR: 4.42)
+No Bowler O M R W 0s 4s 6s WD NB Eco
+1 Koushik S 7.4 2 16 3 35 1 0 1 0 2.09
+`;
+
+  it('reads a real CricHeroes PDF export', () => {
+    const r = parseCricHeroesText(REAL_CRICHEROES_EXPORT);
+
+    // The date must come from Match Details, not the export stamp in the page
+    // footer ("8/10/26") — that footer is what the loose parser latched onto,
+    // dating every imported match to the day it was downloaded.
+    expect(r.matchDate).toBe('2026-07-29');
+    expect(r.matchName).toBe('ERS CHAMPIONS VS CHAMPIONS (League Matches)');
+    expect(r.venue).toBe('JEPPIAAR ERS FLOODLIGHT GROUND');
+    expect(r.matchType).toBe('league');
+    // 46 overs an innings is not a T20, which is what the old default gave.
+    expect(r.format).toBe('odi');
+    expect(r.winningMargin).toBe('62 runs');
+
+    expect(r.teamA.name).toBe('Jeppiaar Cbse');
+    expect(r.teamA.score).toBe('264/10 (46.0 ov)');
+    expect(r.teamB.name).toBe('Jeppiaar Matric');
+    expect(r.teamB.score).toBe('202/10 (45.4 ov)');
+    expect(r.innings).toHaveLength(2);
+
+    const [firstInnings, secondInnings] = r.innings;
+    expect(firstInnings?.batting).toHaveLength(3);
+    expect(firstInnings?.bowling).toHaveLength(2);
+
+    // "(c)" must not be mistaken for the dismissal "c" (caught) and cut the
+    // name in half.
+    const kabilan = firstInnings?.batting[1];
+    expect(kabilan?.name).toBe('Kabilan');
+    expect(kabilan?.runs).toBe(75);
+    expect(kabilan?.balls).toBe(73);
+    expect(kabilan?.fours).toBe(10);
+    expect(kabilan?.sixes).toBe(2);
+    expect(kabilan?.isOut).toBe(true);
+    // Batting position comes from the scorecard's own numbering.
+    expect(kabilan?.battingOrder).toBe(3);
+
+    const koushik = firstInnings?.batting[2];
+    expect(koushik?.name).toBe('Koushik S');
+    expect(koushik?.isOut).toBe(false);
+
+    const moulish = firstInnings?.bowling[1];
+    expect(moulish?.name).toBe('Moulish');
+    expect(moulish?.overs).toBe('7');
+    expect(moulish?.runsConceded).toBe(53);
+    expect(moulish?.wickets).toBe(4);
+    // Wides and no-balls sit after the dot-ball/boundary columns, not
+    // immediately after wickets.
+    expect(moulish?.wides).toBe(2);
+    expect(moulish?.noBalls).toBe(0);
+
+    // Fielding is credited from the dismissal text, which nothing did before,
+    // so catches never reached a player's record.
+    const catcher = secondInnings?.fielding.find((f) => f.name === 'Kabilan');
+    expect(catcher?.catches).toBe(1);
+    const keeper = secondInnings?.fielding.find((f) => f.name === 'Ajay');
+    expect(keeper?.runOuts).toBe(1);
+  });
 });

@@ -156,17 +156,19 @@ describe('playersApi', () => {
   });
 
   describe('fetchPlayerMatches', () => {
-    it('queries four tables in parallel, all scoped by academy_id', async () => {
+    it('queries five tables in parallel, all scoped by academy_id', async () => {
       const battingBuilder = createMockBuilder({ data: [], error: null });
       const bowlingBuilder = createMockBuilder({ data: [], error: null });
       const fieldingBuilder = createMockBuilder({ data: [], error: null });
       const awardsBuilder = createMockBuilder({ data: [], error: null });
+      const lineupBuilder = createMockBuilder({ data: [], error: null });
 
       mockedSupabase.from
         .mockReturnValueOnce(battingBuilder)
         .mockReturnValueOnce(bowlingBuilder)
         .mockReturnValueOnce(fieldingBuilder)
-        .mockReturnValueOnce(awardsBuilder);
+        .mockReturnValueOnce(awardsBuilder)
+        .mockReturnValueOnce(lineupBuilder);
 
       const result = await fetchPlayerMatches(academyId, playerId);
 
@@ -175,6 +177,50 @@ describe('playersApi', () => {
       expect(mockedSupabase.from).toHaveBeenCalledWith('match_bowling');
       expect(mockedSupabase.from).toHaveBeenCalledWith('match_fielding');
       expect(mockedSupabase.from).toHaveBeenCalledWith('match_awards');
+      // The team sheet is what makes a match appear at all: a player who was
+      // selected but never batted, bowled or fielded has no row in any of the
+      // other four tables, and used to vanish from their own match history.
+      expect(mockedSupabase.from).toHaveBeenCalledWith('match_lineups');
+    });
+
+    it('lists a match the player was selected for but did not bat in', async () => {
+      const emptyBuilder = createMockBuilder({ data: [], error: null });
+      const lineupBuilder = createMockBuilder({
+        data: [
+          {
+            match_id: 'm9',
+            batting_order: 6,
+            matches: {
+              id: 'm9',
+              match_name: 'Selected But Did Not Bat',
+              match_date: '2026-02-02',
+              opponent_name: 'Team B',
+              tournament: null,
+              match_type: 'league',
+              format: 't20',
+              result: 'won',
+              winning_margin: '20 runs',
+              status: 'completed',
+            },
+          },
+        ],
+        error: null,
+      });
+
+      mockedSupabase.from
+        .mockReturnValueOnce(emptyBuilder)
+        .mockReturnValueOnce(emptyBuilder)
+        .mockReturnValueOnce(emptyBuilder)
+        .mockReturnValueOnce(emptyBuilder)
+        .mockReturnValueOnce(lineupBuilder);
+
+      const result = await fetchPlayerMatches(academyId, playerId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]!.matchName).toBe('Selected But Did Not Bat');
+      expect(result[0]!.battingOrder).toBe(6);
+      expect(result[0]!.batting).toBeNull();
+      expect(result[0]!.bowling).toBeNull();
     });
 
     it('maps batting rows correctly', async () => {
@@ -208,6 +254,7 @@ describe('playersApi', () => {
       const emptyBuilder = createMockBuilder({ data: [], error: null });
       mockedSupabase.from
         .mockReturnValueOnce(battingBuilder)
+        .mockReturnValueOnce(emptyBuilder)
         .mockReturnValueOnce(emptyBuilder)
         .mockReturnValueOnce(emptyBuilder)
         .mockReturnValueOnce(emptyBuilder);
@@ -382,6 +429,7 @@ describe('playersApi', () => {
         .mockReturnValueOnce(sessionBuilder)
         .mockReturnValueOnce(sessionBuilder)
         .mockReturnValueOnce(sessionBuilder)
+        .mockReturnValueOnce(sessionBuilder)
         .mockReturnValueOnce(sessionBuilder);
 
       const result = await fetchPlayerChartData(academyId, playerId);
@@ -428,6 +476,7 @@ describe('playersApi', () => {
 
       mockedSupabase.from
         .mockReturnValueOnce(battingBuilder)
+        .mockReturnValueOnce(emptyBuilder)
         .mockReturnValueOnce(emptyBuilder)
         .mockReturnValueOnce(emptyBuilder)
         .mockReturnValueOnce(emptyBuilder)
