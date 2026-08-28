@@ -850,489 +850,6 @@ CREATE INDEX training_sessions_coach_idx ON public.training_sessions USING btree
 CREATE INDEX venues_academy_idx ON public.venues USING btree (academy_id);
 
 -- ----------------------------------------------------------------------------
--- Enable Row Level Security
--- ----------------------------------------------------------------------------
-alter table public.academies enable row level security;
-alter table public.academy_join_codes enable row level security;
-alter table public.academy_members enable row level security;
-alter table public.academy_owner_invitations enable row level security;
-alter table public.academy_records enable row level security;
-alter table public.activity_log enable row level security;
-alter table public.announcement_targets enable row level security;
-alter table public.announcements enable row level security;
-alter table public.attendance enable row level security;
-alter table public.batch_coaches enable row level security;
-alter table public.batch_members enable row level security;
-alter table public.batch_players enable row level security;
-alter table public.batches enable row level security;
-alter table public.coaches enable row level security;
-alter table public.cricheroes_player_mappings enable row level security;
-alter table public.drill_assignments enable row level security;
-alter table public.drills enable row level security;
-alter table public.join_requests enable row level security;
-alter table public.match_awards enable row level security;
-alter table public.match_batting enable row level security;
-alter table public.match_bowling enable row level security;
-alter table public.match_bowling_spells enable row level security;
-alter table public.match_coach_notes enable row level security;
-alter table public.match_fielding enable row level security;
-alter table public.match_lineups enable row level security;
-alter table public.match_partnerships enable row level security;
-alter table public.matches enable row level security;
-alter table public.notifications enable row level security;
-alter table public.parent_linking_codes enable row level security;
-alter table public.parent_player_links enable row level security;
-alter table public.player_milestones enable row level security;
-alter table public.player_statistics enable row level security;
-alter table public.players enable row level security;
-alter table public.profiles enable row level security;
-alter table public.push_subscriptions enable row level security;
-alter table public.training_sessions enable row level security;
-alter table public.venues enable row level security;
-
--- ----------------------------------------------------------------------------
--- Row Level Security policies
--- ----------------------------------------------------------------------------
-create policy academies_select on public.academies as PERMISSIVE for SELECT to public
-  using ((is_member(id) OR is_super_admin()));
-create policy academies_update on public.academies as PERMISSIVE for UPDATE to public
-  using (is_owner(id))
-  with check (is_owner(id));
-create policy academy_join_codes_select on public.academy_join_codes as PERMISSIVE for SELECT to public
-  using (is_staff(academy_id));
-create policy academy_join_codes_write on public.academy_join_codes as PERMISSIVE for ALL to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy academy_members_delete on public.academy_members as PERMISSIVE for DELETE to public
-  using (is_owner(academy_id));
-create policy academy_members_insert on public.academy_members as PERMISSIVE for INSERT to public
-  with check (is_owner(academy_id));
-create policy academy_members_select on public.academy_members as PERMISSIVE for SELECT to public
-  using (((user_id = auth.uid()) OR is_staff(academy_id)));
-create policy academy_members_select_parents on public.academy_members as PERMISSIVE for SELECT to public
-  using ((user_id IN ( SELECT my_linked_players(academy_members.academy_id) AS my_linked_players)));
-create policy academy_members_update on public.academy_members as PERMISSIVE for UPDATE to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy "Super Admin owner invitations access" on public.academy_owner_invitations as PERMISSIVE for ALL to public
-  using (is_super_admin())
-  with check (is_super_admin());
-create policy academy_records_select on public.academy_records as PERMISSIVE for SELECT to public
-  using (is_member(academy_id));
-create policy academy_records_write on public.academy_records as PERMISSIVE for ALL to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy activity_log_insert on public.activity_log as PERMISSIVE for INSERT to public
-  with check (is_staff(academy_id));
-create policy activity_log_select on public.activity_log as PERMISSIVE for SELECT to public
-  using (is_member(academy_id));
-create policy announcement_targets_select on public.announcement_targets as PERMISSIVE for SELECT to public
-  using ((is_member(academy_id) OR is_super_admin()));
-create policy announcement_targets_write on public.announcement_targets as PERMISSIVE for ALL to public
-  using (is_staff(academy_id))
-  with check (is_staff(academy_id));
-create policy announcements_delete on public.announcements as PERMISSIVE for DELETE to public
-  using ((is_owner(academy_id) OR (is_staff(academy_id) AND (created_by = auth.uid()))));
-create policy announcements_insert on public.announcements as PERMISSIVE for INSERT to public
-  with check ((is_owner(academy_id) OR (is_staff(academy_id) AND (audience = 'batch'::audience_type) AND (batch_id IS NOT NULL) AND (EXISTS ( SELECT 1
-   FROM (batches b
-     JOIN academy_members am ON ((am.id = b.coach_id)))
-  WHERE ((b.id = announcements.batch_id) AND (am.user_id = auth.uid())))))));
-create policy announcements_select on public.announcements as PERMISSIVE for SELECT to public
-  using ((is_staff(academy_id) OR is_super_admin() OR (is_member(academy_id) AND (((audience)::text = 'all'::text) OR (((audience)::text = 'players'::text) AND has_role(academy_id, ARRAY['player'::app_role])) OR (((audience)::text = 'all_parents'::text) AND has_role(academy_id, ARRAY['parent'::app_role])) OR (((audience)::text = 'batch'::text) AND ((EXISTS ( SELECT 1
-   FROM (batch_members bm
-     JOIN academy_members am ON ((bm.academy_member_id = am.id)))
-  WHERE ((bm.batch_id = announcements.batch_id) AND (am.user_id = auth.uid())))) OR (EXISTS ( SELECT 1
-   FROM ((batch_members bm
-     JOIN academy_members am ON ((bm.academy_member_id = am.id)))
-     JOIN parent_player_links ppl ON ((ppl.player_user_id = am.user_id)))
-  WHERE ((bm.batch_id = announcements.batch_id) AND (ppl.parent_user_id = auth.uid()) AND (ppl.academy_id = announcements.academy_id)))))) OR (((audience)::text = 'custom'::text) AND ((EXISTS ( SELECT 1
-   FROM (announcement_targets t
-     JOIN academy_members am ON ((am.id = t.academy_member_id)))
-  WHERE ((t.announcement_id = announcements.id) AND (am.user_id = auth.uid())))) OR (EXISTS ( SELECT 1
-   FROM ((announcement_targets t
-     JOIN batch_members bm ON ((bm.batch_id = t.batch_id)))
-     JOIN academy_members am ON ((am.id = bm.academy_member_id)))
-  WHERE ((t.announcement_id = announcements.id) AND (am.user_id = auth.uid())))) OR (EXISTS ( SELECT 1
-   FROM (((announcement_targets t
-     JOIN batch_members bm ON ((bm.batch_id = t.batch_id)))
-     JOIN academy_members am ON ((am.id = bm.academy_member_id)))
-     JOIN parent_player_links ppl ON (((ppl.player_user_id = am.user_id) AND (ppl.academy_id = announcements.academy_id) AND (ppl.status = 'active'::text))))
-  WHERE ((t.announcement_id = announcements.id) AND (ppl.parent_user_id = auth.uid())))) OR (EXISTS ( SELECT 1
-   FROM ((announcement_targets t
-     JOIN academy_members am ON ((am.id = t.academy_member_id)))
-     JOIN parent_player_links ppl ON (((ppl.player_user_id = am.user_id) AND (ppl.academy_id = announcements.academy_id) AND (ppl.status = 'active'::text))))
-  WHERE ((t.announcement_id = announcements.id) AND (ppl.parent_user_id = auth.uid()))))))))));
-create policy announcements_update on public.announcements as PERMISSIVE for UPDATE to public
-  using ((is_owner(academy_id) OR (is_staff(academy_id) AND (created_by = auth.uid()))))
-  with check ((is_owner(academy_id) OR (is_staff(academy_id) AND (created_by = auth.uid()))));
-create policy attendance_delete on public.attendance as PERMISSIVE for DELETE to public
-  using ((is_staff(academy_id) AND (EXISTS ( SELECT 1
-   FROM training_sessions s
-  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))));
-create policy attendance_insert on public.attendance as PERMISSIVE for INSERT to public
-  with check ((is_staff(academy_id) AND (EXISTS ( SELECT 1
-   FROM training_sessions s
-  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))));
-create policy attendance_select on public.attendance as PERMISSIVE for SELECT to public
-  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id))));
-create policy attendance_select_parents on public.attendance as PERMISSIVE for SELECT to public
-  using ((player_id IN ( SELECT my_linked_member_ids(attendance.academy_id) AS my_linked_member_ids)));
-create policy attendance_update on public.attendance as PERMISSIVE for UPDATE to public
-  using ((is_staff(academy_id) AND (EXISTS ( SELECT 1
-   FROM training_sessions s
-  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))))
-  with check ((is_staff(academy_id) AND (EXISTS ( SELECT 1
-   FROM training_sessions s
-  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))));
-create policy batch_coaches_select on public.batch_coaches as PERMISSIVE for SELECT to public
-  using ((is_member(academy_id) OR is_super_admin()));
-create policy batch_coaches_write on public.batch_coaches as PERMISSIVE for ALL to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy batch_members_delete on public.batch_members as PERMISSIVE for DELETE to public
-  using (is_owner(( SELECT b.academy_id
-   FROM batches b
-  WHERE (b.id = batch_members.batch_id))));
-create policy batch_members_insert on public.batch_members as PERMISSIVE for INSERT to public
-  with check (is_owner(( SELECT b.academy_id
-   FROM batches b
-  WHERE (b.id = batch_members.batch_id))));
-create policy batch_members_select on public.batch_members as PERMISSIVE for SELECT to public
-  using (is_member(( SELECT b.academy_id
-   FROM batches b
-  WHERE (b.id = batch_members.batch_id))));
-create policy batch_members_select_parents on public.batch_members as PERMISSIVE for SELECT to public
-  using ((academy_member_id IN ( SELECT am.id
-   FROM academy_members am
-  WHERE ((am.id = batch_members.academy_member_id) AND (am.id IN ( SELECT my_linked_member_ids(am.academy_id) AS my_linked_member_ids))))));
-create policy batch_players_select on public.batch_players as PERMISSIVE for SELECT to public
-  using ((is_owner(academy_id) OR coaches_batch(batch_id) OR (EXISTS ( SELECT 1
-   FROM players p
-  WHERE ((p.id = batch_players.player_id) AND (p.user_id = auth.uid())))) OR is_super_admin()));
-create policy batch_players_write on public.batch_players as PERMISSIVE for ALL to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy batches_select on public.batches as PERMISSIVE for SELECT to public
-  using ((is_member(academy_id) OR is_super_admin()));
-create policy batches_select_parents on public.batches as PERMISSIVE for SELECT to public
-  using (has_role(academy_id, ARRAY['parent'::app_role]));
-create policy batches_write on public.batches as PERMISSIVE for ALL to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy coaches_delete on public.coaches as PERMISSIVE for DELETE to public
-  using (is_owner(academy_id));
-create policy coaches_insert on public.coaches as PERMISSIVE for INSERT to public
-  with check (is_owner(academy_id));
-create policy coaches_select on public.coaches as PERMISSIVE for SELECT to public
-  using ((is_member(academy_id) OR is_super_admin()));
-create policy coaches_update on public.coaches as PERMISSIVE for UPDATE to public
-  using ((is_owner(academy_id) OR (user_id = auth.uid())))
-  with check ((is_owner(academy_id) OR (user_id = auth.uid())));
-create policy cricheroes_mappings_delete on public.cricheroes_player_mappings as PERMISSIVE for DELETE to public
-  using (is_staff(academy_id));
-create policy cricheroes_mappings_select on public.cricheroes_player_mappings as PERMISSIVE for SELECT to public
-  using ((academy_id IN ( SELECT m.academy_id
-   FROM academy_members m
-  WHERE ((m.user_id = auth.uid()) AND (m.status = 'active'::member_status)))));
-create policy cricheroes_mappings_update on public.cricheroes_player_mappings as PERMISSIVE for UPDATE to public
-  using (is_staff(academy_id))
-  with check (is_staff(academy_id));
-create policy cricheroes_mappings_write on public.cricheroes_player_mappings as PERMISSIVE for INSERT to public
-  with check (is_staff(academy_id));
-create policy drill_assignments_delete on public.drill_assignments as PERMISSIVE for DELETE to public
-  using (is_staff(academy_id));
-create policy drill_assignments_insert on public.drill_assignments as PERMISSIVE for INSERT to public
-  with check (is_staff(academy_id));
-create policy drill_assignments_select on public.drill_assignments as PERMISSIVE for SELECT to public
-  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id)) OR (EXISTS ( SELECT 1
-   FROM batch_members
-  WHERE ((batch_members.academy_member_id = my_player_id(drill_assignments.academy_id)) AND (batch_members.batch_id = drill_assignments.batch_id))))));
-create policy drill_assignments_select_parents on public.drill_assignments as PERMISSIVE for SELECT to public
-  using (((player_id IN ( SELECT my_linked_member_ids(drill_assignments.academy_id) AS my_linked_member_ids)) OR (batch_id IN ( SELECT batch_members.batch_id
-   FROM batch_members
-  WHERE (batch_members.academy_member_id IN ( SELECT my_linked_member_ids(drill_assignments.academy_id) AS my_linked_member_ids))))));
-create policy drill_assignments_update on public.drill_assignments as PERMISSIVE for UPDATE to public
-  using ((is_staff(academy_id) OR (EXISTS ( SELECT 1
-   FROM academy_members pm
-  WHERE ((pm.id = drill_assignments.player_id) AND (pm.user_id = auth.uid()) AND (pm.status = 'active'::member_status))))))
-  with check ((is_staff(academy_id) OR ((EXISTS ( SELECT 1
-   FROM academy_members pm
-  WHERE ((pm.id = drill_assignments.player_id) AND (pm.user_id = auth.uid()) AND (pm.status = 'active'::member_status)))) AND (player_id = player_id))));
-create policy drills_select on public.drills as PERMISSIVE for SELECT to public
-  using (is_staff(academy_id));
-create policy drills_write on public.drills as PERMISSIVE for ALL to public
-  using (is_staff(academy_id))
-  with check (is_staff(academy_id));
-create policy join_requests_cancel_own on public.join_requests as PERMISSIVE for UPDATE to public
-  using (((user_id = auth.uid()) AND (status = 'pending'::join_status)))
-  with check (((user_id = auth.uid()) AND (status = ANY (ARRAY['pending'::join_status, 'cancelled'::join_status]))));
-create policy join_requests_review on public.join_requests as PERMISSIVE for UPDATE to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy join_requests_select on public.join_requests as PERMISSIVE for SELECT to public
-  using (((user_id = auth.uid()) OR is_owner(academy_id)));
-create policy match_awards_select on public.match_awards as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_awards.match_id) AND is_member(m.academy_id)))));
-create policy match_awards_write on public.match_awards as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_awards.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_awards.match_id) AND is_staff(m.academy_id)))));
-create policy match_batting_select on public.match_batting as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_batting.match_id) AND (is_member(m.academy_id) OR (match_batting.academy_member_id = my_player_id(m.academy_id)))))));
-create policy match_batting_write on public.match_batting as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_batting.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_batting.match_id) AND is_staff(m.academy_id)))));
-create policy match_bowling_select on public.match_bowling as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_bowling.match_id) AND (is_member(m.academy_id) OR (match_bowling.academy_member_id = my_player_id(m.academy_id)))))));
-create policy match_bowling_write on public.match_bowling as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_bowling.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_bowling.match_id) AND is_staff(m.academy_id)))));
-create policy match_bowling_spells_select on public.match_bowling_spells as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_bowling_spells.match_id) AND is_member(m.academy_id)))));
-create policy match_bowling_spells_write on public.match_bowling_spells as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_bowling_spells.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_bowling_spells.match_id) AND is_staff(m.academy_id)))));
-create policy match_coach_notes_select on public.match_coach_notes as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_coach_notes.match_id) AND is_member(m.academy_id)))));
-create policy match_coach_notes_write on public.match_coach_notes as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_coach_notes.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_coach_notes.match_id) AND is_staff(m.academy_id)))));
-create policy match_fielding_select on public.match_fielding as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_fielding.match_id) AND (is_member(m.academy_id) OR (match_fielding.academy_member_id = my_player_id(m.academy_id)))))));
-create policy match_fielding_write on public.match_fielding as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_fielding.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_fielding.match_id) AND is_staff(m.academy_id)))));
-create policy match_lineups_select on public.match_lineups as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_lineups.match_id) AND is_member(m.academy_id)))));
-create policy match_lineups_write on public.match_lineups as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_lineups.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_lineups.match_id) AND is_staff(m.academy_id)))));
-create policy match_partnerships_select on public.match_partnerships as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_partnerships.match_id) AND is_member(m.academy_id)))));
-create policy match_partnerships_write on public.match_partnerships as PERMISSIVE for ALL to public
-  using ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_partnerships.match_id) AND is_staff(m.academy_id)))))
-  with check ((EXISTS ( SELECT 1
-   FROM matches m
-  WHERE ((m.id = match_partnerships.match_id) AND is_staff(m.academy_id)))));
-create policy matches_select on public.matches as PERMISSIVE for SELECT to public
-  using (is_member(academy_id));
-create policy matches_write on public.matches as PERMISSIVE for ALL to public
-  using (is_staff(academy_id))
-  with check (is_staff(academy_id));
-create policy notifications_delete on public.notifications as PERMISSIVE for DELETE to public
-  using ((recipient_user_id = auth.uid()));
-create policy notifications_select on public.notifications as PERMISSIVE for SELECT to public
-  using ((recipient_user_id = auth.uid()));
-create policy notifications_update on public.notifications as PERMISSIVE for UPDATE to public
-  using ((recipient_user_id = auth.uid()))
-  with check ((recipient_user_id = auth.uid()));
-create policy parent_linking_codes_insert on public.parent_linking_codes as PERMISSIVE for INSERT to public
-  with check ((is_staff(academy_id) OR (player_user_id = auth.uid())));
-create policy parent_linking_codes_select on public.parent_linking_codes as PERMISSIVE for SELECT to public
-  using ((is_staff(academy_id) OR (player_user_id = auth.uid())));
-create policy parent_linking_codes_update on public.parent_linking_codes as PERMISSIVE for UPDATE to public
-  using ((is_staff(academy_id) OR (player_user_id = auth.uid())))
-  with check ((is_staff(academy_id) OR (player_user_id = auth.uid())));
-create policy parent_player_links_insert on public.parent_player_links as PERMISSIVE for INSERT to public
-  with check (is_staff(academy_id));
-create policy parent_player_links_select on public.parent_player_links as PERMISSIVE for SELECT to public
-  using (((parent_user_id = auth.uid()) OR is_staff(academy_id) OR (player_user_id = auth.uid())));
-create policy parent_player_links_update on public.parent_player_links as PERMISSIVE for UPDATE to public
-  using ((is_staff(academy_id) OR (player_user_id = auth.uid())))
-  with check ((is_staff(academy_id) OR (player_user_id = auth.uid())));
-create policy player_milestones_select on public.player_milestones as PERMISSIVE for SELECT to public
-  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id))));
-create policy player_milestones_select_parents on public.player_milestones as PERMISSIVE for SELECT to public
-  using ((player_id IN ( SELECT my_linked_member_ids(player_milestones.academy_id) AS my_linked_member_ids)));
-create policy player_milestones_write on public.player_milestones as PERMISSIVE for ALL to public
-  using ((is_owner(academy_id) OR is_super_admin()))
-  with check ((is_owner(academy_id) OR is_super_admin()));
-create policy player_stats_select on public.player_statistics as PERMISSIVE for SELECT to public
-  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id))));
-create policy player_stats_select_parents on public.player_statistics as PERMISSIVE for SELECT to public
-  using ((player_id IN ( SELECT my_linked_member_ids(player_statistics.academy_id) AS my_linked_member_ids)));
-create policy player_stats_write on public.player_statistics as PERMISSIVE for ALL to public
-  using ((is_owner(academy_id) OR is_super_admin()))
-  with check ((is_owner(academy_id) OR is_super_admin()));
-create policy players_delete on public.players as PERMISSIVE for DELETE to public
-  using (is_owner(academy_id));
-create policy players_insert on public.players as PERMISSIVE for INSERT to public
-  with check (is_owner(academy_id));
-create policy players_select on public.players as PERMISSIVE for SELECT to public
-  using ((is_owner(academy_id) OR (user_id = auth.uid()) OR shares_batch_with_player(id) OR is_super_admin()));
-create policy players_update on public.players as PERMISSIVE for UPDATE to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-create policy profiles_insert_self on public.profiles as PERMISSIVE for INSERT to public
-  with check ((id = auth.uid()));
-create policy profiles_select on public.profiles as PERMISSIVE for SELECT to public
-  using (((id = auth.uid()) OR is_super_admin() OR (EXISTS ( SELECT 1
-   FROM academy_members them
-  WHERE ((them.user_id = profiles.id) AND is_staff(them.academy_id))))));
-create policy profiles_select_parents on public.profiles as PERMISSIVE for SELECT to public
-  using ((EXISTS ( SELECT 1
-   FROM parent_player_links ppl
-  WHERE ((ppl.parent_user_id = auth.uid()) AND (ppl.player_user_id = profiles.id) AND (ppl.status = 'active'::text)))));
-create policy profiles_update_self on public.profiles as PERMISSIVE for UPDATE to public
-  using ((id = auth.uid()))
-  with check ((id = auth.uid()));
-create policy "push_subscriptions: service role read all" on public.push_subscriptions as PERMISSIVE for SELECT to public
-  using ((auth.role() = 'service_role'::text));
-create policy "push_subscriptions: users manage own" on public.push_subscriptions as PERMISSIVE for ALL to public
-  using ((user_id = auth.uid()))
-  with check ((user_id = auth.uid()));
-create policy training_sessions_delete on public.training_sessions as PERMISSIVE for DELETE to public
-  using (is_staff(academy_id));
-create policy training_sessions_insert on public.training_sessions as PERMISSIVE for INSERT to public
-  with check (is_staff(academy_id));
-create policy training_sessions_select on public.training_sessions as PERMISSIVE for SELECT to public
-  using (is_member(academy_id));
-create policy training_sessions_update on public.training_sessions as PERMISSIVE for UPDATE to public
-  using (is_staff(academy_id))
-  with check (is_staff(academy_id));
-create policy venues_select on public.venues as PERMISSIVE for SELECT to public
-  using ((is_member(academy_id) OR is_super_admin()));
-create policy venues_write on public.venues as PERMISSIVE for ALL to public
-  using (is_owner(academy_id))
-  with check (is_owner(academy_id));
-
--- ----------------------------------------------------------------------------
--- Views (ranking views, all security_invoker = true)
--- ----------------------------------------------------------------------------
-create view public.v_batting_rankings with (security_invoker = true) as
- SELECT ps.academy_id,
-    ps.player_id,
-    am.user_id,
-    p.full_name,
-    p.avatar_url,
-    ps.batting_runs,
-    ps.batting_innings,
-    ps.batting_highest_score,
-        CASE
-            WHEN (ps.batting_innings - ps.batting_not_outs) > 0 THEN round(ps.batting_runs::numeric / (ps.batting_innings - ps.batting_not_outs)::numeric, 2)
-            WHEN ps.batting_innings > 0 THEN ps.batting_runs::numeric
-            ELSE 0::numeric
-        END AS batting_average,
-        CASE
-            WHEN ps.balls_faced_sum > 0 THEN round(100.0 * ps.batting_runs::numeric / ps.balls_faced_sum::numeric, 2)
-            ELSE 0::numeric
-        END AS strike_rate_placeholder,
-    ps.batting_fifties,
-    ps.batting_centuries,
-    ps.batting_fours,
-    ps.batting_sixes,
-    ps.matches_played,
-    ps.awards_player_of_match
-   FROM player_statistics ps
-     JOIN academy_members am ON am.id = ps.player_id
-     JOIN profiles p ON p.id = am.user_id
-  ORDER BY ps.batting_runs DESC NULLS LAST;
-
-create view public.v_bowling_rankings with (security_invoker = true) as
- SELECT ps.academy_id,
-    ps.player_id,
-    am.user_id,
-    p.full_name,
-    p.avatar_url,
-    ps.bowling_wickets,
-    ps.bowling_overs,
-    ps.bowling_maidens,
-    ps.bowling_runs_conceded,
-    ps.bowling_best_bowling,
-        CASE
-            WHEN ps.bowling_wickets > 0 THEN round(ps.bowling_runs_conceded::numeric / ps.bowling_wickets::numeric, 2)
-            ELSE 0::numeric
-        END AS bowling_average,
-        CASE
-            WHEN ps.bowling_overs > 0::numeric THEN round(ps.bowling_runs_conceded::numeric / ps.bowling_overs, 2)
-            ELSE 0::numeric
-        END AS economy,
-    ps.matches_played,
-    ps.awards_player_of_match
-   FROM player_statistics ps
-     JOIN academy_members am ON am.id = ps.player_id
-     JOIN profiles p ON p.id = am.user_id
-  ORDER BY ps.bowling_wickets DESC NULLS LAST;
-
-create view public.v_fielding_rankings with (security_invoker = true) as
- SELECT ps.academy_id,
-    ps.player_id,
-    am.user_id,
-    p.full_name,
-    p.avatar_url,
-    ps.fielding_catches,
-    ps.fielding_run_outs,
-    ps.fielding_stumpings,
-    ps.matches_played
-   FROM player_statistics ps
-     JOIN academy_members am ON am.id = ps.player_id
-     JOIN profiles p ON p.id = am.user_id
-  ORDER BY ps.fielding_catches DESC NULLS LAST;
-
-create view public.v_overall_rankings with (security_invoker = true) as
- SELECT ps.academy_id,
-    ps.player_id,
-    am.user_id,
-    p.full_name,
-    p.avatar_url,
-    ps.matches_played,
-    ps.awards_player_of_match,
-    ps.batting_runs,
-    ps.bowling_wickets,
-    ps.fielding_catches,
-    ps.batting_runs + ps.bowling_wickets * 20 + ps.fielding_catches * 10 AS contribution_points
-   FROM player_statistics ps
-     JOIN academy_members am ON am.id = ps.player_id
-     JOIN profiles p ON p.id = am.user_id
-  ORDER BY (ps.batting_runs + ps.bowling_wickets * 20 + ps.fielding_catches * 10) DESC NULLS LAST;
-
--- ----------------------------------------------------------------------------
 -- Functions
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.academy_active_join_code(p_academy uuid, p_role app_role DEFAULT 'player'::app_role)
@@ -4158,6 +3675,489 @@ BEGIN
   );
 END $function$
 ;
+
+-- ----------------------------------------------------------------------------
+-- Enable Row Level Security
+-- ----------------------------------------------------------------------------
+alter table public.academies enable row level security;
+alter table public.academy_join_codes enable row level security;
+alter table public.academy_members enable row level security;
+alter table public.academy_owner_invitations enable row level security;
+alter table public.academy_records enable row level security;
+alter table public.activity_log enable row level security;
+alter table public.announcement_targets enable row level security;
+alter table public.announcements enable row level security;
+alter table public.attendance enable row level security;
+alter table public.batch_coaches enable row level security;
+alter table public.batch_members enable row level security;
+alter table public.batch_players enable row level security;
+alter table public.batches enable row level security;
+alter table public.coaches enable row level security;
+alter table public.cricheroes_player_mappings enable row level security;
+alter table public.drill_assignments enable row level security;
+alter table public.drills enable row level security;
+alter table public.join_requests enable row level security;
+alter table public.match_awards enable row level security;
+alter table public.match_batting enable row level security;
+alter table public.match_bowling enable row level security;
+alter table public.match_bowling_spells enable row level security;
+alter table public.match_coach_notes enable row level security;
+alter table public.match_fielding enable row level security;
+alter table public.match_lineups enable row level security;
+alter table public.match_partnerships enable row level security;
+alter table public.matches enable row level security;
+alter table public.notifications enable row level security;
+alter table public.parent_linking_codes enable row level security;
+alter table public.parent_player_links enable row level security;
+alter table public.player_milestones enable row level security;
+alter table public.player_statistics enable row level security;
+alter table public.players enable row level security;
+alter table public.profiles enable row level security;
+alter table public.push_subscriptions enable row level security;
+alter table public.training_sessions enable row level security;
+alter table public.venues enable row level security;
+
+-- ----------------------------------------------------------------------------
+-- Row Level Security policies
+-- ----------------------------------------------------------------------------
+create policy academies_select on public.academies as PERMISSIVE for SELECT to public
+  using ((is_member(id) OR is_super_admin()));
+create policy academies_update on public.academies as PERMISSIVE for UPDATE to public
+  using (is_owner(id))
+  with check (is_owner(id));
+create policy academy_join_codes_select on public.academy_join_codes as PERMISSIVE for SELECT to public
+  using (is_staff(academy_id));
+create policy academy_join_codes_write on public.academy_join_codes as PERMISSIVE for ALL to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy academy_members_delete on public.academy_members as PERMISSIVE for DELETE to public
+  using (is_owner(academy_id));
+create policy academy_members_insert on public.academy_members as PERMISSIVE for INSERT to public
+  with check (is_owner(academy_id));
+create policy academy_members_select on public.academy_members as PERMISSIVE for SELECT to public
+  using (((user_id = auth.uid()) OR is_staff(academy_id)));
+create policy academy_members_select_parents on public.academy_members as PERMISSIVE for SELECT to public
+  using ((user_id IN ( SELECT my_linked_players(academy_members.academy_id) AS my_linked_players)));
+create policy academy_members_update on public.academy_members as PERMISSIVE for UPDATE to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy "Super Admin owner invitations access" on public.academy_owner_invitations as PERMISSIVE for ALL to public
+  using (is_super_admin())
+  with check (is_super_admin());
+create policy academy_records_select on public.academy_records as PERMISSIVE for SELECT to public
+  using (is_member(academy_id));
+create policy academy_records_write on public.academy_records as PERMISSIVE for ALL to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy activity_log_insert on public.activity_log as PERMISSIVE for INSERT to public
+  with check (is_staff(academy_id));
+create policy activity_log_select on public.activity_log as PERMISSIVE for SELECT to public
+  using (is_member(academy_id));
+create policy announcement_targets_select on public.announcement_targets as PERMISSIVE for SELECT to public
+  using ((is_member(academy_id) OR is_super_admin()));
+create policy announcement_targets_write on public.announcement_targets as PERMISSIVE for ALL to public
+  using (is_staff(academy_id))
+  with check (is_staff(academy_id));
+create policy announcements_delete on public.announcements as PERMISSIVE for DELETE to public
+  using ((is_owner(academy_id) OR (is_staff(academy_id) AND (created_by = auth.uid()))));
+create policy announcements_insert on public.announcements as PERMISSIVE for INSERT to public
+  with check ((is_owner(academy_id) OR (is_staff(academy_id) AND (audience = 'batch'::audience_type) AND (batch_id IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM (batches b
+     JOIN academy_members am ON ((am.id = b.coach_id)))
+  WHERE ((b.id = announcements.batch_id) AND (am.user_id = auth.uid())))))));
+create policy announcements_select on public.announcements as PERMISSIVE for SELECT to public
+  using ((is_staff(academy_id) OR is_super_admin() OR (is_member(academy_id) AND (((audience)::text = 'all'::text) OR (((audience)::text = 'players'::text) AND has_role(academy_id, ARRAY['player'::app_role])) OR (((audience)::text = 'all_parents'::text) AND has_role(academy_id, ARRAY['parent'::app_role])) OR (((audience)::text = 'batch'::text) AND ((EXISTS ( SELECT 1
+   FROM (batch_members bm
+     JOIN academy_members am ON ((bm.academy_member_id = am.id)))
+  WHERE ((bm.batch_id = announcements.batch_id) AND (am.user_id = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM ((batch_members bm
+     JOIN academy_members am ON ((bm.academy_member_id = am.id)))
+     JOIN parent_player_links ppl ON ((ppl.player_user_id = am.user_id)))
+  WHERE ((bm.batch_id = announcements.batch_id) AND (ppl.parent_user_id = auth.uid()) AND (ppl.academy_id = announcements.academy_id)))))) OR (((audience)::text = 'custom'::text) AND ((EXISTS ( SELECT 1
+   FROM (announcement_targets t
+     JOIN academy_members am ON ((am.id = t.academy_member_id)))
+  WHERE ((t.announcement_id = announcements.id) AND (am.user_id = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM ((announcement_targets t
+     JOIN batch_members bm ON ((bm.batch_id = t.batch_id)))
+     JOIN academy_members am ON ((am.id = bm.academy_member_id)))
+  WHERE ((t.announcement_id = announcements.id) AND (am.user_id = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM (((announcement_targets t
+     JOIN batch_members bm ON ((bm.batch_id = t.batch_id)))
+     JOIN academy_members am ON ((am.id = bm.academy_member_id)))
+     JOIN parent_player_links ppl ON (((ppl.player_user_id = am.user_id) AND (ppl.academy_id = announcements.academy_id) AND (ppl.status = 'active'::text))))
+  WHERE ((t.announcement_id = announcements.id) AND (ppl.parent_user_id = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM ((announcement_targets t
+     JOIN academy_members am ON ((am.id = t.academy_member_id)))
+     JOIN parent_player_links ppl ON (((ppl.player_user_id = am.user_id) AND (ppl.academy_id = announcements.academy_id) AND (ppl.status = 'active'::text))))
+  WHERE ((t.announcement_id = announcements.id) AND (ppl.parent_user_id = auth.uid()))))))))));
+create policy announcements_update on public.announcements as PERMISSIVE for UPDATE to public
+  using ((is_owner(academy_id) OR (is_staff(academy_id) AND (created_by = auth.uid()))))
+  with check ((is_owner(academy_id) OR (is_staff(academy_id) AND (created_by = auth.uid()))));
+create policy attendance_delete on public.attendance as PERMISSIVE for DELETE to public
+  using ((is_staff(academy_id) AND (EXISTS ( SELECT 1
+   FROM training_sessions s
+  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))));
+create policy attendance_insert on public.attendance as PERMISSIVE for INSERT to public
+  with check ((is_staff(academy_id) AND (EXISTS ( SELECT 1
+   FROM training_sessions s
+  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))));
+create policy attendance_select on public.attendance as PERMISSIVE for SELECT to public
+  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id))));
+create policy attendance_select_parents on public.attendance as PERMISSIVE for SELECT to public
+  using ((player_id IN ( SELECT my_linked_member_ids(attendance.academy_id) AS my_linked_member_ids)));
+create policy attendance_update on public.attendance as PERMISSIVE for UPDATE to public
+  using ((is_staff(academy_id) AND (EXISTS ( SELECT 1
+   FROM training_sessions s
+  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))))
+  with check ((is_staff(academy_id) AND (EXISTS ( SELECT 1
+   FROM training_sessions s
+  WHERE ((s.id = attendance.session_id) AND (s.academy_id = s.academy_id))))));
+create policy batch_coaches_select on public.batch_coaches as PERMISSIVE for SELECT to public
+  using ((is_member(academy_id) OR is_super_admin()));
+create policy batch_coaches_write on public.batch_coaches as PERMISSIVE for ALL to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy batch_members_delete on public.batch_members as PERMISSIVE for DELETE to public
+  using (is_owner(( SELECT b.academy_id
+   FROM batches b
+  WHERE (b.id = batch_members.batch_id))));
+create policy batch_members_insert on public.batch_members as PERMISSIVE for INSERT to public
+  with check (is_owner(( SELECT b.academy_id
+   FROM batches b
+  WHERE (b.id = batch_members.batch_id))));
+create policy batch_members_select on public.batch_members as PERMISSIVE for SELECT to public
+  using (is_member(( SELECT b.academy_id
+   FROM batches b
+  WHERE (b.id = batch_members.batch_id))));
+create policy batch_members_select_parents on public.batch_members as PERMISSIVE for SELECT to public
+  using ((academy_member_id IN ( SELECT am.id
+   FROM academy_members am
+  WHERE ((am.id = batch_members.academy_member_id) AND (am.id IN ( SELECT my_linked_member_ids(am.academy_id) AS my_linked_member_ids))))));
+create policy batch_players_select on public.batch_players as PERMISSIVE for SELECT to public
+  using ((is_owner(academy_id) OR coaches_batch(batch_id) OR (EXISTS ( SELECT 1
+   FROM players p
+  WHERE ((p.id = batch_players.player_id) AND (p.user_id = auth.uid())))) OR is_super_admin()));
+create policy batch_players_write on public.batch_players as PERMISSIVE for ALL to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy batches_select on public.batches as PERMISSIVE for SELECT to public
+  using ((is_member(academy_id) OR is_super_admin()));
+create policy batches_select_parents on public.batches as PERMISSIVE for SELECT to public
+  using (has_role(academy_id, ARRAY['parent'::app_role]));
+create policy batches_write on public.batches as PERMISSIVE for ALL to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy coaches_delete on public.coaches as PERMISSIVE for DELETE to public
+  using (is_owner(academy_id));
+create policy coaches_insert on public.coaches as PERMISSIVE for INSERT to public
+  with check (is_owner(academy_id));
+create policy coaches_select on public.coaches as PERMISSIVE for SELECT to public
+  using ((is_member(academy_id) OR is_super_admin()));
+create policy coaches_update on public.coaches as PERMISSIVE for UPDATE to public
+  using ((is_owner(academy_id) OR (user_id = auth.uid())))
+  with check ((is_owner(academy_id) OR (user_id = auth.uid())));
+create policy cricheroes_mappings_delete on public.cricheroes_player_mappings as PERMISSIVE for DELETE to public
+  using (is_staff(academy_id));
+create policy cricheroes_mappings_select on public.cricheroes_player_mappings as PERMISSIVE for SELECT to public
+  using ((academy_id IN ( SELECT m.academy_id
+   FROM academy_members m
+  WHERE ((m.user_id = auth.uid()) AND (m.status = 'active'::member_status)))));
+create policy cricheroes_mappings_update on public.cricheroes_player_mappings as PERMISSIVE for UPDATE to public
+  using (is_staff(academy_id))
+  with check (is_staff(academy_id));
+create policy cricheroes_mappings_write on public.cricheroes_player_mappings as PERMISSIVE for INSERT to public
+  with check (is_staff(academy_id));
+create policy drill_assignments_delete on public.drill_assignments as PERMISSIVE for DELETE to public
+  using (is_staff(academy_id));
+create policy drill_assignments_insert on public.drill_assignments as PERMISSIVE for INSERT to public
+  with check (is_staff(academy_id));
+create policy drill_assignments_select on public.drill_assignments as PERMISSIVE for SELECT to public
+  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id)) OR (EXISTS ( SELECT 1
+   FROM batch_members
+  WHERE ((batch_members.academy_member_id = my_player_id(drill_assignments.academy_id)) AND (batch_members.batch_id = drill_assignments.batch_id))))));
+create policy drill_assignments_select_parents on public.drill_assignments as PERMISSIVE for SELECT to public
+  using (((player_id IN ( SELECT my_linked_member_ids(drill_assignments.academy_id) AS my_linked_member_ids)) OR (batch_id IN ( SELECT batch_members.batch_id
+   FROM batch_members
+  WHERE (batch_members.academy_member_id IN ( SELECT my_linked_member_ids(drill_assignments.academy_id) AS my_linked_member_ids))))));
+create policy drill_assignments_update on public.drill_assignments as PERMISSIVE for UPDATE to public
+  using ((is_staff(academy_id) OR (EXISTS ( SELECT 1
+   FROM academy_members pm
+  WHERE ((pm.id = drill_assignments.player_id) AND (pm.user_id = auth.uid()) AND (pm.status = 'active'::member_status))))))
+  with check ((is_staff(academy_id) OR ((EXISTS ( SELECT 1
+   FROM academy_members pm
+  WHERE ((pm.id = drill_assignments.player_id) AND (pm.user_id = auth.uid()) AND (pm.status = 'active'::member_status)))) AND (player_id = player_id))));
+create policy drills_select on public.drills as PERMISSIVE for SELECT to public
+  using (is_staff(academy_id));
+create policy drills_write on public.drills as PERMISSIVE for ALL to public
+  using (is_staff(academy_id))
+  with check (is_staff(academy_id));
+create policy join_requests_cancel_own on public.join_requests as PERMISSIVE for UPDATE to public
+  using (((user_id = auth.uid()) AND (status = 'pending'::join_status)))
+  with check (((user_id = auth.uid()) AND (status = ANY (ARRAY['pending'::join_status, 'cancelled'::join_status]))));
+create policy join_requests_review on public.join_requests as PERMISSIVE for UPDATE to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy join_requests_select on public.join_requests as PERMISSIVE for SELECT to public
+  using (((user_id = auth.uid()) OR is_owner(academy_id)));
+create policy match_awards_select on public.match_awards as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_awards.match_id) AND is_member(m.academy_id)))));
+create policy match_awards_write on public.match_awards as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_awards.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_awards.match_id) AND is_staff(m.academy_id)))));
+create policy match_batting_select on public.match_batting as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_batting.match_id) AND (is_member(m.academy_id) OR (match_batting.academy_member_id = my_player_id(m.academy_id)))))));
+create policy match_batting_write on public.match_batting as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_batting.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_batting.match_id) AND is_staff(m.academy_id)))));
+create policy match_bowling_select on public.match_bowling as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_bowling.match_id) AND (is_member(m.academy_id) OR (match_bowling.academy_member_id = my_player_id(m.academy_id)))))));
+create policy match_bowling_write on public.match_bowling as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_bowling.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_bowling.match_id) AND is_staff(m.academy_id)))));
+create policy match_bowling_spells_select on public.match_bowling_spells as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_bowling_spells.match_id) AND is_member(m.academy_id)))));
+create policy match_bowling_spells_write on public.match_bowling_spells as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_bowling_spells.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_bowling_spells.match_id) AND is_staff(m.academy_id)))));
+create policy match_coach_notes_select on public.match_coach_notes as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_coach_notes.match_id) AND is_member(m.academy_id)))));
+create policy match_coach_notes_write on public.match_coach_notes as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_coach_notes.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_coach_notes.match_id) AND is_staff(m.academy_id)))));
+create policy match_fielding_select on public.match_fielding as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_fielding.match_id) AND (is_member(m.academy_id) OR (match_fielding.academy_member_id = my_player_id(m.academy_id)))))));
+create policy match_fielding_write on public.match_fielding as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_fielding.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_fielding.match_id) AND is_staff(m.academy_id)))));
+create policy match_lineups_select on public.match_lineups as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_lineups.match_id) AND is_member(m.academy_id)))));
+create policy match_lineups_write on public.match_lineups as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_lineups.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_lineups.match_id) AND is_staff(m.academy_id)))));
+create policy match_partnerships_select on public.match_partnerships as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_partnerships.match_id) AND is_member(m.academy_id)))));
+create policy match_partnerships_write on public.match_partnerships as PERMISSIVE for ALL to public
+  using ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_partnerships.match_id) AND is_staff(m.academy_id)))))
+  with check ((EXISTS ( SELECT 1
+   FROM matches m
+  WHERE ((m.id = match_partnerships.match_id) AND is_staff(m.academy_id)))));
+create policy matches_select on public.matches as PERMISSIVE for SELECT to public
+  using (is_member(academy_id));
+create policy matches_write on public.matches as PERMISSIVE for ALL to public
+  using (is_staff(academy_id))
+  with check (is_staff(academy_id));
+create policy notifications_delete on public.notifications as PERMISSIVE for DELETE to public
+  using ((recipient_user_id = auth.uid()));
+create policy notifications_select on public.notifications as PERMISSIVE for SELECT to public
+  using ((recipient_user_id = auth.uid()));
+create policy notifications_update on public.notifications as PERMISSIVE for UPDATE to public
+  using ((recipient_user_id = auth.uid()))
+  with check ((recipient_user_id = auth.uid()));
+create policy parent_linking_codes_insert on public.parent_linking_codes as PERMISSIVE for INSERT to public
+  with check ((is_staff(academy_id) OR (player_user_id = auth.uid())));
+create policy parent_linking_codes_select on public.parent_linking_codes as PERMISSIVE for SELECT to public
+  using ((is_staff(academy_id) OR (player_user_id = auth.uid())));
+create policy parent_linking_codes_update on public.parent_linking_codes as PERMISSIVE for UPDATE to public
+  using ((is_staff(academy_id) OR (player_user_id = auth.uid())))
+  with check ((is_staff(academy_id) OR (player_user_id = auth.uid())));
+create policy parent_player_links_insert on public.parent_player_links as PERMISSIVE for INSERT to public
+  with check (is_staff(academy_id));
+create policy parent_player_links_select on public.parent_player_links as PERMISSIVE for SELECT to public
+  using (((parent_user_id = auth.uid()) OR is_staff(academy_id) OR (player_user_id = auth.uid())));
+create policy parent_player_links_update on public.parent_player_links as PERMISSIVE for UPDATE to public
+  using ((is_staff(academy_id) OR (player_user_id = auth.uid())))
+  with check ((is_staff(academy_id) OR (player_user_id = auth.uid())));
+create policy player_milestones_select on public.player_milestones as PERMISSIVE for SELECT to public
+  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id))));
+create policy player_milestones_select_parents on public.player_milestones as PERMISSIVE for SELECT to public
+  using ((player_id IN ( SELECT my_linked_member_ids(player_milestones.academy_id) AS my_linked_member_ids)));
+create policy player_milestones_write on public.player_milestones as PERMISSIVE for ALL to public
+  using ((is_owner(academy_id) OR is_super_admin()))
+  with check ((is_owner(academy_id) OR is_super_admin()));
+create policy player_stats_select on public.player_statistics as PERMISSIVE for SELECT to public
+  using ((is_staff(academy_id) OR (player_id = my_player_id(academy_id))));
+create policy player_stats_select_parents on public.player_statistics as PERMISSIVE for SELECT to public
+  using ((player_id IN ( SELECT my_linked_member_ids(player_statistics.academy_id) AS my_linked_member_ids)));
+create policy player_stats_write on public.player_statistics as PERMISSIVE for ALL to public
+  using ((is_owner(academy_id) OR is_super_admin()))
+  with check ((is_owner(academy_id) OR is_super_admin()));
+create policy players_delete on public.players as PERMISSIVE for DELETE to public
+  using (is_owner(academy_id));
+create policy players_insert on public.players as PERMISSIVE for INSERT to public
+  with check (is_owner(academy_id));
+create policy players_select on public.players as PERMISSIVE for SELECT to public
+  using ((is_owner(academy_id) OR (user_id = auth.uid()) OR shares_batch_with_player(id) OR is_super_admin()));
+create policy players_update on public.players as PERMISSIVE for UPDATE to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+create policy profiles_insert_self on public.profiles as PERMISSIVE for INSERT to public
+  with check ((id = auth.uid()));
+create policy profiles_select on public.profiles as PERMISSIVE for SELECT to public
+  using (((id = auth.uid()) OR is_super_admin() OR (EXISTS ( SELECT 1
+   FROM academy_members them
+  WHERE ((them.user_id = profiles.id) AND is_staff(them.academy_id))))));
+create policy profiles_select_parents on public.profiles as PERMISSIVE for SELECT to public
+  using ((EXISTS ( SELECT 1
+   FROM parent_player_links ppl
+  WHERE ((ppl.parent_user_id = auth.uid()) AND (ppl.player_user_id = profiles.id) AND (ppl.status = 'active'::text)))));
+create policy profiles_update_self on public.profiles as PERMISSIVE for UPDATE to public
+  using ((id = auth.uid()))
+  with check ((id = auth.uid()));
+create policy "push_subscriptions: service role read all" on public.push_subscriptions as PERMISSIVE for SELECT to public
+  using ((auth.role() = 'service_role'::text));
+create policy "push_subscriptions: users manage own" on public.push_subscriptions as PERMISSIVE for ALL to public
+  using ((user_id = auth.uid()))
+  with check ((user_id = auth.uid()));
+create policy training_sessions_delete on public.training_sessions as PERMISSIVE for DELETE to public
+  using (is_staff(academy_id));
+create policy training_sessions_insert on public.training_sessions as PERMISSIVE for INSERT to public
+  with check (is_staff(academy_id));
+create policy training_sessions_select on public.training_sessions as PERMISSIVE for SELECT to public
+  using (is_member(academy_id));
+create policy training_sessions_update on public.training_sessions as PERMISSIVE for UPDATE to public
+  using (is_staff(academy_id))
+  with check (is_staff(academy_id));
+create policy venues_select on public.venues as PERMISSIVE for SELECT to public
+  using ((is_member(academy_id) OR is_super_admin()));
+create policy venues_write on public.venues as PERMISSIVE for ALL to public
+  using (is_owner(academy_id))
+  with check (is_owner(academy_id));
+
+-- ----------------------------------------------------------------------------
+-- Views (ranking views, all security_invoker = true)
+-- ----------------------------------------------------------------------------
+create view public.v_batting_rankings with (security_invoker = true) as
+ SELECT ps.academy_id,
+    ps.player_id,
+    am.user_id,
+    p.full_name,
+    p.avatar_url,
+    ps.batting_runs,
+    ps.batting_innings,
+    ps.batting_highest_score,
+        CASE
+            WHEN (ps.batting_innings - ps.batting_not_outs) > 0 THEN round(ps.batting_runs::numeric / (ps.batting_innings - ps.batting_not_outs)::numeric, 2)
+            WHEN ps.batting_innings > 0 THEN ps.batting_runs::numeric
+            ELSE 0::numeric
+        END AS batting_average,
+        CASE
+            WHEN ps.balls_faced_sum > 0 THEN round(100.0 * ps.batting_runs::numeric / ps.balls_faced_sum::numeric, 2)
+            ELSE 0::numeric
+        END AS strike_rate_placeholder,
+    ps.batting_fifties,
+    ps.batting_centuries,
+    ps.batting_fours,
+    ps.batting_sixes,
+    ps.matches_played,
+    ps.awards_player_of_match
+   FROM player_statistics ps
+     JOIN academy_members am ON am.id = ps.player_id
+     JOIN profiles p ON p.id = am.user_id
+  ORDER BY ps.batting_runs DESC NULLS LAST;
+
+create view public.v_bowling_rankings with (security_invoker = true) as
+ SELECT ps.academy_id,
+    ps.player_id,
+    am.user_id,
+    p.full_name,
+    p.avatar_url,
+    ps.bowling_wickets,
+    ps.bowling_overs,
+    ps.bowling_maidens,
+    ps.bowling_runs_conceded,
+    ps.bowling_best_bowling,
+        CASE
+            WHEN ps.bowling_wickets > 0 THEN round(ps.bowling_runs_conceded::numeric / ps.bowling_wickets::numeric, 2)
+            ELSE 0::numeric
+        END AS bowling_average,
+        CASE
+            WHEN ps.bowling_overs > 0::numeric THEN round(ps.bowling_runs_conceded::numeric / ps.bowling_overs, 2)
+            ELSE 0::numeric
+        END AS economy,
+    ps.matches_played,
+    ps.awards_player_of_match
+   FROM player_statistics ps
+     JOIN academy_members am ON am.id = ps.player_id
+     JOIN profiles p ON p.id = am.user_id
+  ORDER BY ps.bowling_wickets DESC NULLS LAST;
+
+create view public.v_fielding_rankings with (security_invoker = true) as
+ SELECT ps.academy_id,
+    ps.player_id,
+    am.user_id,
+    p.full_name,
+    p.avatar_url,
+    ps.fielding_catches,
+    ps.fielding_run_outs,
+    ps.fielding_stumpings,
+    ps.matches_played
+   FROM player_statistics ps
+     JOIN academy_members am ON am.id = ps.player_id
+     JOIN profiles p ON p.id = am.user_id
+  ORDER BY ps.fielding_catches DESC NULLS LAST;
+
+create view public.v_overall_rankings with (security_invoker = true) as
+ SELECT ps.academy_id,
+    ps.player_id,
+    am.user_id,
+    p.full_name,
+    p.avatar_url,
+    ps.matches_played,
+    ps.awards_player_of_match,
+    ps.batting_runs,
+    ps.bowling_wickets,
+    ps.fielding_catches,
+    ps.batting_runs + ps.bowling_wickets * 20 + ps.fielding_catches * 10 AS contribution_points
+   FROM player_statistics ps
+     JOIN academy_members am ON am.id = ps.player_id
+     JOIN profiles p ON p.id = am.user_id
+  ORDER BY (ps.batting_runs + ps.bowling_wickets * 20 + ps.fielding_catches * 10) DESC NULLS LAST;
 
 -- ----------------------------------------------------------------------------
 -- Triggers
