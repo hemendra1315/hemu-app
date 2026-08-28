@@ -162,16 +162,28 @@ export function AppShell() {
   // Filter allowed items for the user
   const allowedNavItems = SIDEBAR_ITEMS.filter((item) => {
     const isParent = testModeRole === 'parent' || (!testModeRole && roles.includes('parent'));
+
+    // Parents only get their family dashboard and profile — the same
+    // Home | Profile | More set the mobile bottom nav already restricts
+    // them to. Every other item (Sessions, Matches, Stats, My Cricket, ...)
+    // is scoped to running the academy or to one person's own player
+    // profile, not to viewing a child, so capability-based filtering alone
+    // let those leak into the desktop sidebar even though the mobile nav
+    // never showed them.
+    if (isParent) {
+      return item.parentOnly || item.to === '/profile';
+    }
+
+    if (item.parentOnly) return false;
+
     if (testModeRole) {
       if (item.superAdminOnly) return false;
-      if (item.parentOnly && !isParent) return false;
       const mappedTestRole = testModeRole === 'student' ? 'player' : testModeRole;
       return (
         item.requiresCapability === null || hasCapability([mappedTestRole], item.requiresCapability)
       );
     }
     if (item.superAdminOnly) return isSuperAdmin;
-    if (item.parentOnly && !isParent) return false;
     return item.requiresCapability === null || hasCapability(roles, item.requiresCapability);
   });
 
