@@ -852,50 +852,6 @@ CREATE INDEX venues_academy_idx ON public.venues USING btree (academy_id);
 -- ----------------------------------------------------------------------------
 -- Functions
 -- ----------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.academy_active_join_code(p_academy uuid, p_role app_role DEFAULT 'player'::app_role)
- RETURNS text
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  v_code text;
-begin
-  if not is_staff(p_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  select c.code into v_code
-  from academy_join_codes c
-  where c.academy_id = p_academy and c.role = p_role and c.is_active
-  order by c.created_at desc
-  limit 1;
-
-  return v_code;
-end $function$
-;
-
-CREATE OR REPLACE FUNCTION public.academy_join_requests(p_academy uuid, p_status join_status DEFAULT 'pending'::join_status)
- RETURNS TABLE(request_id uuid, user_id uuid, full_name text, email text, avatar_url text, requested_role app_role, status join_status, message text, created_at timestamp with time zone)
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-begin
-  if not is_owner(p_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  return query
-    select r.id, r.user_id, p.full_name, p.email::text, p.avatar_url,
-           r.requested_role, r.status, r.message, r.created_at
-    from join_requests r
-    join profiles p on p.id = r.user_id
-    where r.academy_id = p_academy and r.status = p_status
-    order by r.created_at;
-end $function$
-;
-
 CREATE OR REPLACE FUNCTION public.accept_owner_invitation(p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -988,165 +944,6 @@ BEGIN
 END $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.add_players_to_batch(p_batch uuid, p_players uuid[])
- RETURNS integer
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  v_academy  uuid;
-  v_capacity integer;
-  v_current  integer;
-  v_added    integer;
-begin
-  select academy_id, capacity into v_academy, v_capacity
-  from batches where id = p_batch and deleted_at is null
-  for update;
-
-  if v_academy is null then
-    raise exception 'E_BATCH_NOT_FOUND' using errcode = 'P0002';
-  end if;
-  if not is_owner(v_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  with candidates as (
-    select p.id
-    from players p
-    where p.id = any (p_players)
-      and p.academy_id = v_academy
-      and p.is_active
-      and not exists (
-        select 1 from batch_players bp
-        where bp.batch_id = p_batch and bp.player_id = p.id and bp.left_at is null
-      )
-  )
-  select count(*) into v_added from candidates;
-
-  select count(*) into v_current
-  from batch_players where batch_id = p_batch and left_at is null;
-
-  if v_capacity is not null and v_current + v_added > v_capacity then
-    raise exception 'E_BATCH_FULL' using errcode = '23514';
-  end if;
-
-  insert into batch_players (academy_id, batch_id, player_id)
-  select v_academy, p_batch, p.id
-  from players p
-  where p.id = any (p_players)
-    and p.academy_id = v_academy
-    and p.is_active
-    and not exists (
-      select 1 from batch_players bp
-      where bp.batch_id = p_batch and bp.player_id = p.id and bp.left_at is null
-    );
-
-  return v_added;
-end $function$
-;
-
-CREATE OR REPLACE FUNCTION public.approve_join_request(p_request uuid)
- RETURNS academy_members
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  v_request join_requests;
-  v_member  academy_members;
-begin
-  select * into v_request from join_requests r where r.id = p_request for update;
-
-  if v_request.id is null then
-    raise exception 'E_NOT_FOUND' using errcode = 'P0002';
-  end if;
-
-  if not is_owner(v_request.academy_id) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  if v_request.status <> 'pending' then
-    raise exception 'E_REQUEST_NOT_PENDING' using errcode = '22023';
-  end if;
-
-  insert into academy_members (academy_id, user_id, role, status, joined_at, invited_by)
-  values (v_request.academy_id, v_request.user_id, v_request.requested_role, 'active', now(), auth.uid())
-  on conflict (academy_id, user_id, role)
-    do update set status = 'active', joined_at = coalesce(academy_members.joined_at, now()), left_at = null
-  returning * into v_member;
-
-  perform ensure_person_row(v_request.academy_id, v_request.user_id, v_request.requested_role);
-
-  update join_requests
-     set status = 'approved', reviewed_by = auth.uid(), reviewed_at = now()
-   where id = p_request;
-
-  return v_member;
-end $function$
-;
-
-CREATE OR REPLACE FUNCTION public.approve_join_request(p_request_id uuid, p_batch_ids uuid[] DEFAULT NULL::uuid[])
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_user uuid := auth.uid();
-  v_request join_requests;
-  v_new_member_id uuid;
-BEGIN
-  IF v_user IS NULL THEN
-    RAISE EXCEPTION 'E_UNAUTHENTICATED' USING errcode = '28000';
-  END IF;
-
-  SELECT * INTO v_request
-  FROM join_requests
-  WHERE id = p_request_id
-  FOR UPDATE;
-
-  IF v_request.id IS NULL THEN
-    RAISE EXCEPTION 'E_NOT_FOUND' USING errcode = 'P0002';
-  END IF;
-
-  IF NOT is_owner(v_request.academy_id) THEN
-    RAISE EXCEPTION 'E_FORBIDDEN' USING errcode = '42501';
-  END IF;
-
-  IF v_request.status <> 'pending' THEN
-    RAISE EXCEPTION 'E_INVALID_REQUEST' USING errcode = '22023';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM academy_members m
-    WHERE m.academy_id = v_request.academy_id
-      AND m.user_id = v_request.user_id
-      AND m.status IN ('active', 'pending')
-  ) THEN
-    RAISE EXCEPTION 'E_ALREADY_MEMBER' USING errcode = '23505';
-  END IF;
-
-  INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
-  VALUES (v_request.academy_id, v_request.user_id, v_request.requested_role, 'active', now())
-  RETURNING id INTO v_new_member_id;
-
-  IF p_batch_ids IS NOT NULL AND array_length(p_batch_ids, 1) > 0 THEN
-    INSERT INTO batch_members (batch_id, academy_member_id)
-    SELECT b_id, v_new_member_id
-    FROM unnest(p_batch_ids) AS b_id
-    WHERE EXISTS (
-      SELECT 1 FROM batches b WHERE b.id = b_id AND b.academy_id = v_request.academy_id
-    );
-  END IF;
-
-  UPDATE join_requests
-  SET status = 'approved', reviewed_by = v_user, reviewed_at = now()
-  WHERE id = p_request_id;
-END $function$
-;
-
 CREATE OR REPLACE FUNCTION public.assert_batch_member_tenancy()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1188,71 +985,6 @@ begin
 end $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.assign_coach_to_batch(p_batch uuid, p_coach uuid, p_is_primary boolean DEFAULT false)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare v_academy uuid;
-begin
-  select academy_id into v_academy from batches where id = p_batch and deleted_at is null;
-  if v_academy is null then
-    raise exception 'E_BATCH_NOT_FOUND' using errcode = 'P0002';
-  end if;
-  if not is_owner(v_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-  if not exists (
-    select 1 from coaches where id = p_coach and academy_id = v_academy and is_active
-  ) then
-    raise exception 'E_COACH_NOT_FOUND' using errcode = 'P0002';
-  end if;
-
-  if p_is_primary then
-    update batch_coaches set is_primary = false
-    where batch_id = p_batch and is_primary and coach_id <> p_coach;
-  end if;
-
-  insert into batch_coaches (academy_id, batch_id, coach_id, is_primary)
-  values (v_academy, p_batch, p_coach, p_is_primary)
-  on conflict (batch_id, coach_id) do update set is_primary = excluded.is_primary;
-end $function$
-;
-
-CREATE OR REPLACE FUNCTION public.assign_player_to_batches(p_player uuid, p_batches uuid[])
- RETURNS integer
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  v_academy uuid;
-  v_batch   uuid;
-  v_added   integer := 0;
-begin
-  select academy_id into v_academy from players where id = p_player;
-  if v_academy is null then
-    raise exception 'E_PLAYER_NOT_FOUND' using errcode = 'P0002';
-  end if;
-  if not is_owner(v_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  update batch_players
-  set left_at = now()
-  where player_id = p_player
-    and left_at is null
-    and not (batch_id = any (coalesce(p_batches, '{}'::uuid[])));
-
-  foreach v_batch in array coalesce(p_batches, '{}'::uuid[]) loop
-    v_added := v_added + add_players_to_batch(v_batch, array[p_player]);
-  end loop;
-
-  return v_added;
-end $function$
-;
-
 CREATE OR REPLACE FUNCTION public.batch_member_count(p_batch_id uuid)
  RETURNS integer
  LANGUAGE sql
@@ -1279,195 +1011,6 @@ AS $function$
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.create_academy(p_name text, p_city text DEFAULT NULL::text, p_timezone text DEFAULT 'Asia/Kolkata'::text, p_fee_mode fee_mode DEFAULT 'player_pays'::fee_mode)
- RETURNS academies
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_user     uuid := auth.uid();
-  v_slug     text;
-  v_suffix   integer := 0;
-  v_academy  academies;
-  v_code     text;
-BEGIN
-  IF v_user IS NULL THEN
-    RAISE EXCEPTION 'E_UNAUTHENTICATED' USING errcode = '28000';
-  END IF;
-
-  IF NOT is_super_admin() THEN
-    RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
-      USING errcode = '42501';
-  END IF;
-
-  v_slug := slugify(p_name);
-  IF v_slug = '' THEN
-    RAISE EXCEPTION 'E_VALIDATION: academy name must contain letters or digits'
-      USING errcode = '22023';
-  END IF;
-
-  WHILE EXISTS (SELECT 1 FROM academies a WHERE a.slug = v_slug) LOOP
-    v_suffix := v_suffix + 1;
-    v_slug := slugify(p_name) || '-' || v_suffix;
-  END LOOP;
-
-  INSERT INTO academies (name, slug, city, timezone, fee_mode, owner_user_id)
-  VALUES (btrim(p_name), v_slug, nullif(btrim(coalesce(p_city, '')), ''), p_timezone, p_fee_mode, v_user)
-  RETURNING * INTO v_academy;
-
-  INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
-  VALUES (v_academy.id, v_user, 'academy_owner', 'active', now());
-
-  LOOP
-    v_code := generate_join_code(6);
-    EXIT WHEN NOT EXISTS (
-      SELECT 1 FROM academy_join_codes c WHERE c.code = v_code AND c.is_active
-    );
-  END LOOP;
-
-  INSERT INTO academy_join_codes (academy_id, code, role, created_by)
-  VALUES (v_academy.id, v_code, 'player', v_user);
-
-  RETURN v_academy;
-END $function$
-;
-
-CREATE OR REPLACE FUNCTION public.create_announcement_with_targets(p_academy_id uuid, p_title text, p_message text, p_audience text, p_batch_id uuid DEFAULT NULL::uuid, p_batch_ids uuid[] DEFAULT '{}'::uuid[], p_member_ids uuid[] DEFAULT '{}'::uuid[])
- RETURNS announcements
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_announcement announcements;
-BEGIN
-  IF NOT is_staff(p_academy_id) THEN
-    RAISE EXCEPTION 'E_FORBIDDEN' USING errcode = '42501';
-  END IF;
-
-  IF btrim(coalesce(p_title, '')) = '' OR btrim(coalesce(p_message, '')) = '' THEN
-    RAISE EXCEPTION 'E_VALIDATION: title and message are required' USING errcode = '22023';
-  END IF;
-
-  IF p_audience = 'custom'
-     AND coalesce(array_length(p_batch_ids, 1), 0) = 0
-     AND coalesce(array_length(p_member_ids, 1), 0) = 0 THEN
-    RAISE EXCEPTION 'E_VALIDATION: pick at least one batch or person' USING errcode = '22023';
-  END IF;
-
-  INSERT INTO announcements (academy_id, created_by, title, message, audience, batch_id)
-  VALUES (p_academy_id, auth.uid(), btrim(p_title), btrim(p_message), p_audience::audience_type,
-          CASE WHEN p_audience = 'batch' THEN p_batch_id ELSE NULL END)
-  RETURNING * INTO v_announcement;
-
-  IF p_audience = 'custom' THEN
-    INSERT INTO announcement_targets (announcement_id, academy_id, batch_id)
-    SELECT v_announcement.id, p_academy_id, b.id FROM batches b
-    WHERE b.id = ANY (p_batch_ids) AND b.academy_id = p_academy_id
-    ON CONFLICT DO NOTHING;
-
-    INSERT INTO announcement_targets (announcement_id, academy_id, academy_member_id)
-    SELECT v_announcement.id, p_academy_id, m.id FROM academy_members m
-    WHERE m.id = ANY (p_member_ids) AND m.academy_id = p_academy_id AND m.status = 'active'
-    ON CONFLICT DO NOTHING;
-
-    IF NOT EXISTS (SELECT 1 FROM announcement_targets WHERE announcement_id = v_announcement.id) THEN
-      RAISE EXCEPTION 'E_VALIDATION: none of those batches or people belong to this academy'
-        USING errcode = '22023';
-    END IF;
-
-    PERFORM fanout_announcement(v_announcement.id);
-  END IF;
-
-  RETURN v_announcement;
-END;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.create_platform_academy(p_name text, p_owner_user_id uuid, p_city text DEFAULT NULL::text, p_contact_email text DEFAULT NULL::text, p_contact_phone text DEFAULT NULL::text, p_timezone text DEFAULT 'Asia/Kolkata'::text, p_fee_mode fee_mode DEFAULT 'player_pays'::fee_mode)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_slug     text;
-  v_suffix   integer := 0;
-  v_academy  academies;
-  v_code     text;
-BEGIN
-  -- 1. Super Admin authorization check
-  IF NOT is_super_admin() THEN
-    RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
-      USING errcode = '42501';
-  END IF;
-
-  -- 2. Validate input name
-  IF btrim(coalesce(p_name, '')) = '' THEN
-    RAISE EXCEPTION 'E_VALIDATION: Academy name must not be empty'
-      USING errcode = '22023';
-  END IF;
-
-  -- 3. Verify owner profile exists
-  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_owner_user_id) THEN
-    RAISE EXCEPTION 'E_NOT_FOUND: Selected owner profile does not exist'
-      USING errcode = 'P0002';
-  END IF;
-
-  -- 4. Generate unique platform slug
-  v_slug := slugify(p_name);
-  IF v_slug = '' THEN
-    RAISE EXCEPTION 'E_VALIDATION: Academy name must contain letters or digits'
-      USING errcode = '22023';
-  END IF;
-
-  WHILE EXISTS (SELECT 1 FROM academies a WHERE a.slug = v_slug) LOOP
-    v_suffix := v_suffix + 1;
-    v_slug := slugify(p_name) || '-' || v_suffix;
-  END LOOP;
-
-  -- 5. Insert academy record
-  INSERT INTO academies (
-    name, slug, city, contact_email, contact_phone, timezone, fee_mode, owner_user_id
-  ) VALUES (
-    btrim(p_name),
-    v_slug,
-    nullif(btrim(coalesce(p_city, '')), ''),
-    nullif(btrim(coalesce(p_contact_email, '')), ''),
-    nullif(btrim(coalesce(p_contact_phone, '')), ''),
-    p_timezone,
-    p_fee_mode,
-    p_owner_user_id
-  ) RETURNING * INTO v_academy;
-
-  -- 6. Insert owner academy membership
-  INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
-  VALUES (v_academy.id, p_owner_user_id, 'academy_owner', 'active', now())
-  ON CONFLICT (academy_id, user_id, role) DO UPDATE SET status = 'active', updated_at = now();
-
-  -- 7. Generate default active join code for players
-  LOOP
-    v_code := generate_join_code(6);
-    EXIT WHEN NOT EXISTS (
-      SELECT 1 FROM academy_join_codes c WHERE c.code = v_code AND c.is_active
-    );
-  END LOOP;
-
-  INSERT INTO academy_join_codes (academy_id, code, role, created_by)
-  VALUES (v_academy.id, v_code, 'player', p_owner_user_id);
-
-  RETURN jsonb_build_object(
-    'id', v_academy.id,
-    'name', v_academy.name,
-    'slug', v_academy.slug,
-    'city', v_academy.city,
-    'ownerUserId', v_academy.owner_user_id,
-    'createdAt', v_academy.created_at
-  );
-END $function$
-;
-
 CREATE OR REPLACE FUNCTION public.cricket_overs_to_decimal(p_overs numeric)
  RETURNS numeric
  LANGUAGE sql
@@ -1479,176 +1022,6 @@ AS $function$
     else floor(p_overs) + ((p_overs - floor(p_overs)) * 10.0 / 6.0)
   end;
 $function$
-;
-
-CREATE OR REPLACE FUNCTION public.delete_batch(p_batch uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare v_academy uuid;
-begin
-  select academy_id into v_academy from batches where id = p_batch and deleted_at is null
-  for update;
-
-  if v_academy is null then
-    raise exception 'E_BATCH_NOT_FOUND' using errcode = 'P0002';
-  end if;
-  if not is_owner(v_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  update batch_players set left_at = now() where batch_id = p_batch and left_at is null;
-  delete from batch_coaches where batch_id = p_batch;
-  update batches set deleted_at = now(), is_active = false where id = p_batch;
-end $function$
-;
-
-CREATE OR REPLACE FUNCTION public.delete_platform_academy(p_academy_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  -- 1. Super Admin authorization check
-  IF NOT is_super_admin() THEN
-    RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
-      USING errcode = '42501';
-  END IF;
-
-  -- 2. Verify academy exists
-  IF NOT EXISTS (SELECT 1 FROM academies WHERE id = p_academy_id) THEN
-    RAISE EXCEPTION 'E_NOT_FOUND: Academy does not exist'
-      USING errcode = 'P0002';
-  END IF;
-
-  -- 3. Safely delete dependent records in proper foreign-key order
-  DELETE FROM match_lineups WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM match_batting WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM match_bowling WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM match_fielding WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM match_partnerships WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM match_awards WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM match_coach_notes WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
-  DELETE FROM matches WHERE academy_id = p_academy_id;
-
-  DELETE FROM attendance WHERE session_id IN (SELECT id FROM training_sessions WHERE academy_id = p_academy_id);
-  DELETE FROM training_sessions WHERE academy_id = p_academy_id;
-
-  DELETE FROM batch_members WHERE batch_id IN (SELECT id FROM batches WHERE academy_id = p_academy_id);
-  DELETE FROM batches WHERE academy_id = p_academy_id;
-
-  DELETE FROM player_statistics WHERE academy_id = p_academy_id;
-  DELETE FROM player_milestones WHERE academy_id = p_academy_id;
-  DELETE FROM academy_records WHERE academy_id = p_academy_id;
-  DELETE FROM cricheroes_player_mappings WHERE academy_id = p_academy_id;
-  DELETE FROM drill_assignments WHERE academy_id = p_academy_id;
-  DELETE FROM drills WHERE academy_id = p_academy_id;
-  DELETE FROM activity_log WHERE academy_id = p_academy_id;
-  DELETE FROM academy_join_codes WHERE academy_id = p_academy_id;
-  DELETE FROM join_requests WHERE academy_id = p_academy_id;
-  DELETE FROM academy_members WHERE academy_id = p_academy_id;
-
-  -- 4. Delete academy record
-  DELETE FROM academies WHERE id = p_academy_id;
-END $function$
-;
-
-CREATE OR REPLACE FUNCTION public.detect_player_milestones(p_academy uuid, p_player uuid, p_match uuid, p_matches_played integer, p_batting_runs integer, p_bowling_wickets integer, p_fielding_catches integer, p_match_runs integer, p_match_wickets integer)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-declare
-  v_count integer;
-begin
-  if auth.uid() is not null and not is_staff(p_academy) then
-    raise exception 'E_FORBIDDEN' using errcode = '42501';
-  end if;
-
-  if p_matches_played = 1 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'debut_match' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'debut_match', p_match);
-    end if;
-  end if;
-
-  if p_match_runs >= 50 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'first_fifty' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'first_fifty', p_match);
-    end if;
-  end if;
-
-  if p_match_runs >= 100 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'first_century' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'first_century', p_match);
-    end if;
-  end if;
-
-  if p_match_wickets >= 5 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'first_five_wicket_haul' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'first_five_wicket_haul', p_match);
-    end if;
-  end if;
-
-  if p_batting_runs >= 100 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'runs_100' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'runs_100', p_match);
-    end if;
-  end if;
-
-  if p_batting_runs >= 500 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'runs_500' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'runs_500', p_match);
-    end if;
-  end if;
-
-  if p_batting_runs >= 1000 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'runs_1000' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'runs_1000', p_match);
-    end if;
-  end if;
-
-  if p_bowling_wickets >= 50 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'wickets_50' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'wickets_50', p_match);
-    end if;
-  end if;
-
-  if p_bowling_wickets >= 100 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'wickets_100' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'wickets_100', p_match);
-    end if;
-  end if;
-
-  if p_fielding_catches >= 25 then
-    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'catches_25' and academy_id = p_academy;
-    if v_count is null then
-      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
-      values (p_academy, p_player, 'catches_25', p_match);
-    end if;
-  end if;
-end $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.ensure_person_row(p_academy uuid, p_user uuid, p_role app_role)
@@ -1669,6 +1042,7 @@ begin
   end if;
 end $function$
 ;
+
 CREATE OR REPLACE FUNCTION public.fanout_announcement(p_announcement uuid)
  RETURNS integer
  LANGUAGE plpgsql
@@ -1795,42 +1169,6 @@ begin
 end $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.generate_parent_linking_code(p_academy_id uuid, p_player_user_id uuid, p_relationship_type text)
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'extensions'
-AS $function$
-DECLARE
-  v_code text;
-BEGIN
-  IF NOT (is_staff(p_academy_id) OR auth.uid() = p_player_user_id) THEN
-    RAISE EXCEPTION 'E_FORBIDDEN' USING errcode = '42501';
-  END IF;
-
-  IF p_relationship_type NOT IN ('father', 'mother', 'guardian', 'other') THEN
-    RAISE EXCEPTION 'E_INVALID_RELATIONSHIP' USING errcode = '22023';
-  END IF;
-
-  UPDATE parent_linking_codes 
-  SET is_active = FALSE 
-  WHERE academy_id = p_academy_id 
-    AND player_user_id = p_player_user_id 
-    AND relationship_type = p_relationship_type
-    AND is_active = TRUE;
-
-  v_code := upper(substring(replace(replace(replace(encode(gen_random_bytes(6), 'base64'), '/', 'A'), '+', 'B'), '=', 'C'), 1, 8));
-
-  INSERT INTO parent_linking_codes (
-    academy_id, player_user_id, code, relationship_type, expires_at, created_by
-  ) VALUES (
-    p_academy_id, p_player_user_id, v_code, p_relationship_type, now() + interval '7 days', auth.uid()
-  );
-
-  RETURN v_code;
-END $function$
-;
-
 CREATE OR REPLACE FUNCTION public.get_owner_invitation_details(p_token text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1881,6 +1219,86 @@ BEGIN
     'expiresAt', v_invitation.expires_at,
     'targetRole', 'academy_owner'
   );
+END $function$
+;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  insert into profiles (id, full_name, email, avatar_url)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'),
+    new.email,
+    new.raw_user_meta_data ->> 'avatar_url'
+  )
+  on conflict (id) do nothing;
+  return new;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select coalesce((select p.is_super_admin from profiles p where p.id = auth.uid()), false);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.delete_platform_academy(p_academy_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+BEGIN
+  -- 1. Super Admin authorization check
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
+      USING errcode = '42501';
+  END IF;
+
+  -- 2. Verify academy exists
+  IF NOT EXISTS (SELECT 1 FROM academies WHERE id = p_academy_id) THEN
+    RAISE EXCEPTION 'E_NOT_FOUND: Academy does not exist'
+      USING errcode = 'P0002';
+  END IF;
+
+  -- 3. Safely delete dependent records in proper foreign-key order
+  DELETE FROM match_lineups WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM match_batting WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM match_bowling WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM match_fielding WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM match_partnerships WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM match_awards WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM match_coach_notes WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
+  DELETE FROM matches WHERE academy_id = p_academy_id;
+
+  DELETE FROM attendance WHERE session_id IN (SELECT id FROM training_sessions WHERE academy_id = p_academy_id);
+  DELETE FROM training_sessions WHERE academy_id = p_academy_id;
+
+  DELETE FROM batch_members WHERE batch_id IN (SELECT id FROM batches WHERE academy_id = p_academy_id);
+  DELETE FROM batches WHERE academy_id = p_academy_id;
+
+  DELETE FROM player_statistics WHERE academy_id = p_academy_id;
+  DELETE FROM player_milestones WHERE academy_id = p_academy_id;
+  DELETE FROM academy_records WHERE academy_id = p_academy_id;
+  DELETE FROM cricheroes_player_mappings WHERE academy_id = p_academy_id;
+  DELETE FROM drill_assignments WHERE academy_id = p_academy_id;
+  DELETE FROM drills WHERE academy_id = p_academy_id;
+  DELETE FROM activity_log WHERE academy_id = p_academy_id;
+  DELETE FROM academy_join_codes WHERE academy_id = p_academy_id;
+  DELETE FROM join_requests WHERE academy_id = p_academy_id;
+  DELETE FROM academy_members WHERE academy_id = p_academy_id;
+
+  -- 4. Delete academy record
+  DELETE FROM academies WHERE id = p_academy_id;
 END $function$
 ;
 
@@ -2108,25 +1526,6 @@ BEGIN
 END $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.handle_new_user()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-begin
-  insert into profiles (id, full_name, email, avatar_url)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'),
-    new.email,
-    new.raw_user_meta_data ->> 'avatar_url'
-  )
-  on conflict (id) do nothing;
-  return new;
-end $function$
-;
-
 CREATE OR REPLACE FUNCTION public.has_role(p_academy uuid, p_roles app_role[])
  RETURNS boolean
  LANGUAGE sql
@@ -2142,6 +1541,295 @@ AS $function$
       and m.role = any (p_roles)
   );
 $function$
+;
+
+CREATE OR REPLACE FUNCTION public.is_member(p_academy uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  SELECT has_role(p_academy, ARRAY['academy_owner', 'coach', 'player', 'parent']::app_role[]);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.is_owner(p_academy uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select has_role(p_academy, array['academy_owner']::app_role[]);
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.academy_join_requests(p_academy uuid, p_status join_status DEFAULT 'pending'::join_status)
+ RETURNS TABLE(request_id uuid, user_id uuid, full_name text, email text, avatar_url text, requested_role app_role, status join_status, message text, created_at timestamp with time zone)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if not is_owner(p_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  return query
+    select r.id, r.user_id, p.full_name, p.email::text, p.avatar_url,
+           r.requested_role, r.status, r.message, r.created_at
+    from join_requests r
+    join profiles p on p.id = r.user_id
+    where r.academy_id = p_academy and r.status = p_status
+    order by r.created_at;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.add_players_to_batch(p_batch uuid, p_players uuid[])
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_academy  uuid;
+  v_capacity integer;
+  v_current  integer;
+  v_added    integer;
+begin
+  select academy_id, capacity into v_academy, v_capacity
+  from batches where id = p_batch and deleted_at is null
+  for update;
+
+  if v_academy is null then
+    raise exception 'E_BATCH_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if not is_owner(v_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  with candidates as (
+    select p.id
+    from players p
+    where p.id = any (p_players)
+      and p.academy_id = v_academy
+      and p.is_active
+      and not exists (
+        select 1 from batch_players bp
+        where bp.batch_id = p_batch and bp.player_id = p.id and bp.left_at is null
+      )
+  )
+  select count(*) into v_added from candidates;
+
+  select count(*) into v_current
+  from batch_players where batch_id = p_batch and left_at is null;
+
+  if v_capacity is not null and v_current + v_added > v_capacity then
+    raise exception 'E_BATCH_FULL' using errcode = '23514';
+  end if;
+
+  insert into batch_players (academy_id, batch_id, player_id)
+  select v_academy, p_batch, p.id
+  from players p
+  where p.id = any (p_players)
+    and p.academy_id = v_academy
+    and p.is_active
+    and not exists (
+      select 1 from batch_players bp
+      where bp.batch_id = p_batch and bp.player_id = p.id and bp.left_at is null
+    );
+
+  return v_added;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.approve_join_request(p_request uuid)
+ RETURNS academy_members
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_request join_requests;
+  v_member  academy_members;
+begin
+  select * into v_request from join_requests r where r.id = p_request for update;
+
+  if v_request.id is null then
+    raise exception 'E_NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if not is_owner(v_request.academy_id) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  if v_request.status <> 'pending' then
+    raise exception 'E_REQUEST_NOT_PENDING' using errcode = '22023';
+  end if;
+
+  insert into academy_members (academy_id, user_id, role, status, joined_at, invited_by)
+  values (v_request.academy_id, v_request.user_id, v_request.requested_role, 'active', now(), auth.uid())
+  on conflict (academy_id, user_id, role)
+    do update set status = 'active', joined_at = coalesce(academy_members.joined_at, now()), left_at = null
+  returning * into v_member;
+
+  perform ensure_person_row(v_request.academy_id, v_request.user_id, v_request.requested_role);
+
+  update join_requests
+     set status = 'approved', reviewed_by = auth.uid(), reviewed_at = now()
+   where id = p_request;
+
+  return v_member;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.approve_join_request(p_request_id uuid, p_batch_ids uuid[] DEFAULT NULL::uuid[])
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_user uuid := auth.uid();
+  v_request join_requests;
+  v_new_member_id uuid;
+BEGIN
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'E_UNAUTHENTICATED' USING errcode = '28000';
+  END IF;
+
+  SELECT * INTO v_request
+  FROM join_requests
+  WHERE id = p_request_id
+  FOR UPDATE;
+
+  IF v_request.id IS NULL THEN
+    RAISE EXCEPTION 'E_NOT_FOUND' USING errcode = 'P0002';
+  END IF;
+
+  IF NOT is_owner(v_request.academy_id) THEN
+    RAISE EXCEPTION 'E_FORBIDDEN' USING errcode = '42501';
+  END IF;
+
+  IF v_request.status <> 'pending' THEN
+    RAISE EXCEPTION 'E_INVALID_REQUEST' USING errcode = '22023';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM academy_members m
+    WHERE m.academy_id = v_request.academy_id
+      AND m.user_id = v_request.user_id
+      AND m.status IN ('active', 'pending')
+  ) THEN
+    RAISE EXCEPTION 'E_ALREADY_MEMBER' USING errcode = '23505';
+  END IF;
+
+  INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
+  VALUES (v_request.academy_id, v_request.user_id, v_request.requested_role, 'active', now())
+  RETURNING id INTO v_new_member_id;
+
+  IF p_batch_ids IS NOT NULL AND array_length(p_batch_ids, 1) > 0 THEN
+    INSERT INTO batch_members (batch_id, academy_member_id)
+    SELECT b_id, v_new_member_id
+    FROM unnest(p_batch_ids) AS b_id
+    WHERE EXISTS (
+      SELECT 1 FROM batches b WHERE b.id = b_id AND b.academy_id = v_request.academy_id
+    );
+  END IF;
+
+  UPDATE join_requests
+  SET status = 'approved', reviewed_by = v_user, reviewed_at = now()
+  WHERE id = p_request_id;
+END $function$
+;
+
+CREATE OR REPLACE FUNCTION public.assign_coach_to_batch(p_batch uuid, p_coach uuid, p_is_primary boolean DEFAULT false)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_academy uuid;
+begin
+  select academy_id into v_academy from batches where id = p_batch and deleted_at is null;
+  if v_academy is null then
+    raise exception 'E_BATCH_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if not is_owner(v_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+  if not exists (
+    select 1 from coaches where id = p_coach and academy_id = v_academy and is_active
+  ) then
+    raise exception 'E_COACH_NOT_FOUND' using errcode = 'P0002';
+  end if;
+
+  if p_is_primary then
+    update batch_coaches set is_primary = false
+    where batch_id = p_batch and is_primary and coach_id <> p_coach;
+  end if;
+
+  insert into batch_coaches (academy_id, batch_id, coach_id, is_primary)
+  values (v_academy, p_batch, p_coach, p_is_primary)
+  on conflict (batch_id, coach_id) do update set is_primary = excluded.is_primary;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.assign_player_to_batches(p_player uuid, p_batches uuid[])
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_academy uuid;
+  v_batch   uuid;
+  v_added   integer := 0;
+begin
+  select academy_id into v_academy from players where id = p_player;
+  if v_academy is null then
+    raise exception 'E_PLAYER_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if not is_owner(v_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  update batch_players
+  set left_at = now()
+  where player_id = p_player
+    and left_at is null
+    and not (batch_id = any (coalesce(p_batches, '{}'::uuid[])));
+
+  foreach v_batch in array coalesce(p_batches, '{}'::uuid[]) loop
+    v_added := v_added + add_players_to_batch(v_batch, array[p_player]);
+  end loop;
+
+  return v_added;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.delete_batch(p_batch uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_academy uuid;
+begin
+  select academy_id into v_academy from batches where id = p_batch and deleted_at is null
+  for update;
+
+  if v_academy is null then
+    raise exception 'E_BATCH_NOT_FOUND' using errcode = 'P0002';
+  end if;
+  if not is_owner(v_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  update batch_players set left_at = now() where batch_id = p_batch and left_at is null;
+  delete from batch_coaches where batch_id = p_batch;
+  update batches set deleted_at = now(), is_active = false where id = p_batch;
+end $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.is_academy_owner_or_admin(p_academy_id_text text)
@@ -2168,26 +1856,6 @@ begin
 end $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.is_member(p_academy uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  SELECT has_role(p_academy, ARRAY['academy_owner', 'coach', 'player', 'parent']::app_role[]);
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.is_owner(p_academy uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-  select has_role(p_academy, array['academy_owner']::app_role[]);
-$function$
-;
-
 CREATE OR REPLACE FUNCTION public.is_staff(p_academy uuid)
  RETURNS boolean
  LANGUAGE sql
@@ -2198,14 +1866,210 @@ AS $function$
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.is_super_admin()
- RETURNS boolean
- LANGUAGE sql
+CREATE OR REPLACE FUNCTION public.academy_active_join_code(p_academy uuid, p_role app_role DEFAULT 'player'::app_role)
+ RETURNS text
+ LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  select coalesce((select p.is_super_admin from profiles p where p.id = auth.uid()), false);
+declare
+  v_code text;
+begin
+  if not is_staff(p_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  select c.code into v_code
+  from academy_join_codes c
+  where c.academy_id = p_academy and c.role = p_role and c.is_active
+  order by c.created_at desc
+  limit 1;
+
+  return v_code;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.create_announcement_with_targets(p_academy_id uuid, p_title text, p_message text, p_audience text, p_batch_id uuid DEFAULT NULL::uuid, p_batch_ids uuid[] DEFAULT '{}'::uuid[], p_member_ids uuid[] DEFAULT '{}'::uuid[])
+ RETURNS announcements
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_announcement announcements;
+BEGIN
+  IF NOT is_staff(p_academy_id) THEN
+    RAISE EXCEPTION 'E_FORBIDDEN' USING errcode = '42501';
+  END IF;
+
+  IF btrim(coalesce(p_title, '')) = '' OR btrim(coalesce(p_message, '')) = '' THEN
+    RAISE EXCEPTION 'E_VALIDATION: title and message are required' USING errcode = '22023';
+  END IF;
+
+  IF p_audience = 'custom'
+     AND coalesce(array_length(p_batch_ids, 1), 0) = 0
+     AND coalesce(array_length(p_member_ids, 1), 0) = 0 THEN
+    RAISE EXCEPTION 'E_VALIDATION: pick at least one batch or person' USING errcode = '22023';
+  END IF;
+
+  INSERT INTO announcements (academy_id, created_by, title, message, audience, batch_id)
+  VALUES (p_academy_id, auth.uid(), btrim(p_title), btrim(p_message), p_audience::audience_type,
+          CASE WHEN p_audience = 'batch' THEN p_batch_id ELSE NULL END)
+  RETURNING * INTO v_announcement;
+
+  IF p_audience = 'custom' THEN
+    INSERT INTO announcement_targets (announcement_id, academy_id, batch_id)
+    SELECT v_announcement.id, p_academy_id, b.id FROM batches b
+    WHERE b.id = ANY (p_batch_ids) AND b.academy_id = p_academy_id
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO announcement_targets (announcement_id, academy_id, academy_member_id)
+    SELECT v_announcement.id, p_academy_id, m.id FROM academy_members m
+    WHERE m.id = ANY (p_member_ids) AND m.academy_id = p_academy_id AND m.status = 'active'
+    ON CONFLICT DO NOTHING;
+
+    IF NOT EXISTS (SELECT 1 FROM announcement_targets WHERE announcement_id = v_announcement.id) THEN
+      RAISE EXCEPTION 'E_VALIDATION: none of those batches or people belong to this academy'
+        USING errcode = '22023';
+    END IF;
+
+    PERFORM fanout_announcement(v_announcement.id);
+  END IF;
+
+  RETURN v_announcement;
+END;
 $function$
+;
+
+CREATE OR REPLACE FUNCTION public.detect_player_milestones(p_academy uuid, p_player uuid, p_match uuid, p_matches_played integer, p_batting_runs integer, p_bowling_wickets integer, p_fielding_catches integer, p_match_runs integer, p_match_wickets integer)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare
+  v_count integer;
+begin
+  if auth.uid() is not null and not is_staff(p_academy) then
+    raise exception 'E_FORBIDDEN' using errcode = '42501';
+  end if;
+
+  if p_matches_played = 1 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'debut_match' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'debut_match', p_match);
+    end if;
+  end if;
+
+  if p_match_runs >= 50 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'first_fifty' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'first_fifty', p_match);
+    end if;
+  end if;
+
+  if p_match_runs >= 100 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'first_century' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'first_century', p_match);
+    end if;
+  end if;
+
+  if p_match_wickets >= 5 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'first_five_wicket_haul' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'first_five_wicket_haul', p_match);
+    end if;
+  end if;
+
+  if p_batting_runs >= 100 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'runs_100' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'runs_100', p_match);
+    end if;
+  end if;
+
+  if p_batting_runs >= 500 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'runs_500' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'runs_500', p_match);
+    end if;
+  end if;
+
+  if p_batting_runs >= 1000 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'runs_1000' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'runs_1000', p_match);
+    end if;
+  end if;
+
+  if p_bowling_wickets >= 50 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'wickets_50' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'wickets_50', p_match);
+    end if;
+  end if;
+
+  if p_bowling_wickets >= 100 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'wickets_100' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'wickets_100', p_match);
+    end if;
+  end if;
+
+  if p_fielding_catches >= 25 then
+    select 1 into v_count from player_milestones where player_id = p_player and milestone_type = 'catches_25' and academy_id = p_academy;
+    if v_count is null then
+      insert into player_milestones (academy_id, player_id, milestone_type, match_id)
+      values (p_academy, p_player, 'catches_25', p_match);
+    end if;
+  end if;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.generate_parent_linking_code(p_academy_id uuid, p_player_user_id uuid, p_relationship_type text)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'extensions'
+AS $function$
+DECLARE
+  v_code text;
+BEGIN
+  IF NOT (is_staff(p_academy_id) OR auth.uid() = p_player_user_id) THEN
+    RAISE EXCEPTION 'E_FORBIDDEN' USING errcode = '42501';
+  END IF;
+
+  IF p_relationship_type NOT IN ('father', 'mother', 'guardian', 'other') THEN
+    RAISE EXCEPTION 'E_INVALID_RELATIONSHIP' USING errcode = '22023';
+  END IF;
+
+  UPDATE parent_linking_codes 
+  SET is_active = FALSE 
+  WHERE academy_id = p_academy_id 
+    AND player_user_id = p_player_user_id 
+    AND relationship_type = p_relationship_type
+    AND is_active = TRUE;
+
+  v_code := upper(substring(replace(replace(replace(encode(gen_random_bytes(6), 'base64'), '/', 'A'), '+', 'B'), '=', 'C'), 1, 8));
+
+  INSERT INTO parent_linking_codes (
+    academy_id, player_user_id, code, relationship_type, expires_at, created_by
+  ) VALUES (
+    p_academy_id, p_player_user_id, v_code, p_relationship_type, now() + interval '7 days', auth.uid()
+  );
+
+  RETURN v_code;
+END $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.my_join_requests()
@@ -2266,6 +2130,7 @@ AS $function$
   order by a.name;
 $function$
 ;
+
 CREATE OR REPLACE FUNCTION public.my_player_id(p_academy uuid)
  RETURNS uuid
  LANGUAGE sql
@@ -3129,72 +2994,143 @@ AS $function$
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.super_admin_add_member(p_academy_id uuid, p_full_name text, p_role app_role DEFAULT 'player'::app_role, p_email text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_batch_id uuid DEFAULT NULL::uuid)
- RETURNS jsonb
+CREATE OR REPLACE FUNCTION public.create_academy(p_name text, p_city text DEFAULT NULL::text, p_timezone text DEFAULT 'Asia/Kolkata'::text, p_fee_mode fee_mode DEFAULT 'player_pays'::fee_mode)
+ RETURNS academies
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public', 'auth'
+ SET search_path TO 'public'
 AS $function$
 DECLARE
-  v_email text;
-  v_user_id uuid;
-  v_member_id uuid;
+  v_user     uuid := auth.uid();
+  v_slug     text;
+  v_suffix   integer := 0;
+  v_academy  academies;
+  v_code     text;
 BEGIN
-  -- Super Admin authorization check
+  IF v_user IS NULL THEN
+    RAISE EXCEPTION 'E_UNAUTHENTICATED' USING errcode = '28000';
+  END IF;
+
   IF NOT is_super_admin() THEN
     RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
       USING errcode = '42501';
   END IF;
 
-  -- Verify target academy exists
-  IF NOT EXISTS (SELECT 1 FROM academies WHERE id = p_academy_id) THEN
-    RAISE EXCEPTION 'E_NOT_FOUND: Target academy does not exist'
+  v_slug := slugify(p_name);
+  IF v_slug = '' THEN
+    RAISE EXCEPTION 'E_VALIDATION: academy name must contain letters or digits'
+      USING errcode = '22023';
+  END IF;
+
+  WHILE EXISTS (SELECT 1 FROM academies a WHERE a.slug = v_slug) LOOP
+    v_suffix := v_suffix + 1;
+    v_slug := slugify(p_name) || '-' || v_suffix;
+  END LOOP;
+
+  INSERT INTO academies (name, slug, city, timezone, fee_mode, owner_user_id)
+  VALUES (btrim(p_name), v_slug, nullif(btrim(coalesce(p_city, '')), ''), p_timezone, p_fee_mode, v_user)
+  RETURNING * INTO v_academy;
+
+  INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
+  VALUES (v_academy.id, v_user, 'academy_owner', 'active', now());
+
+  LOOP
+    v_code := generate_join_code(6);
+    EXIT WHEN NOT EXISTS (
+      SELECT 1 FROM academy_join_codes c WHERE c.code = v_code AND c.is_active
+    );
+  END LOOP;
+
+  INSERT INTO academy_join_codes (academy_id, code, role, created_by)
+  VALUES (v_academy.id, v_code, 'player', v_user);
+
+  RETURN v_academy;
+END $function$
+;
+
+CREATE OR REPLACE FUNCTION public.create_platform_academy(p_name text, p_owner_user_id uuid, p_city text DEFAULT NULL::text, p_contact_email text DEFAULT NULL::text, p_contact_phone text DEFAULT NULL::text, p_timezone text DEFAULT 'Asia/Kolkata'::text, p_fee_mode fee_mode DEFAULT 'player_pays'::fee_mode)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_slug     text;
+  v_suffix   integer := 0;
+  v_academy  academies;
+  v_code     text;
+BEGIN
+  -- 1. Super Admin authorization check
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
+      USING errcode = '42501';
+  END IF;
+
+  -- 2. Validate input name
+  IF btrim(coalesce(p_name, '')) = '' THEN
+    RAISE EXCEPTION 'E_VALIDATION: Academy name must not be empty'
+      USING errcode = '22023';
+  END IF;
+
+  -- 3. Verify owner profile exists
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_owner_user_id) THEN
+    RAISE EXCEPTION 'E_NOT_FOUND: Selected owner profile does not exist'
       USING errcode = 'P0002';
   END IF;
 
-  -- Restrict role to player or coach
-  IF p_role NOT IN ('player', 'coach') THEN
-    RAISE EXCEPTION 'E_VALIDATION: Role must be player or coach'
+  -- 4. Generate unique platform slug
+  v_slug := slugify(p_name);
+  IF v_slug = '' THEN
+    RAISE EXCEPTION 'E_VALIDATION: Academy name must contain letters or digits'
       USING errcode = '22023';
   END IF;
 
-  IF btrim(coalesce(p_full_name, '')) = '' THEN
-    RAISE EXCEPTION 'E_VALIDATION: Full name is required'
-      USING errcode = '22023';
-  END IF;
+  WHILE EXISTS (SELECT 1 FROM academies a WHERE a.slug = v_slug) LOOP
+    v_suffix := v_suffix + 1;
+    v_slug := slugify(p_name) || '-' || v_suffix;
+  END LOOP;
 
-  -- Generate email if omitted
-  IF btrim(coalesce(p_email, '')) = '' THEN
-    v_email := lower(slugify(p_full_name)) || '.' || substring(gen_random_uuid()::text from 1 for 8) || '@demo.academy';
-  ELSE
-    v_email := lower(btrim(p_email));
-  END IF;
+  -- 5. Insert academy record
+  INSERT INTO academies (
+    name, slug, city, contact_email, contact_phone, timezone, fee_mode, owner_user_id
+  ) VALUES (
+    btrim(p_name),
+    v_slug,
+    nullif(btrim(coalesce(p_city, '')), ''),
+    nullif(btrim(coalesce(p_contact_email, '')), ''),
+    nullif(btrim(coalesce(p_contact_phone, '')), ''),
+    p_timezone,
+    p_fee_mode,
+    p_owner_user_id
+  ) RETURNING * INTO v_academy;
 
-  v_user_id := super_admin_get_or_create_user(v_email, p_full_name, p_phone);
-
+  -- 6. Insert owner academy membership
   INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
-  VALUES (p_academy_id, v_user_id, p_role, 'active', now())
-  ON CONFLICT (academy_id, user_id, role) DO UPDATE SET status = 'active', updated_at = now()
-  RETURNING id INTO v_member_id;
+  VALUES (v_academy.id, p_owner_user_id, 'academy_owner', 'active', now())
+  ON CONFLICT (academy_id, user_id, role) DO UPDATE SET status = 'active', updated_at = now();
 
-  IF p_batch_id IS NOT NULL AND p_role = 'player' THEN
-    IF EXISTS (SELECT 1 FROM batches WHERE id = p_batch_id AND academy_id = p_academy_id) THEN
-      INSERT INTO batch_members (batch_id, academy_member_id, joined_at)
-      VALUES (p_batch_id, v_member_id, now())
-      ON CONFLICT DO NOTHING;
-    END IF;
-  END IF;
+  -- 7. Generate default active join code for players
+  LOOP
+    v_code := generate_join_code(6);
+    EXIT WHEN NOT EXISTS (
+      SELECT 1 FROM academy_join_codes c WHERE c.code = v_code AND c.is_active
+    );
+  END LOOP;
+
+  INSERT INTO academy_join_codes (academy_id, code, role, created_by)
+  VALUES (v_academy.id, v_code, 'player', p_owner_user_id);
 
   RETURN jsonb_build_object(
-    'id', v_member_id,
-    'academyId', p_academy_id,
-    'userId', v_user_id,
-    'role', p_role,
-    'fullName', p_full_name,
-    'email', v_email
+    'id', v_academy.id,
+    'name', v_academy.name,
+    'slug', v_academy.slug,
+    'city', v_academy.city,
+    'ownerUserId', v_academy.owner_user_id,
+    'createdAt', v_academy.created_at
   );
 END $function$
 ;
+
 CREATE OR REPLACE FUNCTION public.super_admin_create_academy_with_invite(p_name text, p_city text DEFAULT NULL::text, p_contact_email text DEFAULT NULL::text, p_contact_phone text DEFAULT NULL::text, p_timezone text DEFAULT 'Asia/Kolkata'::text, p_fee_mode fee_mode DEFAULT 'player_pays'::fee_mode)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -3337,6 +3273,73 @@ BEGIN
   ON CONFLICT (id) DO UPDATE SET full_name = coalesce(profiles.full_name, EXCLUDED.full_name), phone = coalesce(profiles.phone, EXCLUDED.phone);
 
   RETURN v_user_id;
+END $function$
+;
+
+CREATE OR REPLACE FUNCTION public.super_admin_add_member(p_academy_id uuid, p_full_name text, p_role app_role DEFAULT 'player'::app_role, p_email text DEFAULT NULL::text, p_phone text DEFAULT NULL::text, p_batch_id uuid DEFAULT NULL::uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth'
+AS $function$
+DECLARE
+  v_email text;
+  v_user_id uuid;
+  v_member_id uuid;
+BEGIN
+  -- Super Admin authorization check
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'E_FORBIDDEN: Access restricted to platform super admins'
+      USING errcode = '42501';
+  END IF;
+
+  -- Verify target academy exists
+  IF NOT EXISTS (SELECT 1 FROM academies WHERE id = p_academy_id) THEN
+    RAISE EXCEPTION 'E_NOT_FOUND: Target academy does not exist'
+      USING errcode = 'P0002';
+  END IF;
+
+  -- Restrict role to player or coach
+  IF p_role NOT IN ('player', 'coach') THEN
+    RAISE EXCEPTION 'E_VALIDATION: Role must be player or coach'
+      USING errcode = '22023';
+  END IF;
+
+  IF btrim(coalesce(p_full_name, '')) = '' THEN
+    RAISE EXCEPTION 'E_VALIDATION: Full name is required'
+      USING errcode = '22023';
+  END IF;
+
+  -- Generate email if omitted
+  IF btrim(coalesce(p_email, '')) = '' THEN
+    v_email := lower(slugify(p_full_name)) || '.' || substring(gen_random_uuid()::text from 1 for 8) || '@demo.academy';
+  ELSE
+    v_email := lower(btrim(p_email));
+  END IF;
+
+  v_user_id := super_admin_get_or_create_user(v_email, p_full_name, p_phone);
+
+  INSERT INTO academy_members (academy_id, user_id, role, status, joined_at)
+  VALUES (p_academy_id, v_user_id, p_role, 'active', now())
+  ON CONFLICT (academy_id, user_id, role) DO UPDATE SET status = 'active', updated_at = now()
+  RETURNING id INTO v_member_id;
+
+  IF p_batch_id IS NOT NULL AND p_role = 'player' THEN
+    IF EXISTS (SELECT 1 FROM batches WHERE id = p_batch_id AND academy_id = p_academy_id) THEN
+      INSERT INTO batch_members (batch_id, academy_member_id, joined_at)
+      VALUES (p_batch_id, v_member_id, now())
+      ON CONFLICT DO NOTHING;
+    END IF;
+  END IF;
+
+  RETURN jsonb_build_object(
+    'id', v_member_id,
+    'academyId', p_academy_id,
+    'userId', v_user_id,
+    'role', p_role,
+    'fullName', p_full_name,
+    'email', v_email
+  );
 END $function$
 ;
 
