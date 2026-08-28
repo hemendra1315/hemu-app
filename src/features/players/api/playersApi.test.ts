@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { createMockQueryBuilder } from '../../../test/supabaseQueryBuilder';
+
 import {
   fetchPlayerProfile,
   fetchPlayerStatistics,
@@ -20,21 +22,9 @@ vi.mock('@/lib/supabase/client', () => ({
 import { supabase } from '@/lib/supabase/client';
 const mockedSupabase = vi.mocked(supabase);
 
-type SupabaseQueryBuilder = any;
-
-function createMockBuilder(response: { data: any; error: any }): SupabaseQueryBuilder {
-  const builder: any = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    or: vi.fn().mockReturnThis(),
-    maybeSingle: vi.fn().mockResolvedValue(response),
-    single: vi.fn().mockResolvedValue(response),
-    then: (onfulfilled?: (val: any) => any, onrejected?: (reason: any) => any) =>
-      Promise.resolve(response).then(onfulfilled, onrejected),
-  };
-  return builder;
-}
+// Shared with every other API test; see the note in that file for why this
+// is centralised rather than redefined per suite.
+const createMockBuilder = createMockQueryBuilder;
 
 const academyId = '11111111-1111-1111-1111-111111111111';
 const playerId = '22222222-2222-2222-2222-222222222222';

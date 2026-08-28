@@ -77,14 +77,20 @@ function createBuilder(table: string) {
       return builder;
     }),
     or: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
+    in: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     lte: vi.fn(() => builder),
     then: (onFulfilled: (val: any) => any, onRejected: (reason: any) => any) =>
       Promise.resolve(response).then(onFulfilled, onRejected),
-    maybeSingle: vi.fn(() => Promise.resolve(response)),
-    single: vi.fn(() => Promise.resolve(response)),
+    // `single`/`maybeSingle` return the builder rather than a resolved promise
+    // so that `.single().returns<T>()` chains; the builder is thenable, so
+    // awaiting either still yields `response`.
+    maybeSingle: vi.fn(() => builder),
+    single: vi.fn(() => builder),
+    returns: vi.fn(() => builder),
   };
 
   return { builder, eqArgs };
@@ -206,13 +212,16 @@ describe('Student Stats flow (production regression)', () => {
         select: vi.fn(() => builder),
         eq: vi.fn(() => builder),
         or: vi.fn(() => builder),
+        neq: vi.fn(() => builder),
+        in: vi.fn(() => builder),
         order: vi.fn(() => builder),
         limit: vi.fn(() => builder),
         gte: vi.fn(() => builder),
         lte: vi.fn(() => builder),
         then: (f: any, r: any) => Promise.resolve(denied).then(f, r),
-        maybeSingle: vi.fn(() => Promise.resolve(denied)),
-        single: vi.fn(() => Promise.resolve(denied)),
+        maybeSingle: vi.fn(() => builder),
+        single: vi.fn(() => builder),
+        returns: vi.fn(() => builder),
       };
       return builder;
     });

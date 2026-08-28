@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+import { createMockQueryBuilder } from '../../../test/supabaseQueryBuilder';
+
 import {
   fetchSessionAttendance,
   markAllPresent,
@@ -21,21 +23,9 @@ vi.mock('@/lib/supabase/client', () => ({
 import { supabase } from '@/lib/supabase/client';
 const mockedSupabase = vi.mocked(supabase);
 
-type SupabaseQueryBuilder = any;
-
-function createMockBuilder(response: { data: any; error: any }): SupabaseQueryBuilder {
-  const builder: any = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    upsert: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue(response),
-    maybeSingle: vi.fn().mockResolvedValue(response),
-    then: (onfulfilled?: (val: any) => any, onrejected?: (reason: any) => any) =>
-      Promise.resolve(response).then(onfulfilled, onrejected),
-  };
-  return builder;
-}
+// Shared with every other API test; see the note in that file for why this
+// is centralised rather than redefined per suite.
+const createMockBuilder = createMockQueryBuilder;
 
 const sessionId = '11111111-1111-1111-1111-111111111111';
 const academyId = '22222222-2222-2222-2222-222222222222';
@@ -157,7 +147,9 @@ describe('attendanceApi', () => {
           player_id: playerId,
           status: 'absent',
         }),
-        { onConflict: ['session_id', 'player_id'] },
+        // supabase-js takes a comma-separated column list here, not an array;
+        // the array form silently fails to match the unique index.
+        { onConflict: 'session_id,player_id' },
       );
     });
 

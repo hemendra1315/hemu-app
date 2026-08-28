@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createMockQueryBuilder } from '../../../test/supabaseQueryBuilder';
 import type { UUID } from '@/types';
 import { fetchCoachDashboardAnalytics } from './dashboardAnalytics';
 
@@ -11,21 +13,9 @@ vi.mock('@/lib/supabase/client', () => ({
 import { supabase } from '@/lib/supabase/client';
 const mockedSupabase = vi.mocked(supabase);
 
-function createMockBuilder(response: { data: unknown; error: unknown }) {
-  const builder = {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockReturnThis(),
-    neq: vi.fn().mockReturnThis(),
-    in: vi.fn().mockReturnThis(),
-    gte: vi.fn().mockReturnThis(),
-    lte: vi.fn().mockReturnThis(),
-    order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockReturnThis(),
-    then: (onfulfilled?: (val: unknown) => unknown, onrejected?: (reason: unknown) => unknown) =>
-      Promise.resolve(response).then(onfulfilled, onrejected),
-  };
-  return builder;
-}
+// Shared with every other API test; see the note in that file for why this
+// is centralised rather than redefined per suite.
+const createMockBuilder = createMockQueryBuilder;
 
 describe('fetchCoachDashboardAnalytics', () => {
   beforeEach(() => {
