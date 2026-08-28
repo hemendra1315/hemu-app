@@ -41,10 +41,27 @@ export function parseCricHeroesText(text: string): ExtractedMatchData {
 
 // ─── Structured CricHeroes export ───────────────────────────────────────────
 
-/** `Jeppiaar Cbse 264/10 (46.0 Ov)` — also opens each innings' scorecard. */
+/**
+ * `Jeppiaar Cbse 264/10 (46.0 Ov)   (1st Innings)   Kabilan (Jeppiaar Cbse)`
+ * — the line that opens each innings' scorecard.
+ *
+ * The `(1st Innings)` marker is required, not decoration. Page 1's Match
+ * Result summary carries the same team-and-score text with a column label
+ * glued to the front (`Total   Jeppiaar Cbse 264/10   (46.0 Ov)`), which
+ * without this check is read as an innings of its own — creating a phantom
+ * team called "Total Jeppiaar Cbse" that no scorecard rows ever attach to.
+ */
 const INNINGS_HEADER = /^(.+?)\s+(\d+)\/(\d+)\s+\((\d+(?:\.\d+)?)\s*Ov\)/i;
+const INNINGS_MARKER = /\(\s*\d+\s*(?:st|nd|rd|th)\s+Innings\s*\)/i;
 
-/** `1 Naraindra run out Riswanth / Moulish 51 70 107 8 0 72.86 (RHB)` */
+/**
+ * `1   Naraindra   (RHB)   run out Riswanth / Moulish   51 70 107 8 0 72.86`
+ * — number, then name + handedness + dismissal, then R B M 4s 6s SR.
+ *
+ * Where the `(RHB)` / `(LHB)` marker lands varies with how the PDF reader
+ * walks the page, so it is not anchored anywhere; it is stripped out of the
+ * name later instead.
+ */
 const BATTER_ROW =
   /^(\d{1,2})\s+(.+?)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)(?:\s*\((?:RHB|LHB)\))?\s*$/i;
 
@@ -66,8 +83,12 @@ const BOWLING_COLUMNS = /^No\s+Bowler\b/i;
 const DISMISSAL_TOKEN =
   /\b(c&b|c|b|lbw|st|run\s+out|not\s+out|retired(?:\s+hurt)?|hit\s+wicket|absent)\b/gi;
 
-/** Captaincy and keeper markers, stripped before looking for the dismissal. */
-const ROLE_MARKER = /\(\s*(?:c|wk|vc|c\s*&\s*wk)\s*\)/gi;
+/**
+ * Captaincy, keeper and batting-hand markers, stripped before looking for the
+ * dismissal. `(c)` would otherwise read as "caught" and `(RHB)` would end up
+ * inside the player's name.
+ */
+const ROLE_MARKER = /\(\s*(?:c|wk|vc|c\s*&\s*wk|rhb|lhb)\s*\)/gi;
 
 const NOT_DISMISSED = /^(not\s+out|absent|did\s+not\s+bat|dnb|retired\s+hurt)/i;
 
@@ -159,7 +180,7 @@ function parseStructuredScorecard(lines: string[], text: string): ExtractedMatch
   };
 
   for (const line of lines) {
-    const header = line.match(INNINGS_HEADER);
+    const header = INNINGS_MARKER.test(line) ? line.match(INNINGS_HEADER) : null;
     if (header) {
       closeInnings();
       fielders = new Map();
@@ -267,7 +288,11 @@ function parseStructuredScorecard(lines: string[], text: string): ExtractedMatch
   if (resultLine) {
     const parts = resultLine.match(/^(.*?)\s+won by\s+(.+?)(?:\s+Result)?$/i);
     winningMargin = parts?.[2]?.trim() ?? '';
-    const winner = parts?.[1]?.trim();
+    // CricHeroes' Match Result block is a label column beside a value column,
+    // and depending on how the reader walks the page the label can end up
+    // glued to either end of the line — "Result Jeppiaar Cbse won by 62 runs"
+    // or "Jeppiaar Cbse won by 62 runs Result".
+    const winner = parts?.[1]?.replace(/^\s*Result\s+/i, '').trim();
     if (winner) {
       warnings.push(
         `Recorded as a win for "${winner}" — switch the result to Lost if that is not your team.`,
@@ -282,10 +307,15 @@ function parseStructuredScorecard(lines: string[], text: string): ExtractedMatch
     warnings.push('No result line found in the PDF — please set the result manually.');
   }
 
+  // Same label-column caveat as the result line: the venue may read
+  // "Ground   JEPPIAAR ERS FLOODLIGHT GROUND," or end with the label instead.
   let venue = '';
-  const groundLine = lines.find((l) => /\bGround\s*$/i.test(l) && l.length > 8);
+  const groundLine = lines.find(
+    (l) => (/^Ground\s+\S/i.test(l) || /\bGround\s*$/i.test(l)) && l.length > 8,
+  );
   if (groundLine) {
     venue = groundLine
+      .replace(/^\s*Ground\s+/i, '')
       .replace(/\s*Ground\s*$/i, '')
       .replace(/[,\s]+$/, '')
       .trim();

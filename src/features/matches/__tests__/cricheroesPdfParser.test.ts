@@ -53,32 +53,34 @@ describe('CricHeroes PDF Text Parser', () => {
    */
   const REAL_CRICHEROES_EXPORT = `
 ERS CHAMPIONS VS CHAMPIONS (League Matches)
-Match Details Match Result
-Jeppiaar Cbse Jeppiaar Cbse opt to bat Toss vs
-JEPPIAAR ERS FLOODLIGHT GROUND, Ground
-Jeppiaar Cbse won by 62 runs Result
-2026-07-29, 03:27 AM UTC Date
-8/10/26, 7:52 AM cricheroes.com 1 of 4
+ 8/10/26, 7:52 AM   cricheroes.com   1 of 4
+ Match Details
+ Ground   JEPPIAAR ERS FLOODLIGHT GROUND,
+Chennai
+ Date   2026-07-29, 03:27 AM UTC
+ Match Result
+ Toss   Jeppiaar Cbse opt to bat
+ Total   Jeppiaar Cbse 264/10   (46.0 Ov)
+ Jeppiaar Matric 202/10   (45.4 Ov)
+ Result   Jeppiaar Cbse won by 62 runs
 
-Jeppiaar Cbse 264/10 (46.0 Ov) Kabilan (Jeppiaar Cbse)
-(1st Innings)
-No Batsman Status R B M 4s 6s SR
-1 Naraindra run out Riswanth / Moulish 51 70 107 8 0 72.86 (RHB)
-4 Kabilan (c) lbw b Charan Abishek. M. R 75 73 91 10 2 102.74 (RHB)
-9 Koushik S not out 18 13 19 1 1 138.46 (RHB)
-Total: Overs 46.0, Wickets 10 264 (CRR: 5.74)
-No Bowler O M R W 0s 4s 6s WD NB Eco
-1 M. Rohith 4 0 28 0 15 6 0 0 0 7.00
-5 Moulish 7 0 53 4 18 5 2 2 0 7.57
+ Jeppiaar Cbse 264/10 (46.0 Ov)   (1st Innings)   Kabilan (Jeppiaar Cbse)
+No   Batsman   Status   R   B   M   4s   6s   SR
+ 1   Naraindra   (RHB)   run out Riswanth / Moulish   51   70   107   8   0   72.86
+4   Kabilan (c)   (RHB)   lbw b Charan Abishek. M. R   75   73   91   10   2   102.74
+9   Koushik S   (RHB)   not out   18   13   19   1   1   138.46
+ Total: Overs 46.0, Wickets 10   264 (CRR: 5.74)
+ No   Bowler   O   M   R   W   0s   4s   6s   WD   NB   Eco
+ 1   M. Rohith   4   0   28   0   15   6   0   0   0   7.00
+5   Moulish   7   0   53   4   18   5   2   2   0   7.57
 
-Jeppiaar Matric 202/10 (45.4 Ov)
-(1st Innings)
-No Batsman Status R B M 4s 6s SR
-1 Cheran c Kabilan b Koushik S 14 15 34 2 0 93.33 (RHB)
-3 Sakthivel .R (wk) run out Naraindra / † Ajay 14 22 26 2 0 63.64 (LHB)
-Total: Overs 45.4, Wickets 10 202 (CRR: 4.42)
-No Bowler O M R W 0s 4s 6s WD NB Eco
-1 Koushik S 7.4 2 16 3 35 1 0 1 0 2.09
+ Jeppiaar Matric 202/10 (45.4 Ov)   (2nd Innings)
+No   Batsman   Status   R   B   M   4s   6s   SR
+ 1   Cheran   (RHB)   c Kabilan b Koushik S   14   15   34   2   0   93.33
+3   Sakthivel .R (wk)   (LHB)   run out Naraindra / \u2020 Ajay   14   22   26   2   0   63.64
+ Total: Overs 45.4, Wickets 10   202 (CRR: 4.42)
+ No   Bowler   O   M   R   W   0s   4s   6s   WD   NB   Eco
+ 1   Koushik S   7.4   2   16   3   35   1   0   1   0   2.09
 `;
 
   it('reads a real CricHeroes PDF export', () => {
@@ -99,6 +101,8 @@ No Bowler O M R W 0s 4s 6s WD NB Eco
     expect(r.teamA.score).toBe('264/10 (46.0 ov)');
     expect(r.teamB.name).toBe('Jeppiaar Matric');
     expect(r.teamB.score).toBe('202/10 (45.4 ov)');
+    // Page 1's Match Result summary repeats both scores; only the two real
+    // scorecards (marked "1st Innings" / "2nd Innings") may become innings.
     expect(r.innings).toHaveLength(2);
 
     const [firstInnings, secondInnings] = r.innings;
