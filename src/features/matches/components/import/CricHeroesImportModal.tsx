@@ -4,11 +4,9 @@ import { Button, Card, CardBody } from '@/components/ui';
 import { useAcademyMembers } from '@/features/members';
 import { useAcademyMatches } from '../../hooks/useMatches';
 import type { UUID } from '@/types';
-import {
-  type ExtractedMatchData,
-  type MappedPlayer,
-  getDefaultOversForFormat,
-} from '../../import/cricheroesPdfTypes';
+import { type ExtractedMatchData, type MappedPlayer } from '../../import/cricheroesPdfTypes';
+import { buildImportWizardState } from '../../import/buildImportWizardState';
+import type { WizardState } from '../wizard/types';
 import { parseCricHeroesText } from '../../import/cricheroesPdfParser';
 import { matchPlayers } from '../../import/playerNameMatcher';
 import { checkDuplicateMatch } from '../../import/duplicateMatchChecker';
@@ -19,7 +17,6 @@ import {
 import { PdfUploadStep } from './PdfUploadStep';
 import { TeamSelectStep } from './TeamSelectStep';
 import { PlayerMappingStep } from './PlayerMappingStep';
-import type { WizardState } from '../wizard/types';
 
 export function CricHeroesImportModal({
   academyId,
@@ -112,111 +109,14 @@ export function CricHeroesImportModal({
       // Non-blocking: continue import even if mapping save encounters a network glitch
     }
 
-    // Filter relevant innings for academy team based on selected team A or B
-    // Assuming innings[0] corresponds to team A (first parsed team) and innings[1] to team B
-    const academyInnings =
-      selectedAcademyTeamId === 'A'
-        ? extracted.innings[0]
-        : extracted.innings[1] || extracted.innings[0];
-
-    const playerLookup = new Map(mappedPlayers.map((p) => [p.cricheroesName.toLowerCase(), p]));
-
-    // CricHeroes marks the captain and wicketkeeper next to the name, e.g.
-    // "Kabilan (c)". The parser lifts those off both the batting and bowling
-    // tables — a captain who only bowled is still the captain — so the import
-    // can tick the boxes rather than leaving them all false.
-    const captains = new Set<string>();
-    const keepers = new Set<string>();
-    extracted.innings.forEach((inn) => {
-      [...inn.batting, ...inn.bowling].forEach((p) => {
-        if (p.isCaptain) captains.add(p.name.toLowerCase());
-        if (p.isWicketkeeper) keepers.add(p.name.toLowerCase());
-      });
-    });
-
-    // Construct WizardState compatible with existing MatchWizard
-    const lineup = mappedPlayers
-      .filter((p) => !p.isIgnored)
-      .map((p, idx) => ({
-        memberId: (p.isGuest ? `guest_${idx}` : p.academyMemberId) as UUID,
-        fullName: p.isGuest ? p.cricheroesName : p.academyMemberName,
-        email: '',
-        avatarUrl: null,
-        battingOrder: idx === 0 || idx === 1 ? 0 : idx + 1,
-        isCaptain: captains.has(p.cricheroesName.toLowerCase()),
-        isViceCaptain: false,
-        isWicketkeeper: keepers.has(p.cricheroesName.toLowerCase()),
-        isGuest: p.isGuest,
-        guestName: p.isGuest ? p.cricheroesName : null,
-      }));
-
-    const batting = (academyInnings?.batting || [])
-      .filter((b) => {
-        const mapped = playerLookup.get(b.name.toLowerCase());
-        return mapped && !mapped.isIgnored;
-      })
-      .map((b) => {
-        const mapped = playerLookup.get(b.name.toLowerCase());
-        const isGuest = mapped?.isGuest ?? true;
-        return {
-          memberId: (isGuest ? `guest_${b.name}` : mapped?.academyMemberId) as UUID,
-          runs: b.runs,
-          balls: b.balls,
-          fours: b.fours,
-          sixes: b.sixes,
-          isOut: b.isOut,
-          dismissalType: b.dismissalType,
-          isGuest,
-          guestName: isGuest ? b.name : null,
-        };
-      });
-
-    const bowling = (academyInnings?.bowling || [])
-      .filter((b) => {
-        const mapped = playerLookup.get(b.name.toLowerCase());
-        return mapped && !mapped.isIgnored;
-      })
-      .map((b) => {
-        const mapped = playerLookup.get(b.name.toLowerCase());
-        const isGuest = mapped?.isGuest ?? true;
-        return {
-          memberId: (isGuest ? `guest_${b.name}` : mapped?.academyMemberId) as UUID,
-          overs: b.overs,
-          maidens: b.maidens,
-          runsConceded: b.runsConceded,
-          wickets: b.wickets,
-          wides: b.wides,
-          noBalls: b.noBalls,
-          isGuest,
-          guestName: isGuest ? b.name : null,
-        };
-      });
-
-    const wizardState: WizardState = {
-      matchName: extracted.matchName,
-      matchDate: extracted.matchDate,
-      opponentName: opponentName || extracted.teamB.name,
-      venue: extracted.venue,
-      matchType: extracted.matchType,
-      format: extracted.format,
-      result: extracted.result,
-      teamScore: selectedAcademyTeamId === 'A' ? extracted.teamA.score : extracted.teamB.score,
-      overs: getDefaultOversForFormat(extracted.format),
-      tournament: extracted.tournament,
-      selectedPlayerIds: lineup.map((l) => l.memberId),
-      lineup,
-      batting,
-      bowling,
-      fielding: [],
-      awards: {
-        playerOfMatchId: null,
-        bestBatterId: null,
-        bestBowlerId: null,
-        bestFielderId: null,
-      },
-    };
-
-    onImportReady(wizardState);
+    onImportReady(
+      buildImportWizardState({
+        extracted,
+        mappedPlayers,
+        selectedAcademyTeamId,
+        opponentName,
+      }),
+    );
   }
 
   return (
