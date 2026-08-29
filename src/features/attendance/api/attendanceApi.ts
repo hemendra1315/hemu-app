@@ -8,6 +8,7 @@ import type {
   PlayerAttendanceRecord,
   AttendanceStatus,
 } from './attendanceTypes';
+import type { AttendanceMark } from './attendanceInsights';
 
 export async function fetchSessionAttendance(sessionId: UUID): Promise<AttendanceRecord[]> {
   const rows = await unwrap<any[]>(
@@ -152,5 +153,38 @@ export async function fetchBatchAttendance(batchId: UUID): Promise<BatchAttendan
       playerId: record.player_id,
       status: record.status,
     })),
+  }));
+}
+
+/**
+ * Every attendance mark in a date range, flattened with its session.
+ *
+ * `training_sessions!inner` is load-bearing: without `!inner`, PostgREST
+ * applies the `session_date` filters to the embedded rows only and returns
+ * every parent row regardless of date — which is exactly what the owner
+ * dashboard's "last 6 months" query does, and why its percentage has always
+ * been computed over all time while claiming to be a window.
+ */
+export async function fetchAttendanceMarks(
+  academyId: UUID,
+  from: string,
+  to: string,
+): Promise<AttendanceMark[]> {
+  const rows = await unwrap<any[]>(
+    supabase
+      .from('attendance')
+      .select('player_id, status, training_sessions!inner(id, session_date, batch_id)')
+      .eq('academy_id', academyId)
+      .gte('training_sessions.session_date', from)
+      .lte('training_sessions.session_date', to)
+      .returns<any[]>(),
+  );
+
+  return rows.map((row) => ({
+    playerId: row.player_id,
+    status: row.status,
+    sessionId: row.training_sessions.id,
+    sessionDate: row.training_sessions.session_date,
+    batchId: row.training_sessions.batch_id ?? null,
   }));
 }

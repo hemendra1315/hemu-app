@@ -1,4 +1,5 @@
 import {
+  CalendarCheck,
   CalendarDays,
   FlaskConical,
   LayoutDashboard,
@@ -109,6 +110,15 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     label: 'Sessions',
     icon: <CalendarDays className="h-4 w-4" aria-hidden />,
     requiresCapability: 'sessions:read',
+    group: 'Training',
+  },
+  {
+    // The attendance screen existed but nothing in the app linked to it, so
+    // the only way to reach it was to type the URL.
+    to: '/attendance',
+    label: 'Attendance',
+    icon: <CalendarCheck className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'attendance:read',
     group: 'Training',
   },
   {

@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '@/lib/query/keys';
@@ -10,6 +11,12 @@ import type {
   PlayerAttendanceRecord,
 } from '../api/attendanceTypes';
 import {
+  buildAttendanceInsights,
+  monthBounds,
+  type AttendanceMark,
+} from '../api/attendanceInsights';
+import {
+  fetchAttendanceMarks,
   fetchBatchAttendance,
   fetchPlayerAttendance,
   fetchSessionAttendance,
@@ -81,4 +88,35 @@ export function useBatchAttendance(batchId: UUID | null, academyId: UUID | null)
       Boolean(batchId) && Boolean(academyId) && isUUID(batchId ?? '') && isUUID(academyId ?? ''),
     queryFn: () => fetchBatchAttendance(batchId as UUID),
   });
+}
+
+/**
+ * Aggregated attendance for one month: rate per player, rate per batch, and
+ * who has been missing lately.
+ *
+ * The aggregation itself lives in `buildAttendanceInsights`, a pure function,
+ * so it can be tested without a database or a rendered page.
+ */
+export function useAttendanceInsights(
+  academyId: UUID | null,
+  month: string,
+  playerNames: Map<UUID, string>,
+  batchNames: Map<UUID, string>,
+) {
+  const { from, to } = monthBounds(month);
+  const marksQuery = useQuery<AttendanceMark[]>({
+    queryKey: ['academies', academyId ?? 'none', 'attendance', 'insights', from, to],
+    enabled: Boolean(academyId) && isUUID(academyId ?? ''),
+    queryFn: () => fetchAttendanceMarks(academyId as UUID, from, to),
+  });
+
+  const insights = useMemo(
+    () =>
+      marksQuery.data
+        ? buildAttendanceInsights({ marks: marksQuery.data, playerNames, batchNames, from, to })
+        : null,
+    [marksQuery.data, playerNames, batchNames, from, to],
+  );
+
+  return { ...marksQuery, insights };
 }
