@@ -305,9 +305,12 @@ describe('adminApi', () => {
         data: null,
         error: { message: 'Cannot delete active academy' },
       } as never);
-      await expect(deletePlatformAcademy('acad-del' as UUID)).rejects.toEqual({
-        message: 'Cannot delete active academy',
-      });
+      // It must reject with a real Error, not the raw PostgREST object: the
+      // dashboard reads `.message` only after an `instanceof Error` check, so
+      // a plain object showed the super admin "Unknown error" instead.
+      const thrown = await deletePlatformAcademy('acad-del' as UUID).catch((e: unknown) => e);
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as Error).message).toBe('Cannot delete active academy');
     });
   });
 

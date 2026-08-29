@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { supabase } from '@/lib/supabase/client';
 import { hasCapability } from '@/lib/rbac/permissions';
 import type { AppRole } from '@/types/enums';
 import { createPlatformAcademy, deletePlatformAcademy } from '../api/adminApi';
@@ -51,5 +52,37 @@ describe('Super Admin Role & Academy Access Authorization', () => {
 
     expect(isSuperAdminBypassPermitted(superAdminRoles)).toBe(true);
     expect(isSuperAdminBypassPermitted(playerRoles)).toBe(false);
+  });
+});
+
+/**
+ * Regression test for round 15.
+ *
+ * `deletePlatformAcademy` threw the raw PostgREST error object. That object is
+ * not an `Error` instance, so the dashboard's `err instanceof Error` branch
+ * fell through and every failed delete was reported to the super admin as
+ * "Unknown error" — hiding E_FORBIDDEN (not a super admin) and E_NOT_FOUND
+ * (already deleted), the only two reasons it ever fails.
+ */
+describe('deletePlatformAcademy surfaces the real failure reason', () => {
+  it('throws a real Error carrying the database message', async () => {
+    vi.spyOn(supabase, 'rpc').mockResolvedValue({
+      data: null,
+      error: { message: 'E_FORBIDDEN', details: null, hint: null, code: '42501' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    await expect(
+      deletePlatformAcademy('11111111-1111-4111-8111-111111111111'),
+    ).rejects.toThrowError(/E_FORBIDDEN/);
+
+    // The page checks `instanceof Error` before reading `.message`; a plain
+    // PostgREST object silently degrades to "Unknown error" there.
+    const thrown = await deletePlatformAcademy('11111111-1111-4111-8111-111111111111').catch(
+      (e: unknown) => e,
+    );
+    expect(thrown).toBeInstanceOf(Error);
+
+    vi.restoreAllMocks();
   });
 });

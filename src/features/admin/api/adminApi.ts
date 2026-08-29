@@ -223,7 +223,11 @@ export async function deletePlatformAcademy(academyId: UUID): Promise<void> {
   const { error } = await (supabase.rpc as unknown as RpcCaller)('delete_platform_academy', {
     p_academy_id: academyId,
   });
-  if (error) throw error;
+  // A PostgREST error is a plain object, not an Error instance, so throwing it
+  // raw made the page's `err instanceof Error` branch fall through to "Unknown
+  // error" and hide the real reason a delete was refused (E_FORBIDDEN when the
+  // caller is not a super admin, E_NOT_FOUND when the academy is already gone).
+  if (error) throwRpcError('delete_platform_academy', error);
 }
 
 export interface SuperAdminAddMemberPayload {
