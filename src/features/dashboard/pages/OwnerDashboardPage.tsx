@@ -109,7 +109,7 @@ export default function OwnerDashboardPage() {
         {canManagePlayers ? (
           <Button
             variant="secondary"
-            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4 md:h-auto"
             onClick={() => navigate('/members')}
           >
             <div className="bg-primary/10 rounded-full p-2">
@@ -121,7 +121,7 @@ export default function OwnerDashboardPage() {
         {canManageSessions ? (
           <Button
             variant="secondary"
-            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4 md:h-auto"
             onClick={() => navigate('/sessions/new')}
           >
             <div className="bg-info/10 rounded-full p-2">
@@ -132,7 +132,7 @@ export default function OwnerDashboardPage() {
         ) : null}
         <Button
           variant="secondary"
-          className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+          className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4 md:h-auto"
           onClick={() => navigate('/sessions')}
         >
           <div className="bg-success/10 rounded-full p-2">
@@ -143,7 +143,7 @@ export default function OwnerDashboardPage() {
         {canManageMatches ? (
           <Button
             variant="secondary"
-            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4 md:h-auto"
             onClick={() => navigate('/matches/new')}
           >
             <div className="rounded-full bg-amber-500/10 p-2">

@@ -11,6 +11,16 @@ const VARIANTS: Record<ButtonVariant, string> = {
   link: 'text-primary underline-offset-4 hover:underline',
 };
 
+/**
+ * Every size fixes the height twice — once for mobile, once for `md:` — and
+ * tailwind-merge treats those as two separate groups. A caller passing
+ * `h-auto` to make a button grow around its content therefore only clears the
+ * mobile height; the `md:` one survives and the button stays locked on
+ * desktop. That is what pushed the dashboard's quick-action icons out through
+ * the top of their tiles: 64px of icon and label centred inside a 40px box.
+ *
+ * If you override the height, override both: `h-auto md:h-auto`.
+ */
 const SIZES: Record<ButtonSize, string> = {
   sm: 'h-9 md:h-8 px-3 text-xs md:text-sm min-h-[36px] touch-manipulation',
   md: 'h-12 md:h-10 px-4 text-base md:text-sm min-h-[48px] md:min-h-[40px] font-medium touch-manipulation',
