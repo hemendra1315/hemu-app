@@ -120,6 +120,10 @@ No   Batsman   Status   R   B   M   4s   6s   SR
     expect(kabilan?.isOut).toBe(true);
     // Batting position comes from the scorecard's own numbering.
     expect(kabilan?.battingOrder).toBe(3);
+    // The marker is removed from the name but the role it carried is kept, so
+    // the import can tick the captain box instead of the user doing it.
+    expect(kabilan?.isCaptain).toBe(true);
+    expect(kabilan?.isWicketkeeper).toBe(false);
 
     const koushik = firstInnings?.batting[2];
     expect(koushik?.name).toBe('Koushik S');
@@ -141,5 +145,9 @@ No   Batsman   Status   R   B   M   4s   6s   SR
     expect(catcher?.catches).toBe(1);
     const keeper = secondInnings?.fielding.find((f) => f.name === 'Ajay');
     expect(keeper?.runOuts).toBe(1);
+
+    const sakthivel = secondInnings?.batting.find((b) => b.name === 'Sakthivel .R');
+    expect(sakthivel?.isWicketkeeper).toBe(true);
+    expect(sakthivel?.isCaptain).toBe(false);
   });
 });

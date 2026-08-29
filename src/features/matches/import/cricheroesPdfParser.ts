@@ -92,6 +92,22 @@ const ROLE_MARKER = /\(\s*(?:c|wk|vc|c\s*&\s*wk|rhb|lhb)\s*\)/gi;
 
 const NOT_DISMISSED = /^(not\s+out|absent|did\s+not\s+bat|dnb|retired\s+hurt)/i;
 
+const CAPTAIN_MARKER = /\(\s*(?:c|vc|c\s*&\s*wk)\s*\)/i;
+const KEEPER_MARKER = /\(\s*(?:wk|c\s*&\s*wk)\s*\)/i;
+
+/**
+ * Read the role markers off a raw scorecard cell before they are stripped from
+ * the name. CricHeroes writes them as "Kabilan (c)", "Sakthivel .R (wk)" or
+ * "Ajay (c & wk)"; keeping them means the import can tick the captain and
+ * wicketkeeper boxes instead of leaving the user to set them by hand.
+ */
+function rolesFrom(raw: string): { isCaptain: boolean; isWicketkeeper: boolean } {
+  return {
+    isCaptain: CAPTAIN_MARKER.test(raw),
+    isWicketkeeper: KEEPER_MARKER.test(raw),
+  };
+}
+
 function splitNameAndDismissal(raw: string): { name: string; dismissal: string } {
   // "(c)" would otherwise be read as the dismissal "c" (caught) and cut the
   // name in half, so remove role markers before searching.
@@ -236,6 +252,7 @@ function parseStructuredScorecard(lines: string[], text: string): ExtractedMatch
           strikeRate: Number(row[8] ?? 0),
           isOut,
           dismissalType: isOut ? dismissal : 'not_out',
+          ...rolesFrom(row[2] ?? ''),
         };
         current.batting.push(batter);
         if (isOut) creditFielders(dismissal, fielders);
@@ -246,7 +263,15 @@ function parseStructuredScorecard(lines: string[], text: string): ExtractedMatch
     if (mode === 'bowling') {
       const row = line.match(BOWLER_ROW);
       if (row) {
-        const name = (row[2] ?? '').replace(/[.,\s]+$/, '').trim();
+        // Strip role markers here too. A captain bowling appears as
+        // "Kabilan (c)" in the bowling table and plain "Kabilan" in the
+        // batting one, which otherwise imports the same person twice — once
+        // matched to the roster and once as a guest.
+        const name = (row[2] ?? '')
+          .replace(ROLE_MARKER, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/[.,\s]+$/, '')
+          .trim();
         if (!name) continue;
         const bowler: ExtractedBowler = {
           name,
@@ -258,6 +283,7 @@ function parseStructuredScorecard(lines: string[], text: string): ExtractedMatch
           wides: Number(row[10] ?? 0),
           noBalls: Number(row[11] ?? 0),
           economy: Number(row[12] ?? 0),
+          ...rolesFrom(row[2] ?? ''),
         };
         current.bowling.push(bowler);
       }

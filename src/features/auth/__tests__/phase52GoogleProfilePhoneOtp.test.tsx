@@ -115,7 +115,9 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
 
       expect(screen.getByRole('heading', { name: /complete your profile/i })).toBeInTheDocument();
 
-      const nameInput = screen.getByPlaceholderText(/enter your full name/i) as HTMLInputElement;
+      const nameInput = screen.getByPlaceholderText(
+        /name you use on cricheroes/i,
+      ) as HTMLInputElement;
       expect(nameInput.value).toBe('Rahul Google User');
     });
 
@@ -127,7 +129,7 @@ describe('Phase 52 — Google Profile + Phone OTP Onboarding Verification', () =
         { wrapper: queryWrapper },
       );
 
-      const nameInput = screen.getByPlaceholderText(/enter your full name/i);
+      const nameInput = screen.getByPlaceholderText(/name you use on cricheroes/i);
       fireEvent.change(nameInput, { target: { value: '' } });
 
       const submitButton = screen.getByRole('button', { name: /continue to email verification/i });

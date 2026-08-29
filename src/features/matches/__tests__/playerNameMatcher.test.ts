@@ -98,3 +98,49 @@ describe('Single-word name ambiguity (Bug 3)', () => {
     expect(match?.academyMemberId).toBe('p-raj-1');
   });
 });
+
+/**
+ * Regression tests for round 15: academy players imported as guests.
+ *
+ * The first import of a scorecard is normally done before those players exist
+ * in the academy, so every name is auto-classified as a guest and that verdict
+ * is written to `cricheroes_player_mappings`. Once the players were added and
+ * the same scorecard re-imported, the saved mapping was consulted first and
+ * short-circuited the matcher — so thirteen members whose names matched the
+ * scorecard *character for character* still came in as guests, every time,
+ * with no way to make the correction stick.
+ */
+describe('saved guest mappings must not outlive the player joining (round 15)', () => {
+  const roster = [
+    { id: 'm-guru', fullName: 'Gurupraghalathan N', email: 'guru@example.com' },
+    { id: 'm-dishi', fullName: 'Dishi H', email: 'dishi@example.com' },
+  ];
+
+  const savedAsGuest = [
+    { cricheroesName: 'Gurupraghalathan N', academyMemberId: null, isGuest: true },
+    { cricheroesName: 'Dishi H', academyMemberId: null, isGuest: true },
+  ];
+
+  it('re-matches an exactly-named roster member even though it was saved as a guest', () => {
+    const results = matchPlayers(['Gurupraghalathan N'], roster, savedAsGuest);
+    const match = results[0];
+    expect(match?.isGuest).toBe(false);
+    expect(match?.academyMemberId).toBe('m-guru');
+    expect(match?.status).toBe('exact_match');
+  });
+
+  it('still honours the saved guest decision when the name has no roster match', () => {
+    const results = matchPlayers(['Some Opponent'], roster, savedAsGuest);
+    const match = results[0];
+    expect(match?.isGuest).toBe(true);
+    expect(match?.academyMemberId).toBeNull();
+  });
+
+  it('does not disturb a saved mapping that points at a real member', () => {
+    const results = matchPlayers(['Dishi'], roster, [
+      { cricheroesName: 'Dishi', academyMemberId: 'm-dishi', isGuest: false },
+    ]);
+    expect(results[0]?.academyMemberId).toBe('m-dishi');
+    expect(results[0]?.savedMapping).toBe(true);
+  });
+});

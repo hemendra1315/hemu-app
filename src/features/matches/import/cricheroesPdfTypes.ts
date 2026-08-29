@@ -11,6 +11,9 @@ export type ExtractedBatter = {
   strikeRate?: number;
   isOut: boolean;
   dismissalType: string;
+  /** From the "(c)" / "(wk)" / "(c & wk)" marker CricHeroes prints after the name. */
+  isCaptain?: boolean;
+  isWicketkeeper?: boolean;
 };
 
 export type ExtractedBowler = {
@@ -22,6 +25,8 @@ export type ExtractedBowler = {
   economy?: number;
   wides: number;
   noBalls: number;
+  isCaptain?: boolean;
+  isWicketkeeper?: boolean;
 };
 
 export type ExtractedFielder = {

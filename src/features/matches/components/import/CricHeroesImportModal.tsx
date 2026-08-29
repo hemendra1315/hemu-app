@@ -121,6 +121,19 @@ export function CricHeroesImportModal({
 
     const playerLookup = new Map(mappedPlayers.map((p) => [p.cricheroesName.toLowerCase(), p]));
 
+    // CricHeroes marks the captain and wicketkeeper next to the name, e.g.
+    // "Kabilan (c)". The parser lifts those off both the batting and bowling
+    // tables — a captain who only bowled is still the captain — so the import
+    // can tick the boxes rather than leaving them all false.
+    const captains = new Set<string>();
+    const keepers = new Set<string>();
+    extracted.innings.forEach((inn) => {
+      [...inn.batting, ...inn.bowling].forEach((p) => {
+        if (p.isCaptain) captains.add(p.name.toLowerCase());
+        if (p.isWicketkeeper) keepers.add(p.name.toLowerCase());
+      });
+    });
+
     // Construct WizardState compatible with existing MatchWizard
     const lineup = mappedPlayers
       .filter((p) => !p.isIgnored)
@@ -130,9 +143,9 @@ export function CricHeroesImportModal({
         email: '',
         avatarUrl: null,
         battingOrder: idx === 0 || idx === 1 ? 0 : idx + 1,
-        isCaptain: false,
+        isCaptain: captains.has(p.cricheroesName.toLowerCase()),
         isViceCaptain: false,
-        isWicketkeeper: false,
+        isWicketkeeper: keepers.has(p.cricheroesName.toLowerCase()),
         isGuest: p.isGuest,
         guestName: p.isGuest ? p.cricheroesName : null,
       }));

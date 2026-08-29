@@ -109,11 +109,54 @@ export function matchPlayers(
 
   const academyMap = new Map(academyPlayers.map((p) => [p.id, p]));
 
+  /**
+   * Best roster candidate for a name, ignoring saved mappings entirely.
+   * Needed up front because a saved *guest* decision must not outlive the
+   * player joining the academy (see below).
+   */
+  function bestRosterMatch(chName: string): {
+    player: AcademyPlayerCandidate | null;
+    score: number;
+  } {
+    let player: AcademyPlayerCandidate | null = null;
+    let score = 0;
+    for (const candidate of academyPlayers) {
+      const targetName = candidate.fullName || candidate.email.split('@')[0] || '';
+      const s = calculateSimilarity(chName, targetName);
+      if (s > score) {
+        score = s;
+        player = candidate;
+      }
+    }
+    return { player, score };
+  }
+
   return uniqueNames.map((chName) => {
     // 1. Check persistent saved mapping first
     const saved = savedMap.get(chName.toLowerCase());
     if (saved) {
       if (saved.isGuest || !saved.academyMemberId) {
+        // A saved "guest" decision is only valid while that name still has no
+        // home on the roster. The first import of a scorecard is often done
+        // before the players are added to the academy, so every name gets
+        // saved as a guest; without this check that verdict is permanent and
+        // later imports keep filing real, exactly-named members as guests
+        // however many times the user corrects them.
+        const { player, score } = bestRosterMatch(chName);
+        if (player && score === 100) {
+          return {
+            cricheroesName: chName,
+            cricheroesPlayerId: saved.cricheroesPlayerId,
+            academyMemberId: player.id,
+            academyMemberName: player.fullName ?? player.email,
+            confidenceScore: 100,
+            status: 'exact_match',
+            isGuest: false,
+            isIgnored: false,
+            savedMapping: false,
+          };
+        }
+
         return {
           cricheroesName: chName,
           cricheroesPlayerId: saved.cricheroesPlayerId,
@@ -144,18 +187,7 @@ export function matchPlayers(
     }
 
     // 2. Fallback to Levenshtein name similarity engine
-    let bestMatch: AcademyPlayerCandidate | null = null;
-    let highestScore = 0;
-
-    for (const player of academyPlayers) {
-      const targetName = player.fullName || player.email.split('@')[0] || '';
-      const score = calculateSimilarity(chName, targetName);
-
-      if (score > highestScore) {
-        highestScore = score;
-        bestMatch = player;
-      }
-    }
+    const { player: bestMatch, score: highestScore } = bestRosterMatch(chName);
 
     let status: PlayerMappingStatus = 'guest_player';
     let isGuest = true;

@@ -523,9 +523,19 @@ export default function ProfileOnboardingPage() {
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
+                  placeholder="Same name you use on CricHeroes"
                   className="h-11 text-sm"
+                  aria-describedby="fullName-hint"
                 />
+                {/* Match scorecards are imported from CricHeroes and matched to
+                    players by name. A player who signs up as "Raj" but appears
+                    on the scorecard as "Raj Kumar" has to be mapped by hand on
+                    every import, so it is worth asking for the CricHeroes
+                    spelling up front. */}
+                <p id="fullName-hint" className="text-fg-muted mt-1.5 text-[11px]">
+                  Use the same spelling as your CricHeroes profile so match scorecards link to you
+                  automatically.
+                </p>
               </div>
 
               {/* DATE OF BIRTH */}

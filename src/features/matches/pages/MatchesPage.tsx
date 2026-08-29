@@ -163,9 +163,18 @@ export default function MatchesPage() {
         </div>
 
         {canManage ? (
-          <Button onClick={() => setShowForm((open) => !open)}>
-            {showForm ? 'Hide form' : 'New match'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* The CricHeroes import lives on the full match-entry page, which
+                only the mobile "Add" button reached — on desktop, "New match"
+                opens the quick inline form instead, so the import had no entry
+                point at all here. */}
+            <Button variant="secondary" onClick={() => navigate('/matches/new')}>
+              Import from CricHeroes
+            </Button>
+            <Button onClick={() => setShowForm((open) => !open)}>
+              {showForm ? 'Hide form' : 'New match'}
+            </Button>
+          </div>
         ) : null}
       </div>
 
