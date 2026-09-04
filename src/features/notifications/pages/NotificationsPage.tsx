@@ -25,6 +25,9 @@ export function NotificationsPage() {
     const metadata = notification.metadata as { batch_id?: string };
     if (metadata?.batch_id) {
       navigate(`/batches/${metadata.batch_id}`);
+    } else if (notification.notification_type === 'join_request') {
+      // The pending-requests strip, and the approve button, live on /members.
+      navigate('/members');
     } else if (notification.notification_type === 'announcement') {
       navigate('/announcements');
     }
