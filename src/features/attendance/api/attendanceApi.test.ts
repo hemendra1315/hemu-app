@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMockQueryBuilder } from '../../../test/supabaseQueryBuilder';
 
 import {
+  clearAttendance,
   fetchSessionAttendance,
   markAllPresent,
   markAttendance,
@@ -245,5 +246,46 @@ describe('attendanceApi', () => {
 
       await expect(fetchBatchAttendance(batchId)).rejects.toThrow();
     });
+  });
+});
+
+/**
+ * Regression guard for round 19.
+ *
+ * A coach who tapped the wrong name had no way back: the two buttons set
+ * present or absent, and re-tapping the current one was explicitly ignored, so
+ * a mis-tap became a permanent record quietly skewing that player's rate.
+ *
+ * Clearing deletes the row rather than adding a third status, because
+ * "unmarked" and "marked absent" must stay different things — the attendance
+ * rate counts only sessions a player was actually marked for.
+ */
+describe('clearAttendance', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('deletes exactly that player and session, and nothing wider', async () => {
+    const builder = createMockQueryBuilder({ data: null, error: null });
+    mockedSupabase.from.mockReturnValue(builder as never);
+
+    await clearAttendance('session-1', 'player-1');
+
+    expect(mockedSupabase.from).toHaveBeenCalledWith('attendance');
+    expect(builder.delete).toHaveBeenCalled();
+    expect(builder.eq).toHaveBeenCalledWith('session_id', 'session-1');
+    expect(builder.eq).toHaveBeenCalledWith('player_id', 'player-1');
+    // Both filters, or a delete could take out a whole session's marks.
+    expect(builder.eq).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces a refusal instead of reporting success', async () => {
+    const builder = createMockQueryBuilder({
+      data: null,
+      error: { message: 'permission denied', code: '42501' },
+    });
+    mockedSupabase.from.mockReturnValue(builder as never);
+
+    await expect(clearAttendance('session-1', 'player-1')).rejects.toBeDefined();
   });
 });

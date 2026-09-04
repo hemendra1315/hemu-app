@@ -97,6 +97,22 @@ export async function markAttendance(
   };
 }
 
+/**
+ * Remove a player's mark for a session, putting them back to unmarked.
+ *
+ * A coach tapping the wrong name previously had no way back: the two buttons
+ * set present or absent and re-tapping the current one was explicitly ignored,
+ * so a mis-tap became a permanent record that quietly skewed that player's rate.
+ * Deleting the row rather than adding a third status keeps "not marked" and
+ * "marked absent" distinct — the attendance rate counts only sessions a player
+ * was actually marked for, so an accidental row is not the same as no row.
+ */
+export async function clearAttendance(sessionId: UUID, playerId: UUID): Promise<void> {
+  await unwrapVoid(
+    supabase.from('attendance').delete().eq('session_id', sessionId).eq('player_id', playerId),
+  );
+}
+
 export async function fetchPlayerAttendance(playerId: UUID): Promise<PlayerAttendanceRecord[]> {
   const rows = await unwrap<any[]>(
     supabase

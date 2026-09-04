@@ -16,6 +16,7 @@ import {
   type AttendanceMark,
 } from '../api/attendanceInsights';
 import {
+  clearAttendance,
   fetchAttendanceMarks,
   fetchBatchAttendance,
   fetchPlayerAttendance,
@@ -48,6 +49,23 @@ export function useMarkAttendance(academyId: UUID) {
       playerId: UUID;
       status: string;
     }) => markAttendance(sessionId, playerId, status as any, academyId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.academy.sessionAttendance(academyId, variables.sessionId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.academy.playerAttendance(academyId, variables.playerId),
+      });
+    },
+  });
+}
+
+/** Put a player back to unmarked for a session — the undo for a mis-tap. */
+export function useClearAttendance(academyId: UUID) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, playerId }: { sessionId: UUID; playerId: UUID }) =>
+      clearAttendance(sessionId, playerId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.academy.sessionAttendance(academyId, variables.sessionId),

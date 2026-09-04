@@ -8,7 +8,12 @@ import { useActiveAcademy } from '@/features/academies';
 import { useCan } from '@/lib/rbac';
 import { useUiStore } from '@/stores';
 import { useBatchPlayers } from '@/features/batches';
-import { useSessionAttendance, useMarkAttendance, useMarkAllPresent } from '../hooks/useAttendance';
+import {
+  useSessionAttendance,
+  useMarkAttendance,
+  useMarkAllPresent,
+  useClearAttendance,
+} from '../hooks/useAttendance';
 import { useOfflineAttendanceQueue } from '../lib/offlineAttendanceQueue';
 import { useTrainingSession } from '@/features/sessions';
 import type { AttendanceStatus } from '@/types/enums';
@@ -28,6 +33,7 @@ export default function AttendanceSessionPage() {
   const attendanceQuery = useSessionAttendance(sessionId ?? null, academyId);
   const markAttendance = useMarkAttendance(academyId as string);
   const markAllPresent = useMarkAllPresent(academyId as string);
+  const clearAttendance = useClearAttendance(academyId as string);
   const pushToast = useUiStore((state) => state.pushToast);
 
   const { queuedItems, queuedByPlayer, queueAttendance, queueAllPresent, triggerSync, isSyncing } =
@@ -90,6 +96,37 @@ export default function AttendanceSessionPage() {
           variant: 'error',
         });
       }
+    }
+  };
+
+  /**
+   * Undo a mis-tap by removing the mark entirely, rather than flipping it to
+   * the other status — a player who was never actually marked should not be
+   * recorded as absent. Offline is refused rather than queued: the sync queue
+   * only carries marks, and silently doing nothing would be worse than saying
+   * so.
+   */
+  const handleClear = async (playerId: string) => {
+    if (!academyId || !sessionId) return;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      pushToast({
+        title: 'Undo needs a connection',
+        description: 'Reconnect to clear a mark. Marking still works offline.',
+        variant: 'info',
+      });
+      return;
+    }
+
+    try {
+      await clearAttendance.mutateAsync({ sessionId, playerId });
+      pushToast({ title: 'Mark cleared', variant: 'success' });
+    } catch (err) {
+      pushToast({
+        title: 'Could not clear the mark',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'error',
+      });
     }
   };
 
@@ -198,7 +235,8 @@ export default function AttendanceSessionPage() {
     );
   }
 
-  const isSaving = markAttendance.isPending || markAllPresent.isPending || isSyncing;
+  const isSaving =
+    markAttendance.isPending || markAllPresent.isPending || clearAttendance.isPending || isSyncing;
   const hasSaveError = markAttendance.isError || markAllPresent.isError;
 
   return (
@@ -306,7 +344,12 @@ export default function AttendanceSessionPage() {
 
       {/* 3. Operational Mark All Present Button */}
       {canManage && totalPlayers > 0 && (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Undo is invisible otherwise — nothing about two toggle buttons
+              suggests that tapping the lit one takes the mark away. */}
+          <p className="text-fg-muted text-xs">
+            Tapped the wrong name? Tap the highlighted button again to clear it.
+          </p>
           <Button
             variant="secondary"
             size="sm"
@@ -334,6 +377,9 @@ export default function AttendanceSessionPage() {
             const isPlayerSaving =
               markAttendance.isPending &&
               markAttendance.variables?.playerId === player.academyMemberId;
+            const isPlayerClearing =
+              clearAttendance.isPending &&
+              clearAttendance.variables?.playerId === player.academyMemberId;
 
             const initials = (player.fullName || player.email || 'P')
               .split(' ')
@@ -391,14 +437,26 @@ export default function AttendanceSessionPage() {
                     return (
                       <button
                         key={option.value}
-                        disabled={isPlayerSaving}
+                        disabled={isPlayerSaving || isPlayerClearing}
+                        title={
+                          isSelected
+                            ? `Tap again to clear ${option.label.toLowerCase()}`
+                            : undefined
+                        }
                         onClick={async () => {
-                          if ((hasRecordedStatus && isSelected) || isPlayerSaving) return;
+                          if (isPlayerSaving || isPlayerClearing) return;
+                          // Tapping the option already set clears it, which is
+                          // the only way back to unmarked after a mis-tap.
+                          if (hasRecordedStatus && isSelected) {
+                            await handleClear(player.academyMemberId);
+                            return;
+                          }
                           await handleMark(player.academyMemberId, option.value);
                         }}
                         className={`border-border-subtle flex h-11 min-h-[44px] min-w-[70px] shrink-0 items-center justify-center rounded-[10px] border px-3 text-xs font-bold transition-all ${btnStyle}`}
                       >
-                        {isPlayerSaving && markAttendance.variables?.status === option.value ? (
+                        {(isPlayerSaving && markAttendance.variables?.status === option.value) ||
+                        (isPlayerClearing && isSelected) ? (
                           <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         ) : (
                           option.label
