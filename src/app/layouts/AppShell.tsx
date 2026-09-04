@@ -85,10 +85,16 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     group: 'Home',
   },
   {
+    // Gated on reading players, not on managing members. The mobile bottom bar
+    // already gives coaches a "Players" tab pointing here, and the page itself
+    // works for them — the roster loads, and the owner-only parts (Add People,
+    // the join-request approvals) hide themselves. Requiring `members:manage`
+    // here meant the same page was reachable on a phone and invisible on a
+    // desktop for the same person.
     to: '/members',
     label: 'Members',
     icon: <Users className="h-4 w-4" aria-hidden />,
-    requiresCapability: 'members:manage',
+    requiresCapability: 'players:read',
     group: 'People',
   },
   {
