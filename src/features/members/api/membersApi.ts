@@ -19,19 +19,20 @@ type MemberRow = {
   batch_members?: { batches: { id: string; name: string } | null }[] | null;
 };
 
+/**
+ * Row shape of the `academy_join_requests` RPC — note the flat columns: the
+ * function does the join to `profiles` itself, under SECURITY DEFINER.
+ */
 type PendingJoinRequestRow = {
-  id: string;
-  academy_id: string;
+  request_id: string;
   user_id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
   requested_role: AppRole;
   status: JoinStatus;
   message: string | null;
   created_at: string;
-  profiles: {
-    full_name: string | null;
-    email: string;
-    avatar_url: string | null;
-  } | null;
 };
 
 /**
@@ -61,33 +62,44 @@ function toMember(row: MemberRow): AcademyMember {
   };
 }
 
-function toPendingJoinRequest(row: PendingJoinRequestRow): PendingJoinRequest {
+function toPendingJoinRequest(academyId: UUID, row: PendingJoinRequestRow): PendingJoinRequest {
   return {
-    id: row.id,
-    academyId: row.academy_id,
+    id: row.request_id,
+    academyId,
     userId: row.user_id,
     requestedRole: row.requested_role,
     status: row.status,
     message: row.message,
     createdAt: row.created_at,
-    fullName: row.profiles?.full_name ?? null,
-    email: row.profiles?.email ?? '',
-    avatarUrl: row.profiles?.avatar_url ?? null,
+    fullName: row.full_name,
+    email: row.email ?? '',
+    avatarUrl: row.avatar_url,
   };
 }
 
+/**
+ * Pending join requests, with the requester's name and email.
+ *
+ * This used to read `join_requests` directly and embed
+ * `profiles!join_requests_user_id_fkey`. That embed always came back null: the
+ * `profiles_select` policy only lets staff read a profile once that person has
+ * an `academy_members` row in an academy they are staff of, and someone who has
+ * merely *asked* to join has no membership row yet. So every request rendered
+ * with a blank name, a blank email and an empty avatar, and the owner was asked
+ * to approve anonymous rows — silently, because a blocked embed is null rather
+ * than an error.
+ *
+ * `academy_join_requests` is a SECURITY DEFINER function written for exactly
+ * this, returning the name and email already joined. It existed in the database
+ * the whole time and nothing called it. It checks `is_owner(p_academy)` itself,
+ * so the authorization is stricter than the table read it replaces, not looser.
+ */
 export async function fetchPendingJoinRequests(academyId: UUID): Promise<PendingJoinRequest[]> {
-  const rows = await unwrap<PendingJoinRequestRow[]>(
-    supabase
-      .from('join_requests')
-      .select(
-        'id, academy_id, user_id, requested_role, status, message, created_at, profiles!join_requests_user_id_fkey(full_name, email, avatar_url)',
-      )
-      .eq('academy_id', academyId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true }),
-  );
-  return rows.map(toPendingJoinRequest);
+  const rows = await rpc<PendingJoinRequestRow[]>('academy_join_requests', {
+    p_academy: academyId,
+    p_status: 'pending',
+  });
+  return (rows ?? []).map((row) => toPendingJoinRequest(academyId, row));
 }
 
 /**

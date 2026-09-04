@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Plus, Search, UserCheck, X } from 'lucide-react';
 
+import { errorMessage } from '@/lib/api';
 import { ErrorState } from '@/components/feedback';
 import {
   Avatar,
@@ -35,6 +36,22 @@ const STATUS_TONES: Record<MemberStatus, 'success' | 'warning' | 'danger' | 'neu
   rejected: 'danger',
   left: 'neutral',
 };
+
+/**
+ * Approving and rejecting used to pass no `onError` at all, so a refusal from
+ * the database — the caller is not the owner, or the person already has a
+ * membership row — produced no toast and no change on screen. The row simply
+ * stayed where it was and the owner had no way to tell a failure from a
+ * misclick. These are the only two errors either function raises, so they are
+ * worth saying in words.
+ */
+function approvalError(error: unknown): string {
+  const message = errorMessage(error);
+  if (message.includes('E_ALREADY_MEMBER')) return 'That person is already on this academy.';
+  if (message.includes('E_FORBIDDEN')) return 'Only the academy owner can approve join requests.';
+  if (message.includes('E_INVALID_REQUEST')) return 'That request is no longer pending.';
+  return message || 'Could not update the request.';
+}
 
 export default function MembersPage() {
   const { academyId } = useActiveAcademy();
@@ -88,7 +105,10 @@ export default function MembersPage() {
     } else {
       approveRequest.mutate(
         { requestId: request.id, batchIds: null },
-        { onSuccess: () => pushToast({ title: 'Request approved', variant: 'success' }) },
+        {
+          onSuccess: () => pushToast({ title: 'Request approved', variant: 'success' }),
+          onError: (error) => pushToast({ title: approvalError(error), variant: 'error' }),
+        },
       );
     }
   };
@@ -106,6 +126,7 @@ export default function MembersPage() {
           setApprovingRequest(null);
           setSelectedBatchIds([]);
         },
+        onError: (error) => pushToast({ title: approvalError(error), variant: 'error' }),
       },
     );
   };
@@ -170,7 +191,17 @@ export default function MembersPage() {
                     variant="ghost"
                     size="sm"
                     className="min-h-[40px] rounded-lg px-3 text-xs font-semibold"
-                    onClick={() => rejectRequest.mutate({ requestId: req.id })}
+                    onClick={() =>
+                      rejectRequest.mutate(
+                        { requestId: req.id },
+                        {
+                          onSuccess: () =>
+                            pushToast({ title: 'Request rejected', variant: 'success' }),
+                          onError: (error) =>
+                            pushToast({ title: approvalError(error), variant: 'error' }),
+                        },
+                      )
+                    }
                   >
                     Reject
                   </Button>

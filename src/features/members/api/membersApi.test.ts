@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { approveJoinRequest, rejectJoinRequest } from './membersApi';
+import { approveJoinRequest, fetchPendingJoinRequests, rejectJoinRequest } from './membersApi';
 
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
@@ -51,5 +51,69 @@ describe('membersApi', () => {
         p_reason: null,
       });
     });
+  });
+});
+
+/**
+ * Regression guard for round 17.
+ *
+ * The pending-requests list read `join_requests` and embedded the requester's
+ * `profiles` row. RLS never permits that embed for a person who has not joined
+ * yet — they have no `academy_members` row — so it returned null and the owner
+ * was shown blank names and blank emails to approve. A blocked embed is null,
+ * not an error, which is why nothing ever surfaced.
+ *
+ * The fix routes through `academy_join_requests`, a SECURITY DEFINER function
+ * that does the join itself. These tests pin that, because reverting to a
+ * direct table read would look perfectly reasonable and silently blank the
+ * list again.
+ */
+describe('fetchPendingJoinRequests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('reads through the academy_join_requests RPC, never the table directly', async () => {
+    mockedSupabase.rpc.mockResolvedValue({ data: [], error: null } as never);
+
+    await fetchPendingJoinRequests('acad-1');
+
+    expect(mockedSupabase.rpc).toHaveBeenCalledWith('academy_join_requests', {
+      p_academy: 'acad-1',
+      p_status: 'pending',
+    });
+    // A direct `from('join_requests')` read is what produced the blank rows.
+    expect(mockedSupabase.from).not.toHaveBeenCalled();
+  });
+
+  it('carries the requester name and email through to the UI shape', async () => {
+    mockedSupabase.rpc.mockResolvedValue({
+      data: [
+        {
+          request_id: 'req-1',
+          user_id: 'user-1',
+          full_name: 'Asha Rao',
+          email: 'asha@example.com',
+          avatar_url: null,
+          requested_role: 'player',
+          status: 'pending',
+          message: 'Please add me',
+          created_at: '2026-08-29T06:00:00Z',
+        },
+      ],
+      error: null,
+    } as never);
+
+    const [request] = await fetchPendingJoinRequests('acad-1');
+
+    expect(request?.fullName).toBe('Asha Rao');
+    expect(request?.email).toBe('asha@example.com');
+    expect(request?.id).toBe('req-1');
+    expect(request?.academyId).toBe('acad-1');
+  });
+
+  it('returns an empty list when the function returns nothing at all', async () => {
+    mockedSupabase.rpc.mockResolvedValue({ data: null, error: null } as never);
+    await expect(fetchPendingJoinRequests('acad-1')).resolves.toEqual([]);
   });
 });
