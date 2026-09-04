@@ -68,14 +68,20 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
     unwrap<any[]>(
       supabase.from('matches').select('id').eq('academy_id', academyId).returns<any[]>(),
     ),
-    // Attendance records (join through training_sessions for session_date, last 6 months)
+    // Attendance records (join through training_sessions for session_date, last 6 months).
+    // `training_sessions!inner` is load-bearing, and the filter path must match
+    // the `session:` alias, not the table name — without either, PostgREST
+    // applies the date filter to the embedded row only (or drops it silently)
+    // and returns every attendance row regardless of date, so this "last 6
+    // months" query was actually computed over all-time history. See the
+    // identical defect fixed in `fetchAttendanceMarks` (attendanceApi.ts).
     unwrap<any[]>(
       supabase
         .from('attendance')
-        .select('status, session:training_sessions(session_date)')
+        .select('status, session:training_sessions!inner(session_date)')
         .eq('academy_id', academyId)
         .gte(
-          'training_sessions.session_date',
+          'session.session_date',
           toIsoDate(new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1)),
         )
         .returns<any[]>(),

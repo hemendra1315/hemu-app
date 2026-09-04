@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMockQueryBuilder } from '../../../test/supabaseQueryBuilder';
 import type { UUID } from '@/types';
-import { fetchCoachDashboardAnalytics } from './dashboardAnalytics';
+import { fetchCoachDashboardAnalytics, fetchOwnerDashboardAnalytics } from './dashboardAnalytics';
 
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
@@ -89,5 +89,53 @@ describe('fetchCoachDashboardAnalytics', () => {
     expect(result.playersNeedingAttention[0]!.issues).toContain('Low attendance');
     expect(result.playersNeedingAttention[0]!.issues).toContain('Pending drills');
     expect(result.playersNeedingAttention[0]!.issues).toContain('No recent feedback');
+  });
+});
+
+describe('fetchOwnerDashboardAnalytics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('scopes the "last 6 months" attendance query to attendance rows, not all-time history', async () => {
+    // `training_sessions!inner` plus filtering by the `session` alias (not the
+    // table name) is what actually restricts the parent `attendance` rows to
+    // the date window. Without either, PostgREST silently returns every
+    // attendance row ever recorded while the code claims a 6-month window —
+    // this regression test pins the query shape so that can't come back.
+    const academyId = '11111111-1111-1111-1111-111111111111';
+    const empty = { data: [], error: null };
+
+    const attendanceBuilder = createMockBuilder({
+      data: [{ status: 'present', session: { session_date: '2026-08-01' } }],
+      error: null,
+    });
+
+    const builders = [
+      createMockBuilder(empty), // players
+      createMockBuilder(empty), // coaches
+      createMockBuilder(empty), // batches
+      createMockBuilder(empty), // matches
+      attendanceBuilder, // attendance — the one under test
+      createMockBuilder(empty), // sessions this week
+      createMockBuilder(empty), // recent matches
+      createMockBuilder(empty), // upcoming sessions
+      createMockBuilder(empty), // activity
+      createMockBuilder(empty), // top batters
+      createMockBuilder(empty), // top bowlers
+      createMockBuilder(empty), // top fielders
+      createMockBuilder(empty), // today's sessions
+      createMockBuilder(empty), // academy records
+    ];
+
+    let call = 0;
+    mockedSupabase.from.mockImplementation(() => builders[call++] as never);
+
+    await fetchOwnerDashboardAnalytics(academyId as UUID);
+
+    expect(attendanceBuilder.select).toHaveBeenCalledWith(
+      expect.stringContaining('training_sessions!inner'),
+    );
+    expect(attendanceBuilder.gte).toHaveBeenCalledWith('session.session_date', expect.any(String));
   });
 });
