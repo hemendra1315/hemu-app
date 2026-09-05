@@ -73,6 +73,19 @@ export function useRedeemLinkingCode() {
     onSuccess: () => {
       // Invalidate children for all academies since we don't know the academyId beforehand
       void queryClient.invalidateQueries({ queryKey: parentKeys.all });
+
+      /**
+       * Redeeming a code is what *creates* the parent's membership, so the
+       * identity query — which holds memberships and drives every academy
+       * guard — is stale the instant this succeeds. Without this the app still
+       * believes the user belongs to no academy: a first-time parent is bounced
+       * back to onboarding by `RequireAcademy` right after the success toast,
+       * and a parent linking a second child sees the old academy's dashboard
+       * until a full page reload. `refetchOnWindowFocus` is off globally and
+       * `useIdentity` is mounted once in the auth provider, so nothing else
+       * would ever refetch it.
+       */
+      void queryClient.invalidateQueries({ queryKey: ['identity'] });
     },
   });
 }

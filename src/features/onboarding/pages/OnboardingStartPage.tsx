@@ -1,4 +1,4 @@
-import { Shield, Ticket } from 'lucide-react';
+import { Link2, Shield, Ticket } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { buttonStyles, Card, CardBody } from '@/components/ui';
@@ -18,11 +18,11 @@ export default function OnboardingStartPage() {
         <p className="text-fg-muted text-sm">
           {isSuperAdmin
             ? 'Manage academies via the platform admin dashboard, or join an existing academy.'
-            : 'You are not part of an academy yet. Enter your academy join code to get started.'}
+            : 'You are not part of an academy yet. Join with your academy code, or link to your child if you are a parent.'}
         </p>
       </header>
 
-      <div className={`grid gap-4 ${isSuperAdmin ? 'sm:grid-cols-2' : 'mx-auto max-w-md'}`}>
+      <div className={`grid gap-4 ${isSuperAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <Card className="border-border-subtle shadow-md">
           <CardBody className="flex h-full flex-col gap-3 p-6">
             <Ticket className="text-primary h-7 w-7" aria-hidden />
@@ -35,6 +35,27 @@ export default function OnboardingStartPage() {
             </div>
             <Link to="/onboarding/join-academy" className={buttonStyles('primary')}>
               Join with a code
+            </Link>
+          </CardBody>
+        </Card>
+
+        {/*
+          A parent's linking code is the only thing that creates their
+          membership, so this entry point has to exist before they belong to
+          any academy — otherwise there is no way into the parent side at all.
+        */}
+        <Card className="border-border-subtle shadow-md">
+          <CardBody className="flex h-full flex-col gap-3 p-6">
+            <Link2 className="text-primary h-7 w-7" aria-hidden />
+            <div className="flex-1">
+              <h2 className="text-fg text-lg font-semibold">I'm a parent</h2>
+              <p className="text-fg-muted mt-1.5 text-sm">
+                Enter the linking code your child's coach gave you to see their training, attendance
+                and matches.
+              </p>
+            </div>
+            <Link to="/onboarding/link-child" className={buttonStyles('secondary')}>
+              Link to my child
             </Link>
           </CardBody>
         </Card>

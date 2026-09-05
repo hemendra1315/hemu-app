@@ -26,7 +26,11 @@ export function FamilyTab({
   const generateCode = useGenerateLinkingCode();
   const revokeCode = useRevokeLinkingCode();
   const revokeLink = useRevokeParentLink();
-  const canManageMembers = useCan('members:manage');
+  // The linking-code card is what a coach hands a parent, and the database
+  // already permits any staff member to issue one — gating it on
+  // `members:manage` made it owner-only, so a coach saw an empty Parents tab
+  // while the parent screen told them to ask their coach for a code.
+  const canManageMembers = useCan('parents:link');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const pushToast = useUiStore((s) => s.pushToast);
 

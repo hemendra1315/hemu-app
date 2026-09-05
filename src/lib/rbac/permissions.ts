@@ -12,6 +12,12 @@ export const CAPABILITIES = [
   'players:read',
   'players:manage',
   'players:approve',
+  // Issuing a parent linking code. Separate from `members:manage` because the
+  // database lets any staff member do it (`generate_parent_linking_code`
+  // checks `is_staff`), while gating the UI on `members:manage` hid it from
+  // coaches — leaving parents told to "ask your coach" for a code no coach
+  // could produce.
+  'parents:link',
   'coaches:read',
   'coaches:manage',
   'batches:read',
@@ -56,6 +62,7 @@ const PLAYER: Capability[] = [
 
 const COACH: Capability[] = [
   'players:read',
+  'parents:link',
   'coaches:read',
   'batches:read',
   'matches:read',
@@ -83,6 +90,7 @@ const OWNER: Capability[] = [
   'players:read',
   'players:manage',
   'players:approve',
+  'parents:link',
   'coaches:read',
   'coaches:manage',
   'batches:read',

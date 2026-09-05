@@ -118,6 +118,18 @@ export const router = createBrowserRouter([
                 children: [{ path: '/onboarding/create-academy', element: <CreateAcademyPage /> }],
               },
               { path: '/onboarding/join-academy', element: <JoinAcademyPage /> },
+              /**
+               * A parent redeems their linking code here, outside `RequireAcademy`.
+               *
+               * Redeeming the code is what creates the parent's membership, so
+               * requiring one first — as `/parent/link-player` does — was a
+               * closed loop: a new parent was bounced to `/onboarding`, which
+               * only offers player and coach join codes, and no other path in
+               * the app ever produces a `parent` membership. The whole parent
+               * side was unreachable without editing the database by hand.
+               * `/parent/link-player` stays for a parent adding a second child.
+               */
+              { path: '/onboarding/link-child', element: <ParentLinkPlayerPage /> },
               { path: '/onboarding/pending', element: <PendingApprovalPage /> },
               { path: '/onboarding/select-academy', element: <SelectAcademyPage /> },
             ],
