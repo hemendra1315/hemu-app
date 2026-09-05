@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { createMockQueryBuilder } from '../../../test/supabaseQueryBuilder';
@@ -323,6 +325,18 @@ describe('playersApi', () => {
       expect(mockBuilder.eq).toHaveBeenCalledWith('player_id', playerId);
       expect(result.assigned).toBe(0);
       expect(result.completed).toBe(0);
+    });
+
+    it('does not embed drills with !inner, so an RLS-blocked drill row degrades to null instead of silently deleting the whole assignment', () => {
+      // Regression: `drills` is staff-only under RLS. `!inner` would drop an
+      // entire assignment row whenever the linked drill isn't readable,
+      // which is exactly what made every player's drill list look empty no
+      // matter what a coach assigned them. A migration also grants players
+      // read access to drills they're assigned, but this query must never
+      // regress back to `!inner`.
+      const src = readFileSync(resolve('src/features/players/api/playersApi.ts'), 'utf8');
+      const summarySection = src.slice(src.indexOf('fetchPlayerDrillSummary'));
+      expect(summarySection.slice(0, 400)).not.toContain('drills!inner');
     });
 
     it('computes completion percentage correctly', async () => {

@@ -560,7 +560,7 @@ export async function fetchPlayerDrillSummary(
       .select(
         `
         id, status, assigned_at, due_date,
-        drills!inner(name, category)
+        drills(name, category)
       `,
       )
       .eq('academy_id', academyId)
