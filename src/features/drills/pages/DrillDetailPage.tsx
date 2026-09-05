@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -29,20 +30,41 @@ export default function DrillDetailPage() {
 
   const drill = drillsQuery.data?.find((item) => item.id === drillId) ?? null;
 
-  const defaultValues: CreateDrillInput = {
-    academyId: academyId as string,
-    name: drill?.name ?? '',
-    category: drill?.category ?? 'batting',
-    description: drill?.description ?? null,
-    durationMinutes: drill?.durationMinutes ?? null,
-    difficulty: drill?.difficulty ?? 'beginner',
-  };
-
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isDirty },
-  } = useForm<CreateDrillInput>({ defaultValues });
+  } = useForm<CreateDrillInput>({
+    defaultValues: {
+      academyId: academyId as string,
+      name: '',
+      category: 'batting',
+      description: null,
+      durationMinutes: null,
+      difficulty: 'beginner',
+    },
+  });
+
+  // `useForm`'s `defaultValues` is only read once, at mount. The drills query
+  // is still pending on that very first render (this page can be opened
+  // directly, e.g. via a refresh or deep link), so those blank fallback
+  // values above are what React Hook Form keeps forever unless told
+  // otherwise. Once the real drill arrives, `reset()` re-seeds both the
+  // visible fields and RHF's internal defaults — without this, a coach who
+  // opens a drill and hits Save without changing anything silently wipes its
+  // category, difficulty, description and duration back to these fallbacks.
+  useEffect(() => {
+    if (!drill) return;
+    reset({
+      academyId: academyId as string,
+      name: drill.name,
+      category: drill.category,
+      description: drill.description,
+      durationMinutes: drill.durationMinutes,
+      difficulty: drill.difficulty,
+    });
+  }, [drill, academyId, reset]);
 
   const handleSave = handleSubmit(async (values) => {
     if (!drill || !academyId || !canManage) return;
@@ -98,7 +120,6 @@ export default function DrillDetailPage() {
                 <div>
                   <label className="text-fg block text-sm font-medium">Title</label>
                   <Input
-                    defaultValue={drill.name}
                     {...register('name', { required: 'Title is required' })}
                     hasError={Boolean(errors.name)}
                   />
@@ -108,7 +129,7 @@ export default function DrillDetailPage() {
                 </div>
                 <div>
                   <label className="text-fg block text-sm font-medium">Category</label>
-                  <Select defaultValue={drill.category} {...register('category')}>
+                  <Select {...register('category')}>
                     <option value="batting">Batting</option>
                     <option value="bowling">Bowling</option>
                     <option value="fielding">Fielding</option>
@@ -121,7 +142,6 @@ export default function DrillDetailPage() {
                 <div>
                   <label className="text-fg block text-sm font-medium">Duration (minutes)</label>
                   <Input
-                    defaultValue={drill.durationMinutes ?? ''}
                     {...register('durationMinutes', { valueAsNumber: true })}
                     type="number"
                     min={1}
@@ -129,7 +149,7 @@ export default function DrillDetailPage() {
                 </div>
                 <div>
                   <label className="text-fg block text-sm font-medium">Difficulty</label>
-                  <Select defaultValue={drill.difficulty} {...register('difficulty')}>
+                  <Select {...register('difficulty')}>
                     <option value="beginner">Beginner</option>
                     <option value="intermediate">Intermediate</option>
                     <option value="advanced">Advanced</option>
@@ -140,11 +160,7 @@ export default function DrillDetailPage() {
 
               <div>
                 <label className="text-fg block text-sm font-medium">Description</label>
-                <Textarea
-                  defaultValue={drill.description ?? ''}
-                  {...register('description')}
-                  rows={4}
-                />
+                <Textarea {...register('description')} rows={4} />
               </div>
             </CardBody>
             {canManage ? (
