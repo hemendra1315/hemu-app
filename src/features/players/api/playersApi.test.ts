@@ -375,6 +375,29 @@ describe('playersApi', () => {
       expect(result.pending).toBe(1);
       expect(result.completionPercentage).toBe(67);
     });
+
+    it('does not truncate pendingAssignments/completedAssignments to 10, unlike the recent-activity feed', async () => {
+      // Regression: the dashboard used to build its Pending/Completed cards
+      // from `recentAssignments` (capped at 10), so a player with more than
+      // 10 total assignments saw a dashboard that disagreed with their own
+      // profile page's "assigned"/"completion %" stats, which were always
+      // computed from the full list.
+      const rows = Array.from({ length: 15 }, (_, i) => ({
+        id: `a${i}`,
+        status: i < 12 ? 'completed' : 'assigned',
+        assigned_at: `2026-01-${String(i + 1).padStart(2, '0')}`,
+        due_date: null,
+        drills: { name: `Drill ${i}`, category: 'batting' },
+      }));
+      const mockBuilder = createMockBuilder({ data: rows, error: null });
+      mockedSupabase.from.mockReturnValue(mockBuilder as any);
+
+      const result = await fetchPlayerDrillSummary(academyId, playerId);
+
+      expect(result.recentAssignments).toHaveLength(10);
+      expect(result.completedAssignments).toHaveLength(12);
+      expect(result.pendingAssignments).toHaveLength(3);
+    });
   });
 
   describe('fetchPlayerCareerHighlights', () => {

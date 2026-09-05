@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { unwrap, unwrapVoid } from '@/lib/api';
+import { rpc, unwrap, unwrapVoid } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import type { UUID } from '@/types';
 import type {
@@ -224,4 +224,20 @@ export async function updateDrillAssignment(
 
 export async function deleteDrillAssignment(assignmentId: UUID): Promise<void> {
   await unwrapVoid(supabase.from('drill_assignments').delete().eq('id', assignmentId));
+}
+
+/**
+ * A player marking their OWN drill assignment done. `drill_assignments_update`
+ * (the raw table RLS policy) is staff-only, so this goes through a narrow
+ * RPC that only ever flips `status` on a row that actually belongs to the
+ * calling user — see `player_set_drill_assignment_status`.
+ */
+export async function setMyDrillAssignmentStatus(
+  assignmentId: UUID,
+  status: 'assigned' | 'completed',
+): Promise<void> {
+  await rpc<null>('player_set_drill_assignment_status', {
+    p_assignment_id: assignmentId,
+    p_status: status,
+  });
 }

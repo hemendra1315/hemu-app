@@ -667,19 +667,20 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
     },
   }));
 
-  const pendingAssignments = drillSummary.recentAssignments
-    .filter((a: any) => a.status === 'assigned')
-    .map((a: any) => ({
-      ...a,
-      drill: { name: a.drillName, category: a.category },
-    }));
+  // Built from the drill summary's own full pending/completed lists, not the
+  // 10-row `recentAssignments` activity feed — that feed silently truncated
+  // this card to whatever happened to be most recent, which disagreed with
+  // the player's profile page (its "assigned"/"completion %" stats are
+  // computed from every assignment, not just the last 10).
+  const pendingAssignments = drillSummary.pendingAssignments.map((a: any) => ({
+    ...a,
+    drill: { name: a.drillName, category: a.category },
+  }));
 
-  const completedAssignments = drillSummary.recentAssignments
-    .filter((a: any) => a.status === 'completed')
-    .map((a: any) => ({
-      ...a,
-      drill: { name: a.drillName, category: a.category },
-    }));
+  const completedAssignments = drillSummary.completedAssignments.map((a: any) => ({
+    ...a,
+    drill: { name: a.drillName, category: a.category },
+  }));
 
   const recentAwards = awards.slice(0, 5).map((award: any) => ({
     id: award.id,

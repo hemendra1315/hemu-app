@@ -135,6 +135,16 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     group: 'Matches',
   },
   {
+    // Mobile reaches this from the More page (gated the same way, on
+    // `drills:read`); nothing in the desktop sidebar linked here at all, so
+    // it was only reachable on desktop by typing the URL.
+    to: '/drills',
+    label: 'Drills & Training',
+    icon: <FlaskConical className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'drills:read',
+    group: 'Training',
+  },
+  {
     to: '/stats',
     label: 'Stats & Performance',
     icon: <BarChart2 className="h-4 w-4" aria-hidden />,

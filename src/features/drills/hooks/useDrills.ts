@@ -19,6 +19,7 @@ import {
   fetchDrillAssignments,
   fetchAcademyDrills,
   fetchPlayerDrillAssignments,
+  setMyDrillAssignmentStatus,
   updateDrill,
   updateDrillAssignment,
 } from '../api/drillsApi';
@@ -115,6 +116,26 @@ export function useUpdateDrillAssignment(academyId: UUID) {
         queryKey: ['academies', academyId, 'players'],
         exact: false,
       });
+    },
+  });
+}
+
+/** A player marking their own assignment complete (or undoing that). */
+export function useSetMyDrillAssignmentStatus(academyId: UUID, playerId: UUID) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      assignmentId,
+      status,
+    }: {
+      assignmentId: UUID;
+      status: 'assigned' | 'completed';
+    }) => setMyDrillAssignmentStatus(assignmentId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.academy.playerDrillAssignments(academyId, playerId),
+      });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-player', academyId, playerId] });
     },
   });
 }

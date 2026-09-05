@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
-import { Card, CardBody, CardHeader, Badge, Avatar } from '@/components/ui';
+import { Button, Card, CardBody, CardHeader, Badge, Avatar } from '@/components/ui';
 import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { SuperAdminAcademyActions } from '@/features/admin';
+import { useSetMyDrillAssignmentStatus } from '@/features/drills/hooks/useDrills';
 import { usePlayerDashboardAnalytics } from '../hooks/useDashboardAnalytics';
 import { SimpleBarChart, SimpleLineChart } from '@/components/charts/SimpleBarChart';
 import { SessionRow } from '../components/SessionRow';
@@ -52,6 +53,10 @@ export default function PlayerDashboardPage() {
   const playerId = resolvedPlayerId && isUUID(resolvedPlayerId) ? resolvedPlayerId : null;
 
   const analyticsQuery = usePlayerDashboardAnalytics(academyId, isPlayer ? playerId : null);
+  const setDrillStatus = useSetMyDrillAssignmentStatus(
+    (academyId ?? '') as string,
+    (playerId ?? '') as string,
+  );
 
   if (!isPlayer) {
     return (
@@ -243,15 +248,34 @@ export default function PlayerDashboardPage() {
                     {analytics.pendingAssignments.map((assignment) => (
                       <div
                         key={assignment.id}
-                        className="border-border-subtle rounded-xl border p-3"
+                        className="border-border-subtle flex items-start justify-between gap-3 rounded-xl border p-3"
                       >
-                        <p className="text-fg font-medium">{assignment.drill.name}</p>
-                        <p className="text-fg-muted text-sm">{assignment.drill.category}</p>
-                        {assignment.dueDate && (
-                          <p className="text-fg-muted text-xs">
-                            Due: {formatDate(assignment.dueDate)}
-                          </p>
-                        )}
+                        <div className="min-w-0">
+                          <p className="text-fg font-medium">{assignment.drill.name}</p>
+                          <p className="text-fg-muted text-sm">{assignment.drill.category}</p>
+                          {assignment.dueDate && (
+                            <p className="text-fg-muted text-xs">
+                              Due: {formatDate(assignment.dueDate)}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="shrink-0"
+                          isLoading={
+                            setDrillStatus.isPending &&
+                            setDrillStatus.variables?.assignmentId === assignment.id
+                          }
+                          onClick={() =>
+                            setDrillStatus.mutate({
+                              assignmentId: assignment.id,
+                              status: 'completed',
+                            })
+                          }
+                        >
+                          Mark done
+                        </Button>
                       </div>
                     ))}
                   </div>

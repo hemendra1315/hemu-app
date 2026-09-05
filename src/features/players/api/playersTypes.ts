@@ -132,19 +132,26 @@ export type PlayerAttendanceSummary = {
   }>;
 };
 
+type DrillAssignmentRow = {
+  id: UUID;
+  drillName: string;
+  category: string;
+  status: string;
+  assignedAt: string;
+  dueDate: string | null;
+};
+
 export type PlayerDrillSummary = {
   assigned: number;
   completed: number;
   pending: number;
   completionPercentage: number;
-  recentAssignments: Array<{
-    id: UUID;
-    drillName: string;
-    category: string;
-    status: string;
-    assignedAt: string;
-    dueDate: string | null;
-  }>;
+  /** Most recent 10 assignments regardless of status — an activity feed, not a full list. */
+  recentAssignments: Array<DrillAssignmentRow>;
+  /** Every assignment still pending, unsliced — for callers that need the real, complete list. */
+  pendingAssignments: Array<DrillAssignmentRow>;
+  /** Every completed assignment, unsliced. */
+  completedAssignments: Array<DrillAssignmentRow>;
 };
 
 export type PlayerCareerHighlight = {

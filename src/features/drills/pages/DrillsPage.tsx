@@ -28,6 +28,7 @@ import {
   useDeleteDrillAssignment,
   useDrillAssignments,
   useDrills,
+  useUpdateDrillAssignment,
 } from '../hooks/useDrills';
 import { useBatches } from '@/features/batches';
 
@@ -56,6 +57,7 @@ export default function DrillsPage() {
   const batchesQuery = useBatches(academyId);
   const assignDrill = useAssignDrill(academyId as string);
   const deleteAssignment = useDeleteDrillAssignment(academyId as string);
+  const updateAssignment = useUpdateDrillAssignment(academyId as string);
 
   const {
     register,
@@ -108,6 +110,18 @@ export default function DrillsPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to assign drill';
       pushToast({ title: 'Assign Failed', description: msg, variant: 'error' });
+    }
+  };
+
+  const handleToggleAssignmentStatus = async (assignmentId: UUID, currentlyCompleted: boolean) => {
+    try {
+      await updateAssignment.mutateAsync({
+        assignmentId,
+        input: { status: currentlyCompleted ? 'assigned' : 'completed' },
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update assignment';
+      pushToast({ title: 'Update Failed', description: msg, variant: 'error' });
     }
   };
 
@@ -349,6 +363,20 @@ export default function DrillsPage() {
                       <Badge tone={assignment.status === 'completed' ? 'success' : 'warning'}>
                         {assignment.status}
                       </Badge>
+                      {canManage ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() =>
+                            void handleToggleAssignmentStatus(
+                              assignment.id,
+                              assignment.status === 'completed',
+                            )
+                          }
+                        >
+                          {assignment.status === 'completed' ? 'Mark pending' : 'Mark complete'}
+                        </Button>
+                      ) : null}
                       {canManage ? (
                         <Button
                           variant="danger"

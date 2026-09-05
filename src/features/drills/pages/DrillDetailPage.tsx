@@ -165,7 +165,7 @@ export default function DrillDetailPage() {
             </CardBody>
             {canManage ? (
               <CardFooter>
-                <Button type="submit" isLoading={false} disabled={!isDirty}>
+                <Button type="submit" isLoading={updateDrill.isPending} disabled={!isDirty}>
                   Save changes
                 </Button>
               </CardFooter>

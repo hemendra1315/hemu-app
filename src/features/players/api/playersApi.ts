@@ -574,14 +574,26 @@ export async function fetchPlayerDrillSummary(
   const pending = assigned - completed;
   const completionPercentage = assigned > 0 ? Math.round((completed / assigned) * 100) : 0;
 
-  const recentAssignments = assignments.slice(0, 10).map((a) => ({
+  const toRow = (a: any) => ({
     id: a.id,
     drillName: a.drills?.name ?? 'Unknown',
     category: a.drills?.category ?? 'general',
     status: a.status,
     assignedAt: a.assigned_at,
     dueDate: a.due_date,
-  }));
+  });
+
+  // `recentAssignments` is an activity feed (most recent 10, any status) —
+  // fine for that. It is NOT a substitute for the full pending/completed
+  // lists: the dashboard used to derive its "Pending"/"Completed" cards by
+  // filtering this same truncated list, so a player with more than 10
+  // assignments saw a dashboard that disagreed with their own profile's
+  // "23 assigned, 65% completion" stat (computed from the untruncated
+  // `assignments` array above). These two fields are the real, complete
+  // lists for exactly that purpose.
+  const recentAssignments = assignments.slice(0, 10).map(toRow);
+  const pendingAssignments = assignments.filter((a) => a.status !== 'completed').map(toRow);
+  const completedAssignments = assignments.filter((a) => a.status === 'completed').map(toRow);
 
   return {
     assigned,
@@ -589,6 +601,8 @@ export async function fetchPlayerDrillSummary(
     pending,
     completionPercentage,
     recentAssignments,
+    pendingAssignments,
+    completedAssignments,
   };
 }
 
