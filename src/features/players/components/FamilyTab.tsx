@@ -50,6 +50,24 @@ export function FamilyTab({
     }
   };
 
+  const handleRevokeLink = async (linkId: string) => {
+    try {
+      await revokeLink.mutateAsync(linkId);
+      pushToast({ title: 'Parent access revoked', variant: 'success' });
+    } catch {
+      pushToast({ title: 'Failed to revoke parent access', variant: 'error' });
+    }
+  };
+
+  const handleRevokeCode = async (codeId: string) => {
+    try {
+      await revokeCode.mutateAsync(codeId);
+      pushToast({ title: 'Linking code revoked', variant: 'success' });
+    } catch {
+      pushToast({ title: 'Failed to revoke linking code', variant: 'error' });
+    }
+  };
+
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
@@ -93,7 +111,8 @@ export function FamilyTab({
                       variant="ghost"
                       size="sm"
                       className="text-danger hover:text-danger hover:bg-danger/10"
-                      onClick={() => revokeLink.mutate(parent.id)}
+                      disabled={revokeLink.isPending}
+                      onClick={() => handleRevokeLink(parent.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -165,7 +184,8 @@ export function FamilyTab({
                         variant="ghost"
                         size="icon"
                         className="text-danger"
-                        onClick={() => revokeCode.mutate(code.id)}
+                        disabled={revokeCode.isPending}
+                        onClick={() => handleRevokeCode(code.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
