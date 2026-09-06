@@ -33,3 +33,17 @@ export function useCreateAnnouncement() {
     },
   });
 }
+
+// The delete API call already existed (announcementsApi.deleteAnnouncement) but
+// had no hook and no button anywhere in the UI -- staff had no way to remove
+// a mistaken or outdated announcement short of going into Supabase directly.
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (announcementId: string) => announcementsApi.deleteAnnouncement(announcementId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ANNOUNCEMENTS_KEYS.all });
+    },
+  });
+}

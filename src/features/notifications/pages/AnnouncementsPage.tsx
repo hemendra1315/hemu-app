@@ -1,9 +1,24 @@
-import { Megaphone, Plus } from 'lucide-react';
-import { Button, Card } from '@/components/ui';
-import { useAnnouncements } from '../hooks/useAnnouncements';
+import { useState } from 'react';
+import { Megaphone, Plus, Trash2 } from 'lucide-react';
+import { Button, Card, Modal } from '@/components/ui';
+import { useAnnouncements, useDeleteAnnouncement } from '../hooks/useAnnouncements';
+import type { Announcement, AudienceType } from '../api/announcementsApi';
 import { useNavigate } from 'react-router-dom';
 import { useCan } from '@/lib/rbac';
 import { useActiveAcademy } from '@/features/academies/hooks/useAcademies';
+import { useAuthStore } from '@/stores/authStore';
+import { useUiStore } from '@/stores';
+
+// The badge previously showed the raw enum value (e.g. "all_parents",
+// "batch") verbatim -- readable to a developer, not to a coach.
+const AUDIENCE_LABELS: Record<AudienceType, string> = {
+  all: 'Everyone',
+  coaches: 'Coaches',
+  players: 'Players',
+  batch: 'One Batch',
+  all_parents: 'All Parents',
+  custom: 'Selected People',
+};
 
 export function AnnouncementsPage() {
   const { membership } = useActiveAcademy();
@@ -13,6 +28,29 @@ export function AnnouncementsPage() {
   const { data: announcements = [], isLoading } = useAnnouncements(50);
   const canManage = useCan('announcements:manage');
   const navigate = useNavigate();
+  const userId = useAuthStore((s) => s.user?.id);
+  const deleteAnnouncement = useDeleteAnnouncement();
+  const pushToast = useUiStore((s) => s.pushToast);
+  const [pendingDelete, setPendingDelete] = useState<Announcement | null>(null);
+
+  // The delete API call existed but nothing in the UI ever called it. The
+  // database only allows an owner to delete any announcement, or a coach to
+  // delete one they created themselves -- mirror that here so the button
+  // only appears where the delete would actually succeed.
+  const canDelete = (announcement: Announcement) =>
+    canManage && (membership?.role === 'academy_owner' || announcement.created_by === userId);
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await deleteAnnouncement.mutateAsync(pendingDelete.id);
+      pushToast({ title: 'Announcement deleted', variant: 'success' });
+    } catch {
+      pushToast({ title: 'Failed to delete announcement', variant: 'error' });
+    } finally {
+      setPendingDelete(null);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -47,7 +85,7 @@ export function AnnouncementsPage() {
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-semibold">{announcement.title}</h3>
                 <span className="bg-surface-muted text-fg-subtle rounded px-2 py-1 text-xs font-medium tracking-wider uppercase">
-                  {announcement.audience}
+                  {AUDIENCE_LABELS[announcement.audience]}
                 </span>
               </div>
               <p className="text-fg text-sm leading-relaxed whitespace-pre-wrap">
@@ -61,11 +99,46 @@ export function AnnouncementsPage() {
                     day: 'numeric',
                   })}
                 </span>
+                {canDelete(announcement) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-fg-muted hover:text-danger"
+                    onClick={() => setPendingDelete(announcement)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <Modal
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        title="Delete this announcement?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPendingDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleteAnnouncement.isPending}
+              onClick={() => void handleConfirmDelete()}
+            >
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-fg-muted text-sm">
+          {pendingDelete?.title ? `"${pendingDelete.title}"` : 'This announcement'} will be removed
+          for everyone it was sent to. This can't be undone.
+        </p>
+      </Modal>
     </div>
   );
 }
