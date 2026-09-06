@@ -157,7 +157,7 @@ export function MobileBottomNav() {
         to: '/more',
         label: 'More',
         icon: MoreHorizontal,
-        matchPrefixes: ['/more', '/parent/notifications'],
+        matchPrefixes: ['/more'],
       },
     ];
   } else if (canUpdateAcademy) {

@@ -1,16 +1,27 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Users, QrCode, Calendar, TrendingUp, Bell, MapPin, Clock } from 'lucide-react';
-import { Card, buttonStyles } from '@/components/ui';
+import {
+  Plus,
+  Users,
+  QrCode,
+  Calendar,
+  TrendingUp,
+  Bell,
+  MapPin,
+  Clock,
+  UserMinus,
+} from 'lucide-react';
+import { Card, buttonStyles, Button, Modal } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
-import { useLinkedChildren } from '../hooks/useParents';
+import { useLinkedChildren, useRevokeParentLink } from '../hooks/useParents';
 import { useActiveAcademy } from '@/features/academies/hooks/useAcademies';
-import { useTrainingSessions } from '@/features/sessions/hooks/useSessions';
+import { usePlayerUpcomingSessions } from '@/features/players/hooks/usePlayers';
 import { usePlayerAttendance } from '@/features/attendance/hooks/useAttendance';
 import { useAcademyMatches } from '@/features/matches/hooks/useMatches';
 import { usePlayerStatisticsById } from '@/features/matches/hooks/useMatches';
 import { useAnnouncements } from '@/features/notifications/hooks/useAnnouncements';
 import { format, isAfter } from 'date-fns';
+import { useUiStore } from '@/stores';
 
 export default function ParentDashboardPage() {
   const { academyId, membership } = useActiveAcademy();
@@ -100,11 +111,40 @@ export default function ParentDashboardPage() {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ChildDashboard({ child, academyId }: { child: any; academyId: string }) {
-  const sessionsQuery = useTrainingSessions(academyId);
+  // A parent had no way to unlink themselves from a child — not staff,
+  // just them personally deciding they no longer want that child's
+  // profile linked to their account. There was no button anywhere for it,
+  // and the underlying RLS policy didn't even allow a parent to update
+  // their own parent_player_links row (fixed alongside this).
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const revokeLink = useRevokeParentLink();
+  const pushToast = useUiStore((s) => s.pushToast);
+
+  const handleUnlink = async () => {
+    try {
+      await revokeLink.mutateAsync(child.linkId);
+      pushToast({ title: 'Unlinked from this child', variant: 'success' });
+      setShowUnlinkConfirm(false);
+    } catch {
+      pushToast({ title: 'Failed to unlink', variant: 'error' });
+    }
+  };
+
+  // Was useTrainingSessions(academyId) — every training session the academy
+  // has ever scheduled, unbounded, fetched fresh on every dashboard visit,
+  // just to filter down to "the next one" in the browser. Swapped for the
+  // same bounded, batch-scoped, already-sorted query the player's own
+  // profile page uses (round 19), so this only ever asks the database for
+  // this child's next few sessions.
+  const sessionsQuery = usePlayerUpcomingSessions(child.player.id, academyId);
   const matchesQuery = useAcademyMatches(academyId);
   const statsQuery = usePlayerStatisticsById(academyId, child.player.id);
   const attendanceQuery = usePlayerAttendance(child.player.id, academyId);
-  const announcementsQuery = useAnnouncements();
+  // Was unbounded — every announcement the academy has ever posted,
+  // fetched fresh on every dashboard visit, just to show the 3 most
+  // recent. Only asking the database for the most recent 10 keeps this
+  // bounded regardless of how long the academy's been running.
+  const announcementsQuery = useAnnouncements(10);
 
   if (
     statsQuery.isPending ||
@@ -143,7 +183,6 @@ function ChildDashboard({ child, academyId }: { child: any; academyId: string })
     );
   }
 
-  const sessions = sessionsQuery.data;
   const matches = matchesQuery.data;
   const stats = statsQuery.data;
   const attendance = attendanceQuery.data;
@@ -151,24 +190,31 @@ function ChildDashboard({ child, academyId }: { child: any; academyId: string })
 
   const now = new Date();
 
-  // Next session
-  const upcomingSessions = sessions
-    .filter(
-      (s) =>
-        (s.batchId === child.player.batchId || !s.batchId) && isAfter(new Date(s.startAt), now),
-    )
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  const nextSession = upcomingSessions[0];
+  // usePlayerUpcomingSessions already returns just this child's upcoming
+  // sessions, soonest first — no client-side filter/sort needed.
+  const nextSession = sessionsQuery.data?.[0];
 
   // Upcoming matches (ignore if Match enum statuses do not have "scheduled")
   // Instead filter by matchDate > now
+  //
+  // The old `m.batchId === child.player.batchId || !m.batchId` compared a
+  // possibly-`undefined` player batchId against a possibly-`null` match
+  // batchId with strict equality — `undefined !== null`, so for a
+  // batchless child (batchId missing rather than explicitly null) the
+  // first branch could never match, silently relying on the second branch
+  // alone. Normalizing both sides to `null` first makes "batchless"
+  // actually mean the same thing on both, whatever shape the data arrives
+  // in.
+  const childBatchId = child.player.batchId ?? null;
   const upcomingMatches = matches
-    .filter(
-      (m) =>
-        (m.batchId === child.player.batchId || !m.batchId) &&
+    .filter((m) => {
+      const matchBatchId = m.batchId ?? null;
+      return (
+        (matchBatchId === null || matchBatchId === childBatchId) &&
         m.matchDate &&
-        isAfter(new Date(m.matchDate), now),
-    )
+        isAfter(new Date(m.matchDate), now)
+      );
+    })
     .sort((a, b) => new Date(a.matchDate!).getTime() - new Date(b.matchDate!).getTime())
     .slice(0, 2);
 
@@ -206,10 +252,42 @@ function ChildDashboard({ child, academyId }: { child: any; academyId: string })
             </div>
           </div>
         </div>
-        <Link to={`/parent/child/${child.player.id}`} className={buttonStyles('secondary', 'sm')}>
-          <QrCode className="mr-2 h-4 w-4" /> Card
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to={`/parent/child/${child.player.id}`} className={buttonStyles('secondary', 'sm')}>
+            <QrCode className="mr-2 h-4 w-4" /> Card
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-danger hover:text-danger hover:bg-danger/10"
+            onClick={() => setShowUnlinkConfirm(true)}
+            title="Unlink this child from your account"
+          >
+            <UserMinus className="h-4 w-4" />
+          </Button>
+        </div>
       </Card>
+
+      <Modal
+        open={showUnlinkConfirm}
+        onClose={() => setShowUnlinkConfirm(false)}
+        title="Unlink this child?"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowUnlinkConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" disabled={revokeLink.isPending} onClick={handleUnlink}>
+              Unlink
+            </Button>
+          </>
+        }
+      >
+        <p className="text-fg-muted text-sm">
+          You'll no longer be able to see {child.player.fullName}'s profile, schedule, or stats.
+          Their coach can send you a new linking code if you want to reconnect later.
+        </p>
+      </Modal>
 
       <div className="grid grid-cols-2 gap-4">
         <Card className="flex flex-col items-center justify-center space-y-1 p-4 text-center">

@@ -38,12 +38,18 @@ export interface CreateAnnouncementPayload {
 }
 
 export const announcementsApi = {
-  async getAnnouncements(academyId: string): Promise<Announcement[]> {
-    const { data, error } = await supabase
+  async getAnnouncements(academyId: string, limit?: number): Promise<Announcement[]> {
+    let query = supabase
       .from('announcements')
       .select('*')
       .eq('academy_id', academyId)
       .order('created_at', { ascending: false });
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw toApiError(error);

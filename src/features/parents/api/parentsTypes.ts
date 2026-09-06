@@ -12,6 +12,11 @@ export type ParentPlayerLink = {
   status: 'active' | 'revoked';
   createdAt: string;
   updatedAt: string;
+  /** Who this link actually belongs to — needed so staff revoking access
+   *  can tell two same-relationship-type parents apart. */
+  parentName: string | null;
+  parentEmail: string | null;
+  parentPhone: string | null;
 };
 
 export type ParentLinkingCode = {

@@ -8,12 +8,14 @@ export const ANNOUNCEMENTS_KEYS = {
   lists: (academyId: string) => [...ANNOUNCEMENTS_KEYS.all, academyId, 'list'] as const,
 };
 
-export function useAnnouncements() {
+export function useAnnouncements(limit?: number) {
   const { academyId } = useActiveAcademy();
 
   return useQuery({
-    queryKey: ANNOUNCEMENTS_KEYS.lists(academyId || ''),
-    queryFn: () => announcementsApi.getAnnouncements(academyId!),
+    queryKey: limit
+      ? [...ANNOUNCEMENTS_KEYS.lists(academyId || ''), limit]
+      : ANNOUNCEMENTS_KEYS.lists(academyId || ''),
+    queryFn: () => announcementsApi.getAnnouncements(academyId!, limit),
     enabled: !!academyId,
   });
 }

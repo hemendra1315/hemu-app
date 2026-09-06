@@ -181,7 +181,6 @@ export const router = createBrowserRouter([
                       { path: '/parent/dashboard', element: <ParentDashboardPage /> },
                       { path: '/parent/link-player', element: <ParentLinkPlayerPage /> },
                       { path: '/parent/child/:memberId', element: <PlayerProfilePage /> },
-                      { path: '/parent/notifications', element: <NotificationsPage /> },
                       { path: '/parent/profile', element: <ProfilePage /> },
                     ],
                   },

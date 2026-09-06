@@ -103,7 +103,17 @@ export function FamilyTab({
                   className="border-border-subtle flex items-center justify-between rounded-xl border p-3"
                 >
                   <div>
-                    <p className="text-fg font-medium capitalize">{parent.relationshipType}</p>
+                    <p className="text-fg font-medium">
+                      {parent.parentName || 'Unnamed parent'}{' '}
+                      <span className="text-fg-muted font-normal capitalize">
+                        ({parent.relationshipType})
+                      </span>
+                    </p>
+                    {(parent.parentEmail || parent.parentPhone) && (
+                      <p className="text-fg-muted text-sm">
+                        {[parent.parentEmail, parent.parentPhone].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                     <p className="text-fg-muted text-sm">Linked: {formatDate(parent.createdAt)}</p>
                   </div>
                   {canManageMembers && (
