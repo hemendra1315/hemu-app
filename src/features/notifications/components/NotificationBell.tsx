@@ -4,12 +4,16 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNotifications, NOTIFICATIONS_KEYS } from '../hooks/useNotifications';
+import { useUnreadNotificationCount, NOTIFICATIONS_KEYS } from '../hooks/useNotifications';
 
 export function NotificationBell() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const { data: notifications = [] } = useNotifications();
+  // Was useNotifications() -- fetched this user's ENTIRE notification
+  // history, forever, just to run `.filter(...).length` for a badge
+  // number, and re-fetched all of it again on every single realtime
+  // insert. A count-only query never grows and is always exact.
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   useEffect(() => {
     if (!user) return;
@@ -25,8 +29,9 @@ export function NotificationBell() {
           filter: `recipient_user_id=eq.${user.id}`,
         },
         () => {
-          // Invalidate the notifications list query so React Query refetches.
-          void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEYS.lists() });
+          // Invalidate every notifications query so both the badge count
+          // and any open list refetch.
+          void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEYS.all });
         },
       )
       .subscribe();
@@ -35,9 +40,6 @@ export function NotificationBell() {
       void supabase.removeChannel(channel);
     };
   }, [user, queryClient]);
-
-  // Recalculate unreadCount whenever notifications change
-  const unreadCount = notifications.filter((n) => n.status !== 'read' && !n.read_at).length;
 
   return (
     <Link

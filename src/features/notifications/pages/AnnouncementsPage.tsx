@@ -7,7 +7,10 @@ import { useActiveAcademy } from '@/features/academies/hooks/useAcademies';
 
 export function AnnouncementsPage() {
   const { membership } = useActiveAcademy();
-  const { data: announcements = [], isLoading } = useAnnouncements();
+  // Bounded like the parent dashboard's announcements list (round 21) and
+  // the notifications list/bell (this round) -- this screen doesn't need
+  // the academy's entire announcement history to render.
+  const { data: announcements = [], isLoading } = useAnnouncements(50);
   const canManage = useCan('announcements:manage');
   const navigate = useNavigate();
 

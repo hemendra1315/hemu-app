@@ -9,6 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { formatDateTime } from '@/lib/utils/date';
 import type { Notification } from '../api/notificationsApi';
+import { useUiStore } from '@/stores';
 
 export function NotificationsPage() {
   const { data: notifications = [], isLoading } = useNotifications();
@@ -16,10 +17,20 @@ export function NotificationsPage() {
   const markAllAsRead = useMarkAllAsRead();
   const deleteNotif = useDeleteNotification();
   const navigate = useNavigate();
+  const pushToast = useUiStore((s) => s.pushToast);
 
-  const handleNotificationClick = (notification: Notification) => {
+  // These three used to call .mutate() directly with no onError and no
+  // try/catch. The app's global mutation-error handler only logs silently
+  // (queryClient.ts), so a failed mark-as-read/mark-all/delete (RLS
+  // denial, network blip) gave zero feedback -- the item just stayed
+  // exactly as it was, indistinguishable from success.
+  const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read_at) {
-      markAsRead.mutate(notification.id);
+      try {
+        await markAsRead.mutateAsync(notification.id);
+      } catch {
+        pushToast({ title: 'Failed to mark as read', variant: 'error' });
+      }
     }
 
     const metadata = notification.metadata as { batch_id?: string };
@@ -30,6 +41,22 @@ export function NotificationsPage() {
       navigate('/members');
     } else if (notification.notification_type === 'announcement') {
       navigate('/announcements');
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead.mutateAsync();
+    } catch {
+      pushToast({ title: 'Failed to mark all as read', variant: 'error' });
+    }
+  };
+
+  const handleDelete = async (notificationId: string) => {
+    try {
+      await deleteNotif.mutateAsync(notificationId);
+    } catch {
+      pushToast({ title: 'Failed to delete notification', variant: 'error' });
     }
   };
 
@@ -45,7 +72,7 @@ export function NotificationsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => markAllAsRead.mutate()}
+            onClick={() => handleMarkAllAsRead()}
             disabled={markAllAsRead.isPending}
           >
             <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -96,7 +123,7 @@ export function NotificationsPage() {
                     className="text-fg-muted hover:text-danger opacity-0 transition-opacity group-hover:opacity-100"
                     onClick={(e) => {
                       e.stopPropagation();
-                      deleteNotif.mutate(notif.id);
+                      void handleDelete(notif.id);
                     }}
                     disabled={deleteNotif.isPending}
                   >

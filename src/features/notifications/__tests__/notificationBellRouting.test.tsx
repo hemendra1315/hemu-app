@@ -6,14 +6,24 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NotificationBell } from '../components/NotificationBell';
 import { router } from '@/app/router';
 
-// Mock the Supabase transport so rendering the bell never talks to the network.
+// Mock the Supabase transport so rendering the bell never talks to the
+// network. The bell now runs a `select(..., { count: 'exact', head: true })
+// .is('read_at', null)` count query (see notificationsApi.getUnreadCount)
+// instead of fetching rows, so the stub needs to be a generic thenable
+// chain rather than a fixed `select().order()` shape.
+function makeChainableQueryStub(result: { data: unknown[]; error: null; count?: number }) {
+  const stub: Record<string, unknown> = {};
+  for (const method of ['select', 'eq', 'is', 'order', 'limit']) {
+    stub[method] = vi.fn(() => stub);
+  }
+  (stub as { then: unknown }).then = (resolve: (value: typeof result) => unknown) =>
+    Promise.resolve(result).then(resolve);
+  return stub;
+}
+
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        order: vi.fn(() => Promise.resolve({ data: [], error: null })),
-      })),
-    })),
+    from: vi.fn(() => makeChainableQueryStub({ data: [], error: null, count: 0 })),
     channel: vi.fn(() => ({
       on: vi.fn(() => ({ subscribe: vi.fn() })),
     })),

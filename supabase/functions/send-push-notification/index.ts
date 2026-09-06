@@ -371,13 +371,42 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // 1. Load the announcement (for the push payload's title/body)
+    // 1. Load the announcement (for the push payload's title/body, and the
+    // academy_id needed for the caller-authorization check below)
     const { data: announcement, error: annErr } = await supabase
       .from('announcements')
-      .select('id, title, message')
+      .select('id, title, message, academy_id')
       .eq('id', announcement_id)
       .single();
     if (annErr || !announcement) return new Response('Announcement not found', { status: 404 });
+
+    // Platform-level JWT verification (the default for edge functions,
+    // unless explicitly disabled) only proves the caller is SOME
+    // authenticated user -- it never checked they actually belong to
+    // THIS announcement's academy. This function runs on the service-role
+    // client specifically to resolve already-computed recipients and
+    // dispatch real push notifications, so without this check any
+    // authenticated user in any academy could pass an arbitrary
+    // announcement_id from an academy they're not a member of and force a
+    // real push re-send to its recipients.
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return new Response('Missing Authorization header', { status: 401 });
+    const {
+      data: { user: caller },
+    } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!caller) return new Response('Invalid session', { status: 401 });
+
+    const { data: staffRows } = await supabase
+      .from('academy_members')
+      .select('id')
+      .eq('academy_id', announcement.academy_id)
+      .eq('user_id', caller.id)
+      .in('role', ['coach', 'academy_owner'])
+      .limit(1);
+    if (!staffRows || staffRows.length === 0) {
+      console.log('push_dispatch_forbidden', { announcement_id, caller: caller.id });
+      return new Response('Forbidden', { status: 403 });
+    }
 
     // 2. Resolve target user IDs from `notifications`, not by re-deriving
     // audience membership here. `create_announcement_with_targets` /

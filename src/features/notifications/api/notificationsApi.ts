@@ -20,17 +20,44 @@ export interface Notification {
 }
 
 export const notificationsApi = {
-  async getNotifications(): Promise<Notification[]> {
+  // Was unbounded -- every notification a user has ever received, fetched
+  // fresh on every /notifications visit AND refetched in full on every
+  // single realtime INSERT event via NotificationBell's subscription. For
+  // any long-lived member that grows without limit. Bounded to a recent
+  // window by default; callers that genuinely need everything can still
+  // pass a larger limit explicitly.
+  async getNotifications(limit = 50): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit);
 
     if (error) {
       throw toApiError(error);
     }
 
     return data as Notification[];
+  },
+
+  // The bell's unread badge only ever needs a count, not the rows
+  // themselves -- previously it fetched (and re-fetched, on every
+  // realtime insert) the user's ENTIRE notification history just to run
+  // `.filter(...).length` in the browser. A `head: true` count query
+  // never transfers row data and stays correct however large the unread
+  // count actually is (a bounded row fetch would silently undercount
+  // past its limit).
+  async getUnreadCount(): Promise<number> {
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .is('read_at', null);
+
+    if (error) {
+      throw toApiError(error);
+    }
+
+    return count ?? 0;
   },
 
   async markAsRead(notificationId: string): Promise<void> {
