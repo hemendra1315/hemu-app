@@ -45,6 +45,23 @@ describe('sessionsApi', () => {
       expect(mockBuilder.eq).toHaveBeenCalledWith('academy_id', academyId);
     });
 
+    it('does not embed the coach or batch with !inner, so an unreadable coach identity degrades to null instead of hiding the whole session', async () => {
+      // Regression: `academy_members_select`/`profiles_select` only let a
+      // viewer read a coach's own identity if they're staff (or, since the
+      // fix, a fellow academy member/parent via the new
+      // `*_select_staff_identity` policies) — an `!inner` embed there used
+      // to delete the ENTIRE session row for any player or parent viewer,
+      // because they couldn't read the nested coach/profile rows. This
+      // meant no player or parent ever saw a single training session.
+      const mockBuilder = createMockBuilder({ data: [], error: null });
+      mockedSupabase.from.mockReturnValue(mockBuilder as any);
+
+      await fetchAcademyTrainingSessions(academyId);
+
+      const selectCall = mockBuilder.select.mock.calls[0]?.[0] as string;
+      expect(selectCall).not.toContain('!inner');
+    });
+
     it('returns mapped sessions with batch and coach info', async () => {
       const mockBuilder = createMockBuilder({
         data: [

@@ -10,9 +10,20 @@ import type {
 
 // `training_sessions.coach_id` references `academy_members(id)` via
 // `training_sessions_coach_id_fkey`. `academy_members` references `profiles`
-// twice (`user_id`, `invited_by`) so the inner `profiles` embed must use
+// twice (`user_id`, `invited_by`) so the `profiles` embed must use
 // `academy_members_user_id_fkey` explicitly.
-const SESSION_COLUMNS = `id, academy_id, batch_id, title, focus_area, session_date, start_at, end_at, coach_id, status, notes, created_at, updated_at, batch:batches!inner(id, name), coach:academy_members!training_sessions_coach_id_fkey!inner(id, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url))`;
+//
+// Neither embed uses `!inner`. It's tempting — the coach and batch should
+// always exist — but `!inner` doesn't just require the row to exist, it
+// requires the CURRENT VIEWER to be able to read it under RLS. A player or
+// parent reading their own session list can read the session row itself,
+// but until a dedicated policy grants it, they might not be able to read
+// the coach's own `academy_members`/`profiles` row — and an inner embed
+// silently deletes the whole session, not just the coach's name, the
+// moment that read fails. This is exactly what made every non-staff role
+// see zero training sessions, ever. A left embed degrades to a null coach
+// instead of hiding the session.
+const SESSION_COLUMNS = `id, academy_id, batch_id, title, focus_area, session_date, start_at, end_at, coach_id, status, notes, created_at, updated_at, batch:batches(id, name), coach:academy_members!training_sessions_coach_id_fkey(id, profiles!academy_members_user_id_fkey(full_name, email, avatar_url))`;
 
 function toTrainingSession(row: any): TrainingSession {
   return {

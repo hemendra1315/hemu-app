@@ -582,7 +582,7 @@ export async function fetchMatchCoachNotes(matchId: UUID): Promise<MatchCoachNot
         id, match_id, academy_member_id, coach_id, notes,
         coach:coach_id(
           id,
-          profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url)
+          profiles!academy_members_user_id_fkey(full_name, email, avatar_url)
         )
       `,
       )
@@ -643,7 +643,7 @@ export async function saveMatchCoachNote(
         id, match_id, academy_member_id, coach_id, notes,
         coach:coach_id(
           id,
-          profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url)
+          profiles!academy_members_user_id_fkey(full_name, email, avatar_url)
         )
       `,
       )

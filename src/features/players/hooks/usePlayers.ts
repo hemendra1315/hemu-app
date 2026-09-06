@@ -209,16 +209,32 @@ export function usePlayerUpcomingSessions(playerId: UUID | null, academyId: UUID
     enabled:
       Boolean(academyId) && Boolean(playerId) && isUUID(academyId ?? '') && isUUID(playerId ?? ''),
     queryFn: async () => {
-      if (!academyId) return [];
+      if (!academyId || !playerId) return [];
+
+      // The `playerId` parameter used to be accepted and never used to
+      // filter anything — this returned every upcoming session in the
+      // whole academy, on every player's profile, regardless of which
+      // batch (if any) they were actually in.
+      const { data: batchRows, error: batchError } = await supabase
+        .from('batch_members')
+        .select('batch_id')
+        .eq('academy_member_id', playerId);
+      if (batchError) throw batchError;
+      const batchIds = Array.from(
+        new Set((batchRows ?? []).map((r: any) => r.batch_id).filter(Boolean)),
+      );
+      if (batchIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from('training_sessions')
         .select(
           `
           id, title, session_date, start_at, end_at,
-          academy_members!training_sessions_coach_id_fkey!inner(id, profiles!academy_members_user_id_fkey!inner(full_name))
+          academy_members!training_sessions_coach_id_fkey(id, profiles!academy_members_user_id_fkey(full_name))
         `,
         )
         .eq('academy_id', academyId)
+        .in('batch_id', batchIds)
         .eq('status', 'scheduled')
         .gte('session_date', toIsoDate(new Date()))
         .order('session_date', { ascending: true })

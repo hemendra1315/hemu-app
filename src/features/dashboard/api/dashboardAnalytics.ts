@@ -574,6 +574,20 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
   const matchesPromise = fetchPlayerMatches(academyId, playerId);
   const attendancePromise = fetchPlayerAttendanceSummary(academyId, playerId);
 
+  // The upcoming-sessions query below used to filter only by academy_id and
+  // date, with no reference to `playerId` at all — every player's dashboard
+  // showed the whole academy's next few sessions, not their own batch's.
+  const batchIdsResult = await unwrap<any[]>(
+    supabase
+      .from('batch_members')
+      .select('batch_id')
+      .eq('academy_member_id', playerId)
+      .returns<any[]>(),
+  );
+  const playerBatchIds = Array.from(
+    new Set(batchIdsResult.map((r: any) => r.batch_id).filter(Boolean)),
+  );
+
   const [
     statistics,
     matches,
@@ -593,22 +607,25 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
     ),
     attendancePromise,
     fetchPlayerDrillSummary(academyId, playerId),
-    unwrap<any[]>(
-      supabase
-        .from('training_sessions')
-        .select(
-          `
+    playerBatchIds.length === 0
+      ? Promise.resolve([])
+      : unwrap<any[]>(
+          supabase
+            .from('training_sessions')
+            .select(
+              `
           id, title, session_date, start_at, end_at,
           academy_members!training_sessions_coach_id_fkey(id, profiles!academy_members_user_id_fkey(full_name))
         `,
-        )
-        .eq('academy_id', academyId)
-        .eq('status', 'scheduled')
-        .gte('session_date', toIsoDate(new Date()))
-        .order('session_date', { ascending: true })
-        .limit(3)
-        .returns<any[]>(),
-    ),
+            )
+            .eq('academy_id', academyId)
+            .in('batch_id', playerBatchIds)
+            .eq('status', 'scheduled')
+            .gte('session_date', toIsoDate(new Date()))
+            .order('session_date', { ascending: true })
+            .limit(3)
+            .returns<any[]>(),
+        ),
   ]);
 
   const dismissals = statistics ? statistics.battingInnings - statistics.battingNotOuts : 0;
