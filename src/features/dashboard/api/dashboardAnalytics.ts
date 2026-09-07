@@ -373,11 +373,19 @@ export async function fetchCoachDashboardAnalytics(academyId: UUID, coachId: UUI
     assignedBatchesResult,
     playersNeedingAttentionResult,
   ] = await Promise.all([
-    // Today's session
+    // Today's session. Mirrors the owner dashboard's equivalent query below --
+    // this one used to select only 'id, title, start_at, end_at, batch_id,
+    // batches(name)', missing session_date, status, the batch's player-count
+    // aggregate and the attendance-count aggregate entirely. The mapper below
+    // reads all four of those fields anyway, so every coach's "Today's
+    // Schedule" widget always showed 0 players expected and always showed
+    // attendance as not-yet-taken, even on sessions where it had been.
     unwrap<any[]>(
       supabase
         .from('training_sessions')
-        .select('id, title, start_at, end_at, batch_id, batches(name)')
+        .select(
+          'id, title, session_date, start_at, end_at, batch_id, status, batches(name, player_count:batch_members(count)), attendance_count:attendance(count)',
+        )
         .eq('academy_id', academyId)
         .eq('coach_id', coachId)
         .eq('session_date', toIsoDate(new Date()))

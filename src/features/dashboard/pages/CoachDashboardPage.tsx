@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Layers, ArrowRight, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Layers, ArrowRight, CheckCircle2, ChevronRight, AlertTriangle } from 'lucide-react';
 
 import { Card, CardBody, CardHeader, Button, Badge } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
@@ -43,6 +43,14 @@ export default function CoachDashboardPage() {
 
   const totalAssignedPlayers =
     analytics.assignedBatches?.reduce((acc, b) => acc + (b.playerCount || 0), 0) ?? 0;
+
+  // This was already computed by fetchCoachDashboardAnalytics on every
+  // dashboard load (attendance/drills/feedback checked across the whole
+  // active roster) but never rendered anywhere -- the query ran, the flags
+  // were built, and the result was thrown away. Showing it here is the fix,
+  // not deleting the query: the underlying computation was correct and
+  // already covered by tests.
+  const playersNeedingAttention = analytics.playersNeedingAttention ?? [];
 
   const hasFixtures = todaySessions.length > 0;
   const todayStr = dayjs().format('ddd, DD MMM YYYY').toUpperCase();
@@ -289,7 +297,48 @@ export default function CoachDashboardPage() {
         </CardBody>
       </Card>
 
-      {/* 6. Recent Activity (Latest 2-3 items) */}
+      {/* 6. Players Needing Attention */}
+      {playersNeedingAttention.length > 0 && (
+        <Card className="border-border-subtle bg-surface min-w-0 shadow-2xs">
+          <CardHeader
+            title={
+              <div className="flex min-w-0 items-center gap-2">
+                <AlertTriangle className="text-warning h-4 w-4 shrink-0" />
+                <span className="truncate">Players Needing Attention</span>
+              </div>
+            }
+          />
+          <CardBody className="min-w-0 p-3 pt-0">
+            <div className="min-w-0 space-y-2">
+              {playersNeedingAttention.map((player) => (
+                <Link
+                  key={player.id}
+                  to={`/members/${player.id}`}
+                  className="border-border-subtle hover:border-primary/50 bg-surface flex min-w-0 items-center justify-between gap-3 rounded-xl border p-3 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-fg truncate text-sm font-bold">{player.name}</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {player.issues.map((issue) => (
+                        <Badge
+                          key={issue}
+                          tone="warning"
+                          className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold tracking-tight uppercase"
+                        >
+                          {issue}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <ChevronRight className="text-fg-muted/60 h-4 w-4 shrink-0" />
+                </Link>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 7. Recent Activity (Latest 2-3 items) */}
       <ActivityFeed title="Recent Activity" activities={activities} />
     </div>
   );

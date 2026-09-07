@@ -19,6 +19,8 @@ import { useActiveAcademy } from '@/features/academies';
 import { useOwnerDashboardAnalytics } from '../hooks/useDashboardAnalytics';
 import { KpiCard } from '../components/KpiCard';
 import { ActivityFeed } from '../components/ActivityFeed';
+import { PerformanceLeadersCard } from '../components/PerformanceLeadersCard';
+import { LeaderboardCard } from '../components/LeaderboardCard';
 import { JoinCodeCard } from '@/features/academies';
 import { SuperAdminAcademyActions } from '@/features/admin';
 import type { ActivityItem } from '../components/ActivityFeed';
@@ -252,7 +254,29 @@ export default function OwnerDashboardPage() {
       {/* 5. Player Join Code Card */}
       {academyId ? <JoinCodeCard academyId={academyId} /> : null}
 
-      {/* 6. Recent Activity Feed */}
+      {/* 6. Performance Leaders -- this was already being fetched
+          (topBatters/topBowlers/topFielders) on every dashboard load, but the
+          component that displays it was never rendered anywhere in the app. */}
+      <PerformanceLeadersCard
+        topBatters={analytics.topBatters ?? []}
+        topBowlers={analytics.topBowlers ?? []}
+        topFielders={analytics.topFielders ?? []}
+      />
+
+      {/* 7. Academy Records -- same situation: fetched and mapped, never shown. */}
+      {(analytics.academyRecords?.length ?? 0) > 0 && (
+        <LeaderboardCard
+          title="Academy Records"
+          entries={(analytics.academyRecords ?? []).map((record) => ({
+            id: record.id,
+            name: record.recordType.replace(/_/g, ' '),
+            value: record.value ?? '—',
+            href: record.href,
+          }))}
+        />
+      )}
+
+      {/* 8. Recent Activity Feed */}
       <ActivityFeed title="Recent Activity" activities={activities} />
     </div>
   );

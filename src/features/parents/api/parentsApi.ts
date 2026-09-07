@@ -15,11 +15,27 @@ import { fetchPlayerProfile } from '@/features/players/api/playersApi';
 export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[]> {
   if (!isUUID(academyId)) return [];
 
+  // This used to filter only by academy_id/status and rely entirely on RLS
+  // ("parent_user_id = auth.uid() OR is_staff(academy_id) OR ...") to scope
+  // the result to "my children." That's correct for a genuine parent, but
+  // whoever calls this while impersonating a parent via Test App As is
+  // frequently also staff of the academy they're previewing -- for them
+  // is_staff() is true, so the unfiltered query actually returned every
+  // active parent-child link in the academy, and the parent dashboard would
+  // show a real, arbitrary child's real data instead of the empty "no
+  // children" state a genuinely-new parent should see. Filtering explicitly
+  // by the caller's own id makes this correct regardless of who's asking.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const links = await unwrap<any[]>(
     supabase
       .from('parent_player_links')
       .select('id, relationship_type, player_user_id')
       .eq('academy_id', academyId)
+      .eq('parent_user_id', user.id)
       .eq('status', 'active')
       .returns<any[]>(),
   );

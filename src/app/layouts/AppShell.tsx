@@ -26,7 +26,7 @@ import { hasCapability, useActiveRoles, useCan, type Capability } from '@/lib/rb
 import { useAcademyStore, useTestModeStore } from '@/stores';
 import type { TestModeRole } from '@/stores/testModeStore';
 import { cn } from '@/lib/utils/cn';
-import { MobileBottomNav, MobileFab } from '@/components/mobile';
+import { MobileBottomNav } from '@/components/mobile';
 
 /** Display names for the Super Admin "Test App As" banner. */
 const TEST_MODE_LABELS: Record<Exclude<TestModeRole, null>, string> = {
@@ -351,9 +351,14 @@ export function AppShell() {
         </main>
       </div>
 
-      {/* MOBILE FIXED BOTTOM NAVIGATION & FAB. The overflow menu behind the
-          nav's "More" entry is the routed /more page (src/pages/MorePage.tsx). */}
-      <MobileFab />
+      {/* MOBILE FIXED BOTTOM NAVIGATION. The overflow menu behind the nav's
+          "More" entry is the routed /more page (src/pages/MorePage.tsx).
+          A floating "+" button (MobileFab) used to render here with no
+          onClick supplied, so it was permanently invisible on every route --
+          each of the pages it was meant to shortcut (Batches, Members,
+          Sessions, Matches) already has its own working "New ..." button in
+          its header, visible on mobile too, so removing the dead FAB doesn't
+          take anything away. */}
       <MobileBottomNav />
     </div>
   );

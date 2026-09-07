@@ -49,6 +49,7 @@ const ACADEMY_ID = '880e8400-e29b-41d4-a716-446655440000';
 const PARENT_LINK_ID = '11111111-1111-4111-8111-111111111111';
 const PLAYER_USER_ID = '22222222-2222-4222-8222-222222222222';
 const MEMBER_ID = '33333333-3333-4333-8333-333333333333';
+const PARENT_USER_ID = '44444444-4444-4444-8444-444444444444';
 
 /**
  * Minimal stand-in for the PostgREST builder chain. Every filter method
@@ -57,35 +58,51 @@ const MEMBER_ID = '33333333-3333-4333-8333-333333333333';
  */
 function makeQueryStub(rows: unknown[]) {
   const selectCalls: string[] = [];
+  const eqCalls: [string, unknown][] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stub: any = {};
-  for (const method of ['eq', 'in', 'order', 'limit', 'returns', 'neq', 'or']) {
+  for (const method of ['in', 'order', 'limit', 'returns', 'neq', 'or']) {
     stub[method] = vi.fn(() => stub);
   }
+  stub.eq = vi.fn((column: string, value: unknown) => {
+    eqCalls.push([column, value]);
+    return stub;
+  });
   stub.select = vi.fn((columns: string) => {
     selectCalls.push(columns);
     return stub;
   });
   stub.then = (resolve: (value: { data: unknown[]; error: null }) => unknown) =>
     Promise.resolve({ data: rows, error: null }).then(resolve);
-  return { stub, selectCalls };
+  return { stub, selectCalls, eqCalls };
 }
 
 describe('fetchLinkedChildren — query shape (bug #42)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // fetchLinkedChildren now resolves the caller's own id and filters by it
+    // (round 24, dashboard/mobile-UX audit finding #5) instead of relying
+    // solely on RLS, so every call needs a signed-in user to work with.
+    vi.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: { user: { id: PARENT_USER_ID } as any },
+      error: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
   });
 
   it('resolves links and members in two separate queries, never as an embed', async () => {
     const selectsByTable: Record<string, string[]> = {};
+    let linksEqCalls: [string, unknown][] = [];
 
     vi.spyOn(supabase, 'from').mockImplementation(((table: string) => {
       const rows =
         table === 'parent_player_links'
           ? [{ id: PARENT_LINK_ID, relationship_type: 'father', player_user_id: PLAYER_USER_ID }]
           : [{ id: MEMBER_ID, user_id: PLAYER_USER_ID }];
-      const { stub, selectCalls } = makeQueryStub(rows);
+      const { stub, selectCalls, eqCalls } = makeQueryStub(rows);
       selectsByTable[table] = selectCalls;
+      if (table === 'parent_player_links') linksEqCalls = eqCalls;
       return stub;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any);
@@ -114,6 +131,11 @@ describe('fetchLinkedChildren — query shape (bug #42)', () => {
     const [child] = children;
     expect(child?.linkId).toBe(PARENT_LINK_ID);
     expect(child?.relationshipType).toBe('father');
+
+    // Round 24 finding #5: this must filter by the caller's own id, not rely
+    // solely on RLS -- otherwise staff previewing "Test App As Parent" (who
+    // pass is_staff() too) see every real parent-child link in the academy.
+    expect(linksEqCalls).toContainEqual(['parent_user_id', PARENT_USER_ID]);
   });
 
   it('returns an empty list without a second query when there are no links', async () => {
@@ -126,6 +148,18 @@ describe('fetchLinkedChildren — query shape (bug #42)', () => {
 
     await expect(fetchLinkedChildren(ACADEMY_ID)).resolves.toEqual([]);
     expect(tablesQueried).toEqual(['parent_player_links']);
+  });
+
+  it('returns an empty list without querying anything when there is no signed-in user', async () => {
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: null },
+      error: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    const fromSpy = vi.spyOn(supabase, 'from');
+
+    await expect(fetchLinkedChildren(ACADEMY_ID)).resolves.toEqual([]);
+    expect(fromSpy).not.toHaveBeenCalled();
   });
 });
 

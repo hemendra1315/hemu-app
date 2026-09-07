@@ -90,6 +90,49 @@ describe('fetchCoachDashboardAnalytics', () => {
     expect(result.playersNeedingAttention[0]!.issues).toContain('Pending drills');
     expect(result.playersNeedingAttention[0]!.issues).toContain('No recent feedback');
   });
+
+  // Round 24 (dashboard/mobile-UX audit) finding #1: the today's-session
+  // select used to omit session_date/status/the batch player-count
+  // aggregate/the attendance-count aggregate entirely, so the mapper below
+  // always read undefined for all four and every coach's "Today's Schedule"
+  // widget always showed 0 players expected and attendance as never marked.
+  it("maps a real player count and a marked attendance flag onto today's session", async () => {
+    const academyId = '11111111-1111-1111-1111-111111111111';
+    const coachId = '22222222-2222-2222-2222-222222222222';
+
+    const todaySessionBuilder = createMockBuilder({
+      data: [
+        {
+          id: 'session-1',
+          title: 'Nets',
+          session_date: '2026-09-07',
+          start_at: '2026-09-07T09:00:00Z',
+          end_at: '2026-09-07T10:00:00Z',
+          status: 'scheduled',
+          batches: { name: 'U14', player_count: [{ count: 12 }] },
+          attendance_count: [{ count: 9 }],
+        },
+      ],
+      error: null,
+    });
+    const recentMatchesBuilder = createMockBuilder({ data: [], error: null });
+    const assignedBatchesBuilder = createMockBuilder({ data: [], error: null });
+    const activePlayersBuilder = createMockBuilder({ data: [], error: null });
+
+    mockedSupabase.from
+      .mockReturnValueOnce(todaySessionBuilder as never)
+      .mockReturnValueOnce(recentMatchesBuilder as never)
+      .mockReturnValueOnce(assignedBatchesBuilder as never)
+      .mockReturnValueOnce(activePlayersBuilder as never);
+
+    const result = await fetchCoachDashboardAnalytics(academyId, coachId);
+
+    expect(result.todaySessions).toHaveLength(1);
+    const [session] = result.todaySessions!;
+    expect(session!.playerCount).toBe(12);
+    expect(session!.attendanceMarked).toBe(true);
+    expect(session!.batchName).toBe('U14');
+  });
 });
 
 describe('fetchOwnerDashboardAnalytics', () => {
