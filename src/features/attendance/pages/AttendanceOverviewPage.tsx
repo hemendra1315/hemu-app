@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CalendarCheck, TrendingUp, UserCheck, Users } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, FileText, TrendingUp, UserCheck, Users } from 'lucide-react';
 
 import { ErrorState } from '@/components/feedback';
 import { Button, Card, CardBody, CardHeader } from '@/components/ui';
 import { MobilePageHeader, MobileStatCard } from '@/components/mobile';
+import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
 import { useActiveAcademy } from '@/features/academies';
 import { useCan } from '@/lib/rbac';
 import { useBatches } from '@/features/batches';
 import { useAcademyMembers } from '@/features/members';
-import { useAttendanceInsights } from '../hooks/useAttendance';
+import { useAttendanceInsights, useAttendanceTrend } from '../hooks/useAttendance';
 import { recentMonths, type PlayerAttendanceStat } from '../api/attendanceInsights';
 
 function rateLabel(rate: number | null): string {
@@ -85,6 +86,8 @@ export default function AttendanceOverviewPage() {
   );
 
   const attendance = useAttendanceInsights(academyId, month, playerNames, batchNames);
+  const trend = useAttendanceTrend(academyId, 6);
+  const canExportReports = useCan('reports:export');
 
   if (!academyId) return null;
 
@@ -129,6 +132,16 @@ export default function AttendanceOverviewPage() {
         </div>
         <div className="flex items-center gap-3">
           {monthPicker}
+          {canExportReports ? (
+            <Button
+              variant="secondary"
+              onClick={() => navigate('/reports')}
+              className="min-h-[44px]"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Reports
+            </Button>
+          ) : null}
           {canMark ? (
             <Button onClick={() => navigate('/sessions')} className="min-h-[44px]">
               <CalendarCheck className="mr-2 h-4 w-4" />
@@ -139,6 +152,15 @@ export default function AttendanceOverviewPage() {
       </div>
 
       <div className="md:hidden">{monthPicker}</div>
+
+      {trend.trend && trend.trend.some((point) => point.value > 0) ? (
+        <Card>
+          <CardHeader title="Last 6 months" description="Overall attendance rate by month" />
+          <CardBody>
+            <SimpleBarChart data={trend.trend} height={140} />
+          </CardBody>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <MobileStatCard

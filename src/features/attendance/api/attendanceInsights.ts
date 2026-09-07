@@ -203,6 +203,39 @@ export function monthBounds(month: string): { from: string; to: string } {
   };
 }
 
+/**
+ * Buckets raw marks into one overall attendance rate per month, for a
+ * multi-month trend chart. `months` should be oldest-first (chart libraries,
+ * and this app's `SimpleBarChart`, read left-to-right as chronological), the
+ * opposite order from `recentMonths` (which is newest-first for a dropdown).
+ *
+ * A month with zero marks gets `value: 0` rather than being omitted, so the
+ * chart's x-axis stays evenly spaced and a genuinely empty month is visible
+ * as a gap rather than silently missing.
+ */
+export function buildMonthlyAttendanceTrend(
+  marks: AttendanceMark[],
+  months: Array<{ value: string; label: string }>,
+): Array<{ label: string; value: number }> {
+  const byMonth = new Map<string, { present: number; total: number }>();
+  for (const month of months) byMonth.set(month.value, { present: 0, total: 0 });
+
+  for (const mark of marks) {
+    const key = mark.sessionDate.slice(0, 7);
+    const bucket = byMonth.get(key);
+    if (!bucket) continue; // outside the requested window
+    bucket.total += 1;
+    if (mark.status === 'present') bucket.present += 1;
+  }
+
+  return months.map((month) => {
+    const bucket = byMonth.get(month.value)!;
+    const rate = bucket.total > 0 ? Math.round((bucket.present / bucket.total) * 100) : 0;
+    // Short label ("Jan") for chart x-axis ticks, not the full "January 2026".
+    return { label: month.label.slice(0, 3), value: rate };
+  });
+}
+
 /** The last `count` months, most recent first, as `{ value: 'YYYY-MM', label }`. */
 export function recentMonths(
   count: number,

@@ -12,7 +12,9 @@ import type {
 } from '../api/attendanceTypes';
 import {
   buildAttendanceInsights,
+  buildMonthlyAttendanceTrend,
   monthBounds,
+  recentMonths,
   type AttendanceMark,
 } from '../api/attendanceInsights';
 import {
@@ -137,4 +139,28 @@ export function useAttendanceInsights(
   );
 
   return { ...marksQuery, insights };
+}
+
+/**
+ * Overall attendance rate per month for the last `monthCount` months, oldest
+ * first, for a trend chart. Fetches the whole window in one query rather than
+ * one query per month.
+ */
+export function useAttendanceTrend(academyId: UUID | null, monthCount = 6) {
+  const months = useMemo(() => [...recentMonths(monthCount)].reverse(), [monthCount]);
+  const from = months[0] ? monthBounds(months[0].value).from : '';
+  const to = months[months.length - 1] ? monthBounds(months[months.length - 1]!.value).to : '';
+
+  const marksQuery = useQuery<AttendanceMark[]>({
+    queryKey: ['academies', academyId ?? 'none', 'attendance', 'trend', from, to],
+    enabled: Boolean(academyId) && isUUID(academyId ?? '') && Boolean(from) && Boolean(to),
+    queryFn: () => fetchAttendanceMarks(academyId as UUID, from, to),
+  });
+
+  const trend = useMemo(
+    () => (marksQuery.data ? buildMonthlyAttendanceTrend(marksQuery.data, months) : null),
+    [marksQuery.data, months],
+  );
+
+  return { ...marksQuery, trend };
 }

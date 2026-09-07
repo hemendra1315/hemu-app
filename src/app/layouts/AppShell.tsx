@@ -12,6 +12,7 @@ import {
   WifiOff,
   BarChart2,
   Settings,
+  FileText,
 } from 'lucide-react';
 import { Suspense, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -44,6 +45,15 @@ interface NavItemDef {
   superAdminOnly?: boolean;
   group?: string;
   parentOnly?: boolean;
+  /**
+   * Hide from players even though `players` already hold `reports:export`
+   * (so a player viewing their own stats page isn't blocked by RBAC, in
+   * case that's reused later). The `/reports` route itself is staff-only —
+   * a player has no batch to run a report against — so without this flag a
+   * capability-only filter would still put a dead-end nav link in their
+   * sidebar.
+   */
+  staffOnly?: boolean;
 }
 
 const SIDEBAR_ITEMS: NavItemDef[] = [
@@ -152,6 +162,14 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     group: 'Matches',
   },
   {
+    to: '/reports',
+    label: 'Reports',
+    icon: <FileText className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'reports:export',
+    staffOnly: true,
+    group: 'Training',
+  },
+  {
     to: '/settings/academy',
     label: 'Academy Settings',
     icon: <Settings className="h-4 w-4" aria-hidden />,
@@ -205,11 +223,20 @@ export function AppShell() {
     if (testModeRole) {
       if (item.superAdminOnly) return false;
       const mappedTestRole = testModeRole === 'student' ? 'player' : testModeRole;
+      if (item.staffOnly && !['coach', 'academy_owner'].includes(mappedTestRole)) return false;
       return (
         item.requiresCapability === null || hasCapability([mappedTestRole], item.requiresCapability)
       );
     }
     if (item.superAdminOnly) return isSuperAdmin;
+    if (
+      item.staffOnly &&
+      !isSuperAdmin &&
+      !roles.includes('coach') &&
+      !roles.includes('academy_owner')
+    ) {
+      return false;
+    }
     return item.requiresCapability === null || hasCapability(roles, item.requiresCapability);
   });
 

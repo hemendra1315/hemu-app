@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { UUID } from '@/types';
 import {
   buildAttendanceInsights,
+  buildMonthlyAttendanceTrend,
   isAtRisk,
   monthBounds,
   recentMonths,
@@ -199,5 +200,46 @@ describe('month helpers', () => {
   it('lists recent months newest first and steps back across a year boundary', () => {
     const months = recentMonths(3, new Date(Date.UTC(2026, 0, 15)));
     expect(months.map((m) => m.value)).toEqual(['2026-01', '2025-12', '2025-11']);
+  });
+});
+
+describe('buildMonthlyAttendanceTrend', () => {
+  const months = [
+    { value: '2026-06', label: 'June 2026' },
+    { value: '2026-07', label: 'July 2026' },
+    { value: '2026-08', label: 'August 2026' },
+  ];
+
+  it('buckets marks by month and computes a rate per bucket', () => {
+    const trend = buildMonthlyAttendanceTrend(
+      [
+        mark(ANA, '2026-06-05', 'present'),
+        mark(ANA, '2026-06-12', 'absent'),
+        mark(BEN, '2026-07-01', 'present'),
+        mark(BEN, '2026-07-08', 'present'),
+      ],
+      months,
+    );
+
+    expect(trend).toEqual([
+      { label: 'Jun', value: 50 },
+      { label: 'Jul', value: 100 },
+      { label: 'Aug', value: 0 },
+    ]);
+  });
+
+  it('gives a month with no marks value 0 instead of dropping it', () => {
+    const trend = buildMonthlyAttendanceTrend([], months);
+    expect(trend.map((t) => t.value)).toEqual([0, 0, 0]);
+    expect(trend).toHaveLength(3);
+  });
+
+  it('ignores marks whose month falls outside the requested window', () => {
+    const trend = buildMonthlyAttendanceTrend(
+      [mark(ANA, '2025-01-01', 'present'), mark(ANA, '2026-07-01', 'present')],
+      months,
+    );
+    expect(trend.find((t) => t.label === 'Jul')?.value).toBe(100);
+    expect(trend.every((t) => t.value === 0 || t.label === 'Jul')).toBe(true);
   });
 });

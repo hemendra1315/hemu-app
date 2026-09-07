@@ -70,6 +70,8 @@ const CreateAnnouncementPage = lazy(() =>
     default: m.CreateAnnouncementPage,
   })),
 );
+const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'));
+const ReportPrintPage = lazy(() => import('@/features/reports/pages/ReportPrintPage'));
 const ForbiddenPage = lazy(() => import('@/pages/ForbiddenPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -213,6 +215,7 @@ export const router = createBrowserRouter([
                       { path: '/batches/:batchId', element: <BatchDetailPage /> },
                       { path: '/batches/:batchId/attendance', element: <BatchAttendancePage /> },
                       { path: '/attendance', element: <AttendanceOverviewPage /> },
+                      { path: '/reports', element: <ReportsPage /> },
                       { path: '/matches/new', element: <AddMatchPage /> },
                       {
                         path: '/sessions/:sessionId/attendance',
@@ -228,7 +231,23 @@ export const router = createBrowserRouter([
       },
       {
         element: <PrintLayout />,
-        children: [{ path: '/print/placeholder', element: <div>Report preview</div> }],
+        children: [
+          { path: '/print/placeholder', element: <div>Report preview</div> },
+          {
+            // The report itself shows real academy data, unlike
+            // `/print/placeholder` above, so this needs the same
+            // academy + role protection as `/reports` -- just without
+            // `AppShell`, since a printable page should render with no
+            // sidebar or header.
+            element: <RequireAcademy />,
+            children: [
+              {
+                element: <RequireRole allow={['coach', 'academy_owner', 'super_admin']} />,
+                children: [{ path: '/reports/print', element: <ReportPrintPage /> }],
+              },
+            ],
+          },
+        ],
       },
     ],
   },
