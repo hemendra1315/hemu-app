@@ -13,6 +13,7 @@ import {
   BarChart2,
   Settings,
   FileText,
+  GraduationCap,
 } from 'lucide-react';
 import { Suspense, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -105,6 +106,18 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     label: 'Members',
     icon: <Users className="h-4 w-4" aria-hidden />,
     requiresCapability: 'players:read',
+    group: 'People',
+  },
+  {
+    // `coaches:manage` is owner/super-admin only (a coach only holds
+    // `coaches:read`), so this naturally hides the list from coaches
+    // themselves without needing the `staffOnly` flag `/reports` uses —
+    // a coach still reaches their own profile via the "My Profile" link
+    // on `CoachDashboardPage`, just not through this list.
+    to: '/coaches',
+    label: 'Coaches',
+    icon: <GraduationCap className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'coaches:manage',
     group: 'People',
   },
   {

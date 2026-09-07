@@ -24,6 +24,7 @@ import { isUUID } from '@/lib/validators';
 import { useUiStore } from '@/stores';
 import type { Batch } from '../api/batchesTypes';
 import { AddBatchPlayersModal } from '../components/AddBatchPlayersModal';
+import { BatchCoachesCard } from '../components/BatchCoachesCard';
 import {
   useBatchAvailablePlayers,
   useBatchMemberships,
@@ -226,6 +227,8 @@ export default function BatchDetailPage() {
               }}
             />
           ) : null}
+
+          <BatchCoachesCard academyId={academyId} batch={batch} canManage={canManage} />
 
           {/* 3. Assigned Players List Section */}
           <div className="border-border-subtle bg-surface overflow-hidden rounded-xl border shadow-2xs">

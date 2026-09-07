@@ -72,6 +72,8 @@ const CreateAnnouncementPage = lazy(() =>
 );
 const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'));
 const ReportPrintPage = lazy(() => import('@/features/reports/pages/ReportPrintPage'));
+const CoachesPage = lazy(() => import('@/features/coaches/pages/CoachesPage'));
+const CoachProfilePage = lazy(() => import('@/features/coaches/pages/CoachProfilePage'));
 const ForbiddenPage = lazy(() => import('@/pages/ForbiddenPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -216,6 +218,8 @@ export const router = createBrowserRouter([
                       { path: '/batches/:batchId/attendance', element: <BatchAttendancePage /> },
                       { path: '/attendance', element: <AttendanceOverviewPage /> },
                       { path: '/reports', element: <ReportsPage /> },
+                      { path: '/coaches', element: <CoachesPage /> },
+                      { path: '/coaches/:coachId', element: <CoachProfilePage /> },
                       { path: '/matches/new', element: <AddMatchPage /> },
                       {
                         path: '/sessions/:sessionId/attendance',

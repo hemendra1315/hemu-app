@@ -1,5 +1,12 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Layers, ArrowRight, CheckCircle2, ChevronRight, AlertTriangle } from 'lucide-react';
+import {
+  Layers,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  AlertTriangle,
+  UserCheck,
+} from 'lucide-react';
 
 import { Card, CardBody, CardHeader, Button, Badge } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
@@ -59,9 +66,18 @@ export default function CoachDashboardPage() {
     <div className="space-y-4 pb-20 md:pb-6">
       {/* 1. Floodlit Turf + Scorebook App Bar */}
       <div className="border-border-subtle/40 flex flex-col gap-1 border-b pb-4">
-        <h1 className="font-heading text-fg text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
-          Coach Dashboard
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-heading text-fg text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
+            Coach Dashboard
+          </h1>
+          <Link
+            to="/coaches/me"
+            className="text-primary flex shrink-0 items-center gap-1.5 text-xs font-bold hover:underline"
+          >
+            <UserCheck className="h-3.5 w-3.5" aria-hidden />
+            My Coach Profile
+          </Link>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold tracking-tight transition-colors ${
