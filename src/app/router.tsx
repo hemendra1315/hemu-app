@@ -74,6 +74,8 @@ const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'));
 const ReportPrintPage = lazy(() => import('@/features/reports/pages/ReportPrintPage'));
 const CoachesPage = lazy(() => import('@/features/coaches/pages/CoachesPage'));
 const CoachProfilePage = lazy(() => import('@/features/coaches/pages/CoachProfilePage'));
+const BillingPage = lazy(() => import('@/features/billing/pages/BillingPage'));
+const PlayerFeeDetailPage = lazy(() => import('@/features/billing/pages/PlayerFeeDetailPage'));
 const ForbiddenPage = lazy(() => import('@/pages/ForbiddenPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -163,6 +165,8 @@ export const router = createBrowserRouter([
                       { path: '/owner', element: <OwnerDashboardPage /> },
                       { path: '/settings', element: <AcademySettingsPage /> },
                       { path: '/settings/academy', element: <AcademySettingsPage /> },
+                      { path: '/fees', element: <BillingPage /> },
+                      { path: '/fees/:memberId', element: <PlayerFeeDetailPage /> },
                     ],
                   },
                   {

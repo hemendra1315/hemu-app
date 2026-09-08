@@ -68,4 +68,9 @@ export const queryKeys = {
   attendance: (academyId: string, sessionId: string) =>
     ['academies', academyId, 'sessions', sessionId, 'attendance'] as const,
   notifications: (userId: string) => ['notifications', userId] as const,
+
+  feeSummaries: (academyId: string, periodMonth: string) =>
+    ['academies', academyId, 'fee-summaries', periodMonth] as const,
+  playerFeeDetail: (academyId: string, playerId: string) =>
+    ['academies', academyId, 'player-fee-detail', playerId] as const,
 } as const;

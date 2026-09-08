@@ -14,6 +14,7 @@ import {
   Settings,
   FileText,
   GraduationCap,
+  IndianRupee,
 } from 'lucide-react';
 import { Suspense, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -118,6 +119,17 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     label: 'Coaches',
     icon: <GraduationCap className="h-4 w-4" aria-hidden />,
     requiresCapability: 'coaches:manage',
+    group: 'People',
+  },
+  {
+    // `billing:manage` is owner/super-admin only, same shape as
+    // `coaches:manage` above -- coaches hold no billing capability at all
+    // (a deliberate scoping decision, not an oversight), so this item
+    // simply doesn't render for them.
+    to: '/fees',
+    label: 'Fees',
+    icon: <IndianRupee className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'billing:manage',
     group: 'People',
   },
   {

@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1047,6 +1047,60 @@ export type Database = {
           },
         ]
       }
+      fee_payments: {
+        Row: {
+          academy_id: string
+          amount_paise: number
+          created_at: string
+          id: string
+          method: string | null
+          notes: string | null
+          paid_on: string
+          period_month: string
+          player_id: string
+          recorded_by: string | null
+        }
+        Insert: {
+          academy_id: string
+          amount_paise: number
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_on?: string
+          period_month: string
+          player_id: string
+          recorded_by?: string | null
+        }
+        Update: {
+          academy_id?: string
+          amount_paise?: number
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_on?: string
+          period_month?: string
+          player_id?: string
+          recorded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_payments_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_payments_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "academy_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       join_requests: {
         Row: {
           academy_id: string
@@ -1844,6 +1898,48 @@ export type Database = {
           },
         ]
       }
+      player_fees: {
+        Row: {
+          academy_id: string
+          created_at: string
+          id: string
+          monthly_fee_paise: number
+          player_id: string
+          updated_at: string
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string
+          id?: string
+          monthly_fee_paise: number
+          player_id: string
+          updated_at?: string
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string
+          id?: string
+          monthly_fee_paise?: number
+          player_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_fees_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_fees_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: true
+            referencedRelation: "academy_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_milestones: {
         Row: {
           academy_id: string
@@ -2486,39 +2582,10 @@ export type Database = {
         Args: { p_batch: string; p_players: string[] }
         Returns: number
       }
-      approve_join_request:
-        | {
-            Args: { p_request: string }
-            Returns: {
-              academy_id: string
-              batting_style: string | null
-              bio: string | null
-              bowling_style: string | null
-              created_at: string
-              id: string
-              invited_by: string | null
-              jersey_number: number | null
-              joined_at: string | null
-              left_at: string | null
-              notes: string | null
-              player_code: string | null
-              player_role: string | null
-              role: Database["public"]["Enums"]["app_role"]
-              status: Database["public"]["Enums"]["member_status"]
-              updated_at: string
-              user_id: string
-            }
-            SetofOptions: {
-              from: "*"
-              to: "academy_members"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: { p_batch_ids?: string[]; p_request_id: string }
-            Returns: undefined
-          }
+      approve_join_request: {
+        Args: { p_batch_ids?: string[]; p_request_id: string }
+        Returns: undefined
+      }
       assign_coach_to_batch: {
         Args: { p_batch: string; p_coach: string; p_is_primary?: boolean }
         Returns: undefined
@@ -2695,6 +2762,13 @@ export type Database = {
         }[]
       }
       my_player_id: { Args: { p_academy: string }; Returns: string }
+      player_set_drill_assignment_status: {
+        Args: {
+          p_assignment_id: string
+          p_status: Database["public"]["Enums"]["drill_assignment_status"]
+        }
+        Returns: undefined
+      }
       record_academy_record: {
         Args: {
           p_academy: string
@@ -2936,12 +3010,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2965,11 +3039,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2990,11 +3064,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3015,11 +3089,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3032,11 +3106,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
