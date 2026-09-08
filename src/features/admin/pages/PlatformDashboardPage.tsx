@@ -30,13 +30,16 @@ import {
 } from '../hooks/useAdmin';
 import type { PlatformAcademy } from '../api/adminApi';
 import type { UUID } from '@/types';
+import { PlatformSubscriptionsPanel } from '@/features/platform-billing/components/PlatformSubscriptionsPanel';
 
 export default function PlatformDashboardPage() {
   const pushToast = useUiStore((state) => state.pushToast);
   const navigate = useNavigate();
   const { switchAcademy } = useActiveAcademy();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'academies' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'academies' | 'users' | 'subscriptions'>(
+    'overview',
+  );
   const [academySearch, setAcademySearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [userPage, setUserPage] = useState(1);
@@ -244,7 +247,22 @@ export default function PlatformDashboardPage() {
         >
           Users ({users.length})
         </button>
+        <button
+          type="button"
+          className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'subscriptions'
+              ? 'border-primary text-primary'
+              : 'text-fg-muted hover:text-fg border-transparent'
+          }`}
+          onClick={() => setActiveTab('subscriptions')}
+        >
+          Subscriptions
+        </button>
       </div>
+
+      {/* SUBSCRIPTIONS TAB -- your own app-subscription QR/amount and who's
+          paid it. Private to you; nothing here is academy-scoped. */}
+      {activeTab === 'subscriptions' && <PlatformSubscriptionsPanel />}
 
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (

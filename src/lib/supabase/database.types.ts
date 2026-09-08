@@ -1904,6 +1904,132 @@ export type Database = {
           },
         ]
       }
+      platform_settings: {
+        Row: {
+          id: string
+          monthly_fee_paise: number
+          payment_note: string | null
+          payment_qr_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          monthly_fee_paise?: number
+          payment_note?: string | null
+          payment_qr_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          monthly_fee_paise?: number
+          payment_note?: string | null
+          payment_qr_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_subscription_claims: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          payer_phone: string
+          period_month: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          payer_phone: string
+          period_month: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          payer_phone?: string
+          period_month?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_subscription_claims_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_subscription_claims_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_subscription_payments: {
+        Row: {
+          amount_paise: number
+          created_at: string
+          id: string
+          method: string | null
+          notes: string | null
+          paid_on: string
+          period_month: string
+          recorded_by: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_paise: number
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_on: string
+          period_month: string
+          recorded_by?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_paise?: number
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_on?: string
+          period_month?: string
+          recorded_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_subscription_payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_subscription_payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_fees: {
         Row: {
           academy_id: string

@@ -30,6 +30,7 @@ import { useAcademyStore, useTestModeStore } from '@/stores';
 import type { TestModeRole } from '@/stores/testModeStore';
 import { cn } from '@/lib/utils/cn';
 import { MobileBottomNav } from '@/components/mobile';
+import { SubscriptionDueBanner } from '@/features/platform-billing/components/SubscriptionDueBanner';
 
 /** Display names for the Super Admin "Test App As" banner. */
 const TEST_MODE_LABELS: Record<Exclude<TestModeRole, null>, string> = {
@@ -65,6 +66,10 @@ interface NavItemDef {
    * (harmless: the page just shows a "not a player" state for them).
    */
   playerOnly?: boolean;
+  /** Hide from the super admin outright, regardless of capability match --
+   * for an item that's meaningless or actively misleading for them (see the
+   * `/subscription` item for why). */
+  hideForSuperAdmin?: boolean;
 }
 
 const SIDEBAR_ITEMS: NavItemDef[] = [
@@ -225,6 +230,20 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     requiresCapability: null,
     group: 'Academy',
   },
+  {
+    // Every signed-in user except the super admin -- they're the one
+    // collecting, not paying, and this route sits inside `RequireAcademy`,
+    // which redirects a super admin with no active academy straight to
+    // `/admin` before the page ever renders. Excluding them here (like
+    // MorePage.tsx's matching entry does) avoids a nav link that would
+    // silently bounce them elsewhere instead of showing anything useful.
+    to: '/subscription',
+    label: 'My Subscription',
+    icon: <IndianRupee className="h-4 w-4" aria-hidden />,
+    requiresCapability: null,
+    hideForSuperAdmin: true,
+    group: 'Academy',
+  },
 ];
 
 /** Authenticated application chrome: sidebar (desktop), bottom nav (mobile), top bar & routed content. */
@@ -257,7 +276,7 @@ export function AppShell() {
     // let those leak into the desktop sidebar even though the mobile nav
     // never showed them.
     if (isParent) {
-      return item.parentOnly || item.to === '/profile';
+      return item.parentOnly || item.to === '/profile' || item.to === '/subscription';
     }
 
     if (item.parentOnly) return false;
@@ -272,6 +291,7 @@ export function AppShell() {
       );
     }
     if (item.superAdminOnly) return isSuperAdmin;
+    if (item.hideForSuperAdmin && isSuperAdmin) return false;
     if (
       item.staffOnly &&
       !isSuperAdmin &&
@@ -378,6 +398,8 @@ export function AppShell() {
           </Button>
         </div>
       ) : null}
+
+      <SubscriptionDueBanner suppressed={Boolean(testModeRole)} />
 
       <div className="flex">
         {/* DESKTOP SIDEBAR (>= 768px / md) */}

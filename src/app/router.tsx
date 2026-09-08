@@ -77,6 +77,9 @@ const CoachProfilePage = lazy(() => import('@/features/coaches/pages/CoachProfil
 const BillingPage = lazy(() => import('@/features/billing/pages/BillingPage'));
 const PlayerFeeDetailPage = lazy(() => import('@/features/billing/pages/PlayerFeeDetailPage'));
 const MyFeesPage = lazy(() => import('@/features/billing/pages/MyFeesPage'));
+const MySubscriptionPage = lazy(
+  () => import('@/features/platform-billing/pages/MySubscriptionPage'),
+);
 const ForbiddenPage = lazy(() => import('@/pages/ForbiddenPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -211,6 +214,7 @@ export const router = createBrowserRouter([
                       { path: '/matches/:matchId', element: <MatchDetailPage /> },
                       { path: '/sessions', element: <TrainingSessionsPage /> },
                       { path: '/sessions/:sessionId', element: <TrainingSessionDetailPage /> },
+                      { path: '/subscription', element: <MySubscriptionPage /> },
                     ],
                   },
                   {

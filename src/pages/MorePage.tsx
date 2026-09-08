@@ -13,6 +13,7 @@ import {
   Building2,
   BarChart2,
   Megaphone,
+  IndianRupee,
 } from 'lucide-react';
 import { MobilePageHeader } from '@/components/mobile';
 import { Card, Badge } from '@/components/ui';
@@ -110,6 +111,12 @@ export function MorePage() {
       label: 'My Profile',
       desc: profile?.fullName ?? profile?.email ?? 'User Account',
       icon: User,
+    },
+    !isSuperAdmin && {
+      to: '/subscription',
+      label: 'My Subscription',
+      desc: 'App subscription payment & status',
+      icon: IndianRupee,
     },
     isSuperAdmin && {
       to: '/admin',
