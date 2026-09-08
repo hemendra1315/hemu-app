@@ -1,33 +1,83 @@
+import { useState } from 'react';
 import { IndianRupee, QrCode, CheckCircle2 } from 'lucide-react';
 
 import { Card, CardBody, CardHeader, Badge } from '@/components/ui';
 import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy, useAcademy } from '@/features/academies';
+import { useLinkedChildren } from '@/features/parents/hooks/useParents';
+import { useTestModeStore } from '@/stores';
 import { formatPaise } from '@/lib/utils/money';
 import { usePlayerFeeDetail } from '../hooks/useBilling';
 import { toPeriodMonth } from '../api/billingApi';
 
 /**
- * Player-facing "Pay Fees" page. Shows what the player owes this month, the
- * academy owner's UPI QR code to pay it (uploaded on Academy Settings), and
- * the player's own payment history. Read-only: the player pays the owner
- * directly through their own UPI app, then the owner marks it paid on their
- * side (`/fees/:memberId`) -- nothing here moves money or writes a payment.
+ * "Pay Fees" page for players and (viewing a linked child's fees)
+ * parents. Shows what's owed this month, the academy owner's UPI QR code to
+ * pay it (uploaded on Academy Settings), and the payment history. Read-only:
+ * the player/parent pays the owner directly through their own UPI app, then
+ * the owner marks it paid on their side (`/fees/:memberId`) -- nothing here
+ * moves money or writes a payment.
  */
 export default function MyFeesPage() {
   const { academyId, membership } = useActiveAcademy();
+  const testModeRole = useTestModeStore((s) => s.activeRole);
+
+  const role = testModeRole
+    ? testModeRole === 'student'
+      ? 'player'
+      : testModeRole
+    : (membership?.role ?? 'player');
+
+  const isParent = role === 'parent';
+
   const playerId = membership?.role === 'player' ? membership.id : null;
 
-  const academyQuery = useAcademy(academyId);
-  const detailQuery = usePlayerFeeDetail(academyId, playerId);
+  // Parents don't have their own player row -- same linked-child pattern
+  // used on the Stats page: pick from whichever children are linked to
+  // this parent's account.
+  const linkedChildrenQuery = useLinkedChildren(isParent ? (academyId ?? undefined) : undefined);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const children = linkedChildrenQuery.data ?? [];
+  const activeChild = children.find((c) => c.player.id === selectedChildId) ?? children[0];
+  const childPlayerId = activeChild?.player.id ?? null;
 
-  if (membership && membership.role !== 'player') {
+  const resolvedPlayerId = isParent ? childPlayerId : playerId;
+
+  const academyQuery = useAcademy(academyId);
+  const detailQuery = usePlayerFeeDetail(academyId, resolvedPlayerId);
+
+  if (membership && role !== 'player' && !isParent) {
     return (
       <div className="space-y-4">
         <h1 className="text-fg text-xl font-semibold">Pay Fees</h1>
         <EmptyState
-          title="Pay Fees is for players"
-          description="You're not signed in as a player on this academy."
+          title="Pay Fees is for players and parents"
+          description="You're not signed in as a player or parent on this academy."
+        />
+      </div>
+    );
+  }
+
+  if (isParent && linkedChildrenQuery.isPending) {
+    return <p className="text-fg-muted">Loading…</p>;
+  }
+
+  if (isParent && linkedChildrenQuery.isError) {
+    return (
+      <ErrorState
+        error={linkedChildrenQuery.error}
+        onRetry={() => void linkedChildrenQuery.refetch()}
+      />
+    );
+  }
+
+  if (isParent && children.length === 0) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-fg text-xl font-semibold">Pay Fees</h1>
+        <EmptyState
+          title="No child linked yet"
+          description="Link a child from your dashboard to see their fees here."
         />
       </div>
     );
@@ -59,9 +109,30 @@ export default function MyFeesPage() {
   return (
     <div className="space-y-6 pb-24 md:pb-6">
       <div>
-        <h1 className="text-fg text-2xl font-bold tracking-tight">Pay Fees</h1>
+        <h1 className="text-fg text-2xl font-bold tracking-tight">
+          {isParent ? "Child's Fees" : 'Pay Fees'}
+        </h1>
         <p className="text-fg-muted mt-1 text-sm">{membership?.academyName ?? 'Academy'}</p>
       </div>
+
+      {isParent && children.length > 1 && (
+        <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
+          {children.map((child) => (
+            <button
+              key={child.player.id}
+              type="button"
+              onClick={() => setSelectedChildId(child.player.id)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                activeChild?.player.id === child.player.id
+                  ? 'bg-primary text-primary-fg'
+                  : 'bg-surface hover:bg-surface-muted border'
+              }`}
+            >
+              {child.player.fullName?.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Prominent due/status banner */}
       <Card className={isPaid ? 'border-success/40' : 'border-warning/40'}>

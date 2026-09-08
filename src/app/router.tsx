@@ -185,7 +185,6 @@ export const router = createBrowserRouter([
                     children: [
                       { path: '/me', element: <PlayerDashboardPage /> },
                       { path: '/player', element: <PlayerDashboardPage /> },
-                      { path: '/my-fees', element: <MyFeesPage /> },
                     ],
                   },
                   {
@@ -208,6 +207,7 @@ export const router = createBrowserRouter([
                       { path: '/announcements', element: <AnnouncementsPage /> },
                       { path: '/more', element: <MorePage /> },
                       { path: '/stats', element: <StatsPage /> },
+                      { path: '/my-fees', element: <MyFeesPage /> },
                       { path: '/drills', element: <DrillsPage /> },
                       { path: '/drills/:drillId', element: <DrillDetailPage /> },
                       { path: '/matches', element: <MatchesPage /> },

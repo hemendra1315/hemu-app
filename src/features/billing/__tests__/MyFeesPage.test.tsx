@@ -23,18 +23,41 @@ let academyState: {
   isPending: boolean;
 };
 
-let membershipRole: 'player' | 'academy_owner' = 'player';
+let membershipRole: 'player' | 'academy_owner' | 'parent' = 'player';
+
+const CHILD_A_ID = '33333333-3333-3333-3333-333333333333';
+const CHILD_B_ID = '44444444-4444-4444-4444-444444444444';
+
+let linkedChildrenState: {
+  data: Array<{ player: { id: string; fullName: string } }> | undefined;
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: () => void;
+} = { data: [], isPending: false, isError: false, error: null, refetch: vi.fn() };
 
 vi.mock('@/features/academies', () => ({
   useActiveAcademy: () => ({
     academyId: ACADEMY_ID,
-    membership: { id: PLAYER_ID, role: membershipRole, academyName: 'Test Academy' },
+    membership:
+      membershipRole === 'player'
+        ? { id: PLAYER_ID, role: membershipRole, academyName: 'Test Academy' }
+        : { id: 'staff-1', role: membershipRole, academyName: 'Test Academy' },
   }),
   useAcademy: () => academyState,
 }));
 
 vi.mock('../hooks/useBilling', () => ({
   usePlayerFeeDetail: () => detailState,
+}));
+
+vi.mock('@/features/parents/hooks/useParents', () => ({
+  useLinkedChildren: () => linkedChildrenState,
+}));
+
+vi.mock('@/stores', () => ({
+  useTestModeStore: (selector: (state: { activeRole: null }) => unknown) =>
+    selector({ activeRole: null }),
 }));
 
 function renderPage() {
@@ -166,6 +189,110 @@ describe('MyFeesPage', () => {
     renderPage();
 
     expect(screen.getByText(/pay fees is for players/i)).toBeInTheDocument();
+    membershipRole = 'player'; // reset for subsequent test runs
+  });
+
+  it("shows a linked child's fee info when signed in as a parent", () => {
+    membershipRole = 'parent';
+    linkedChildrenState = {
+      data: [{ player: { id: CHILD_A_ID, fullName: 'Test Child' } }],
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    detailState = {
+      data: {
+        playerId: CHILD_A_ID,
+        fullName: 'Test Child',
+        email: 'child@test.com',
+        monthlyFeePaise: 150000,
+        payments: [],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    academyState = { data: { paymentQrUrl: null, paymentNote: null }, isPending: false };
+    renderPage();
+
+    expect(screen.getByText("Child's Fees")).toBeInTheDocument();
+    expect(screen.getByText('Unpaid')).toBeInTheDocument();
+    expect(screen.getByText(/1,500/)).toBeInTheDocument();
+
+    membershipRole = 'player'; // reset for subsequent test runs
+    linkedChildrenState = {
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+
+  it('lets a parent with multiple linked children switch between them', () => {
+    membershipRole = 'parent';
+    linkedChildrenState = {
+      data: [
+        { player: { id: CHILD_A_ID, fullName: 'First Child' } },
+        { player: { id: CHILD_B_ID, fullName: 'Second Child' } },
+      ],
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    detailState = {
+      data: {
+        playerId: CHILD_A_ID,
+        fullName: 'First Child',
+        email: 'first@test.com',
+        monthlyFeePaise: 150000,
+        payments: [],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    academyState = { data: { paymentQrUrl: null, paymentNote: null }, isPending: false };
+    renderPage();
+
+    expect(screen.getByRole('button', { name: 'First' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Second' })).toBeInTheDocument();
+
+    membershipRole = 'player'; // reset for subsequent test runs
+    linkedChildrenState = {
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+  });
+
+  it('shows an empty state when a parent has no linked children', () => {
+    membershipRole = 'parent';
+    linkedChildrenState = {
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    detailState = {
+      data: undefined,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    academyState = { data: undefined, isPending: false };
+    renderPage();
+
+    expect(screen.getByText(/no child linked yet/i)).toBeInTheDocument();
+
     membershipRole = 'player'; // reset for subsequent test runs
   });
 });

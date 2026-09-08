@@ -50,6 +50,11 @@ export function MorePage() {
       : testModeRole
     : (current?.role ?? 'player');
 
+  // Players already have a dedicated "Fees" tab in the bottom nav; parents
+  // don't have their own player row, so this is the only way for them to
+  // reach their linked child's fee status/history.
+  const isParentRole = (testModeRole ?? current?.role) === 'parent';
+
   const { logout } = useAuth();
 
   const handleSignOut = async () => {
@@ -96,6 +101,12 @@ export function MorePage() {
       label: 'Drills & Training',
       desc: 'Drill bank and skill logs',
       icon: Activity,
+    },
+    isParentRole && {
+      to: '/my-fees',
+      label: 'My Fees',
+      desc: "Your child's payment status and history",
+      icon: IndianRupee,
     },
     {
       to: '/announcements',
