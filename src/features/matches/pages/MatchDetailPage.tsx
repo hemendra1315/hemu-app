@@ -14,6 +14,7 @@ import {
   useMatchBowling,
   useMatchFielding,
   useMatchAwards,
+  useMatchPartnerships,
 } from '../hooks/useMatches';
 
 export default function MatchDetailPage() {
@@ -26,6 +27,7 @@ export default function MatchDetailPage() {
   const bowlingQuery = useMatchBowling(matchId ?? null);
   const fieldingQuery = useMatchFielding(matchId ?? null);
   const awardsQuery = useMatchAwards(matchId ?? null);
+  const partnershipsQuery = useMatchPartnerships(matchId ?? null);
 
   const matchTypeLabel = matchQuery.data?.matchType;
   const formatLabel = matchQuery.data?.format;
@@ -259,6 +261,41 @@ export default function MatchDetailPage() {
                 </table>
               </div>
             </>
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Partnerships" description="Key batting partnerships." />
+        <CardBody>
+          {partnershipsQuery.isPending ? (
+            <p className="text-fg-muted">Loading partnerships…</p>
+          ) : partnershipsQuery.data?.length === 0 ? (
+            <p className="text-fg-muted">No partnerships recorded.</p>
+          ) : (
+            <div className="space-y-3">
+              {[...(partnershipsQuery.data ?? [])]
+                .sort((a, b) => b.runsAdded - a.runsAdded)
+                .map((p) => (
+                  <div
+                    key={p.id}
+                    className="border-border-subtle bg-surface flex items-center justify-between rounded-xl border p-3.5 text-sm shadow-2xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-fg truncate font-medium">
+                        {p.batter1.fullName ?? p.batter1.email} &amp;{' '}
+                        {p.batter2.fullName ?? p.batter2.email}
+                      </p>
+                      <p className="text-fg-muted text-xs">
+                        {p.wicketNumber != null ? `Wicket ${p.wicketNumber}` : 'Unbroken'}
+                      </p>
+                    </div>
+                    <span className="text-primary shrink-0 text-base font-bold">
+                      {p.runsAdded} runs
+                    </span>
+                  </div>
+                ))}
+            </div>
           )}
         </CardBody>
       </Card>
