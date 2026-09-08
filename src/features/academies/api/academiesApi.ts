@@ -41,10 +41,12 @@ type AcademyRow = {
   owner_user_id: string;
   is_active: boolean;
   created_at: string;
+  payment_qr_url: string | null;
+  payment_note: string | null;
 };
 
 const ACADEMY_COLUMNS =
-  'id, name, slug, logo_url, city, state, timezone, contact_email, contact_phone, fee_mode, default_monthly_fee_paise, grace_period_days, owner_user_id, is_active, created_at';
+  'id, name, slug, logo_url, city, state, timezone, contact_email, contact_phone, fee_mode, default_monthly_fee_paise, grace_period_days, owner_user_id, is_active, created_at, payment_qr_url, payment_note';
 
 function toMembership(row: MembershipRow): Membership {
   return {
@@ -88,6 +90,8 @@ function toAcademy(row: AcademyRow): Academy {
     ownerUserId: row.owner_user_id,
     isActive: row.is_active,
     createdAt: row.created_at,
+    paymentQrUrl: row.payment_qr_url,
+    paymentNote: row.payment_note,
   };
 }
 
@@ -172,6 +176,8 @@ export type UpdateAcademyInput = Partial<{
   contactPhone: string | null;
   timezone: string;
   feeMode: FeeMode;
+  paymentQrUrl: string | null;
+  paymentNote: string | null;
 }>;
 
 export async function updateAcademy(academyId: UUID, input: UpdateAcademyInput): Promise<Academy> {
@@ -186,6 +192,8 @@ export async function updateAcademy(academyId: UUID, input: UpdateAcademyInput):
         ...(input.contactPhone === undefined ? null : { contact_phone: input.contactPhone }),
         ...(input.timezone === undefined ? null : { timezone: input.timezone }),
         ...(input.feeMode === undefined ? null : { fee_mode: input.feeMode }),
+        ...(input.paymentQrUrl === undefined ? null : { payment_qr_url: input.paymentQrUrl }),
+        ...(input.paymentNote === undefined ? null : { payment_note: input.paymentNote }),
       })
       .eq('id', academyId)
       .select(ACADEMY_COLUMNS)
@@ -253,6 +261,68 @@ export async function removeAcademyLogo(academyId: UUID, logoUrl?: string | null
         .remove([oldPath])
         .catch((err) => {
           logger.warn('academy_logo_remove_old_failed', { error: err });
+        });
+    }
+  }
+}
+
+/** Same upload path as `uploadAcademyLogo`, targeting the `academy-payment-qr` bucket. */
+export async function uploadAcademyPaymentQr(academyId: UUID, file: File | Blob): Promise<string> {
+  const isFile = file instanceof File;
+  const fileName = isFile && file.name ? file.name : 'qr.jpg';
+  const fileType = file.type || 'image/jpeg';
+
+  if (!ALLOWED_IMAGE_TYPES.includes(fileType)) {
+    throw new Error('Invalid file format. Please upload a JPG, PNG, or WebP image.');
+  }
+
+  if (file.size > MAX_LOGO_SIZE_BYTES) {
+    throw new Error('Image file is too large. Maximum allowed size is 5 MB.');
+  }
+
+  const ext = fileName.split('.').pop()?.toLowerCase() || 'jpg';
+  const filePath = `${academyId}/${Date.now()}.${ext}`;
+
+  let safeBlob: Blob = file;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    safeBlob = new Blob([arrayBuffer], { type: fileType });
+  } catch (err: unknown) {
+    logger.warn('academy_payment_qr_arraybuffer_conversion_failed', { error: err });
+  }
+
+  const { error: uploadError } = await supabase.storage
+    .from('academy-payment-qr')
+    .upload(filePath, safeBlob, {
+      upsert: true,
+      contentType: fileType,
+    });
+
+  if (uploadError) throw toApiError(uploadError);
+
+  const { data } = supabase.storage.from('academy-payment-qr').getPublicUrl(filePath);
+  const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+
+  await updateAcademy(academyId, { paymentQrUrl: publicUrl });
+  return publicUrl;
+}
+
+export async function removeAcademyPaymentQr(
+  academyId: UUID,
+  qrUrl?: string | null,
+): Promise<void> {
+  await updateAcademy(academyId, { paymentQrUrl: null });
+
+  if (qrUrl && qrUrl.includes('/storage/v1/object/public/academy-payment-qr/')) {
+    const baseUrl = qrUrl.split('?')[0];
+    if (!baseUrl) return;
+    const oldPath = baseUrl.split('/storage/v1/object/public/academy-payment-qr/')[1];
+    if (oldPath && oldPath.startsWith(`${academyId}/`)) {
+      supabase.storage
+        .from('academy-payment-qr')
+        .remove([oldPath])
+        .catch((err) => {
+          logger.warn('academy_payment_qr_remove_old_failed', { error: err });
         });
     }
   }

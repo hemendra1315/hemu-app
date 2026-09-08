@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Copy, RefreshCw, Check, Upload, Trash2, Building2, AlertCircle } from 'lucide-react';
+import {
+  Copy,
+  RefreshCw,
+  Check,
+  Upload,
+  Trash2,
+  Building2,
+  AlertCircle,
+  QrCode,
+} from 'lucide-react';
 
 import {
   Avatar,
@@ -24,7 +33,12 @@ import {
   useRegenerateJoinCode,
   useUpdateAcademy,
 } from '../hooks/useAcademies';
-import { uploadAcademyLogo, removeAcademyLogo } from '../api/academiesApi';
+import {
+  uploadAcademyLogo,
+  removeAcademyLogo,
+  uploadAcademyPaymentQr,
+  removeAcademyPaymentQr,
+} from '../api/academiesApi';
 
 interface FormValues {
   name: string;
@@ -42,10 +56,24 @@ export default function AcademySettingsPage() {
   const pushToast = useUiStore((s) => s.pushToast);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isRemovingLogo, setIsRemovingLogo] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
+
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const [isRemovingQr, setIsRemovingQr] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+
+  const [paymentNote, setPaymentNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  // Tracks which academy's note is currently loaded into `paymentNote`, so we
+  // can re-sync it when the academy data arrives/changes without calling
+  // setState inside a useEffect (flagged by react-hooks/set-state-in-effect --
+  // this is React's documented "adjust state during render" alternative:
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const [syncedNoteForAcademyId, setSyncedNoteForAcademyId] = useState<string | null>(null);
 
   const academyQuery = useAcademy(academyId);
   const updateAcademy = useUpdateAcademy(academyId as UUID);
@@ -83,6 +111,13 @@ export default function AcademySettingsPage() {
       });
     }
   }, [academy, reset]);
+
+  // Same sync as above for `paymentNote`, but done during render rather than
+  // in the effect above -- see the comment on `syncedNoteForAcademyId`.
+  if (academy && academy.id !== syncedNoteForAcademyId) {
+    setSyncedNoteForAcademyId(academy.id);
+    setPaymentNote(academy.paymentNote ?? '');
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     if (!academyId) return;
@@ -161,6 +196,80 @@ export default function AcademySettingsPage() {
     }
   };
 
+  const handleQrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !academyId) return;
+
+    // Reset input value so re-selecting same file triggers onChange
+    e.target.value = '';
+    setQrError(null);
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setQrError('Invalid format. Please select a JPG, PNG, or WebP image.');
+      return;
+    }
+
+    if (file.size > MAX_LOGO_SIZE_BYTES) {
+      setQrError('File too large. Maximum allowed image size is 5 MB.');
+      return;
+    }
+
+    setIsUploadingQr(true);
+    try {
+      await uploadAcademyPaymentQr(academyId as UUID, file);
+      await updateAcademy.mutateAsync({});
+      pushToast({ title: 'Payment QR code updated', variant: 'success' });
+    } catch (err) {
+      const msg = errorMessage(err);
+      setQrError(msg);
+      pushToast({
+        title: 'Failed to upload payment QR code',
+        description: msg,
+        variant: 'error',
+      });
+    } finally {
+      setIsUploadingQr(false);
+    }
+  };
+
+  const handleRemoveQr = async () => {
+    if (!academyId) return;
+    setQrError(null);
+    setIsRemovingQr(true);
+    try {
+      await removeAcademyPaymentQr(academyId as UUID, academy?.paymentQrUrl);
+      await updateAcademy.mutateAsync({});
+      pushToast({ title: 'Payment QR code removed', variant: 'success' });
+    } catch (err) {
+      const msg = errorMessage(err);
+      setQrError(msg);
+      pushToast({
+        title: 'Failed to remove payment QR code',
+        description: msg,
+        variant: 'error',
+      });
+    } finally {
+      setIsRemovingQr(false);
+    }
+  };
+
+  const handleSavePaymentNote = async () => {
+    if (!academyId) return;
+    setIsSavingNote(true);
+    try {
+      await updateAcademy.mutateAsync({ paymentNote: paymentNote.trim() || null });
+      pushToast({ title: 'Payment note saved', variant: 'success' });
+    } catch (err) {
+      pushToast({
+        title: 'Failed to save payment note',
+        description: errorMessage(err),
+        variant: 'error',
+      });
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
   const handleCopyCode = async () => {
     if (!joinCodeQuery.data) return;
     try {
@@ -190,6 +299,8 @@ export default function AcademySettingsPage() {
 
   const currentDisplayName = watchedName.trim() || academy?.name || 'Academy';
   const currentLogoUrl = academy?.logoUrl;
+  const currentQrUrl = academy?.paymentQrUrl;
+  const isNoteDirty = paymentNote.trim() !== (academy?.paymentNote ?? '').trim();
 
   return (
     <div className="space-y-6 pb-24 md:pb-6">
@@ -291,6 +402,119 @@ export default function AcademySettingsPage() {
               <span>{logoError}</span>
             </div>
           )}
+        </CardBody>
+      </Card>
+
+      {/* 1b. PAYMENT QR CODE */}
+      <Card>
+        <CardHeader
+          title="Payment QR Code"
+          description="Upload your UPI QR code so players can pay their fees directly to you. Payments happen between you and the player through their own UPI app — the app never handles the money."
+        />
+        <CardBody className="space-y-6">
+          <div className="border-border-subtle bg-surface-elevated/60 flex flex-col gap-5 rounded-2xl border p-4 sm:flex-row sm:items-center sm:gap-6">
+            <div className="relative flex shrink-0 items-center justify-center">
+              {currentQrUrl ? (
+                <img
+                  src={currentQrUrl}
+                  alt="Payment QR code"
+                  className="border-border-subtle h-24 w-24 rounded-xl border bg-white object-contain sm:h-28 sm:w-28"
+                />
+              ) : (
+                <div className="border-border-subtle bg-surface flex h-24 w-24 items-center justify-center rounded-xl border border-dashed sm:h-28 sm:w-28">
+                  <QrCode className="text-fg-muted h-8 w-8" />
+                </div>
+              )}
+              {isUploadingQr && (
+                <div className="bg-bg/70 absolute inset-0 flex items-center justify-center rounded-xl backdrop-blur-xs">
+                  <RefreshCw className="text-primary h-6 w-6 animate-spin" />
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-fg-muted text-xs">
+                {currentQrUrl
+                  ? 'Players will see this QR code on their Pay Fees page.'
+                  : 'No QR code uploaded yet. Players won’t see a way to pay until you add one.'}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <input
+                  type="file"
+                  ref={qrFileInputRef}
+                  onChange={handleQrFileChange}
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  aria-label="Upload Payment QR Code"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="min-h-[40px] gap-2 font-medium"
+                  isLoading={isUploadingQr}
+                  disabled={isUploadingQr || isRemovingQr}
+                  onClick={() => qrFileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>{currentQrUrl ? 'Change QR Code' : 'Upload QR Code'}</span>
+                </Button>
+
+                {currentQrUrl ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="text-danger hover:bg-danger/10 min-h-[40px] gap-1.5"
+                    isLoading={isRemovingQr}
+                    disabled={isUploadingQr || isRemovingQr}
+                    onClick={handleRemoveQr}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Remove QR Code</span>
+                  </Button>
+                ) : null}
+              </div>
+
+              <p className="text-fg-muted text-[11px]">
+                Accepts JPG, PNG, or WebP up to 5 MB. Use the static QR code from your UPI app (e.g.
+                FamPay, Google Pay, PhonePe).
+              </p>
+            </div>
+          </div>
+
+          {qrError && (
+            <div className="border-danger/30 bg-danger/10 text-danger flex items-center gap-2 rounded-xl border p-3 text-xs">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{qrError}</span>
+            </div>
+          )}
+
+          <FormField
+            label="Payment Note (optional)"
+            hint="Shown next to the QR code, e.g. your UPI ID as backup in case a player can't scan."
+          >
+            {(field) => (
+              <Input
+                {...field}
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                placeholder="e.g. academy@upi"
+              />
+            )}
+          </FormField>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              size="sm"
+              isLoading={isSavingNote}
+              disabled={!isNoteDirty || isSavingNote}
+              onClick={() => void handleSavePaymentNote()}
+            >
+              Save note
+            </Button>
+          </div>
         </CardBody>
       </Card>
 

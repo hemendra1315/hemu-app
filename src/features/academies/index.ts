@@ -11,6 +11,8 @@ export {
   updateAcademy,
   uploadAcademyLogo,
   removeAcademyLogo,
+  uploadAcademyPaymentQr,
+  removeAcademyPaymentQr,
   type CreateAcademyInput,
   type UpdateAcademyInput,
   type OwnerInvitationDetails,

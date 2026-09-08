@@ -56,6 +56,10 @@ export type Academy = AcademySummary & {
   ownerUserId: UUID;
   isActive: boolean;
   createdAt: string;
+  /** URL of the owner's uploaded UPI QR code image, shown to players on the Pay Fees page. */
+  paymentQrUrl: string | null;
+  /** Optional short text shown alongside the QR (e.g. a UPI ID as backup). */
+  paymentNote: string | null;
 };
 
 export type JoinRequest = {

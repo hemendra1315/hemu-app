@@ -8,6 +8,7 @@ import {
   User,
   Settings,
   ShieldCheck,
+  IndianRupee,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMemberships } from '@/features/academies';
@@ -116,6 +117,13 @@ export function MobileBottomNav() {
         label: 'Matches',
         icon: Trophy,
         matchPrefixes: ['/matches'],
+      },
+      {
+        key: 'fees',
+        to: '/my-fees',
+        label: 'Fees',
+        icon: IndianRupee,
+        matchPrefixes: ['/my-fees'],
       },
       {
         key: 'profile',

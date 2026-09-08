@@ -32,6 +32,8 @@ export type Database = {
           logo_url: string | null
           name: string
           owner_user_id: string
+          payment_note: string | null
+          payment_qr_url: string | null
           settings: Json
           slug: string
           state: string | null
@@ -55,6 +57,8 @@ export type Database = {
           logo_url?: string | null
           name: string
           owner_user_id: string
+          payment_note?: string | null
+          payment_qr_url?: string | null
           settings?: Json
           slug: string
           state?: string | null
@@ -78,6 +82,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           owner_user_id?: string
+          payment_note?: string | null
+          payment_qr_url?: string | null
           settings?: Json
           slug?: string
           state?: string | null
@@ -2620,6 +2626,8 @@ export type Database = {
           logo_url: string | null
           name: string
           owner_user_id: string
+          payment_note: string | null
+          payment_qr_url: string | null
           settings: Json
           slug: string
           state: string | null

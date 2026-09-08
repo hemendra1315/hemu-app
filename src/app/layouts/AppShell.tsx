@@ -56,6 +56,15 @@ interface NavItemDef {
    * sidebar.
    */
   staffOnly?: boolean;
+  /**
+   * Hide from non-players even though `billing:read_own` is held by both
+   * players *and* academy owners (owners use it elsewhere for their own
+   * billing view). Without this flag, a plain academy owner sees "Pay Fees"
+   * in their sidebar, but `/my-fees` is inside a player-only route guard —
+   * clicking it would bounce them to Forbidden. Super admins still see it
+   * (harmless: the page just shows a "not a player" state for them).
+   */
+  playerOnly?: boolean;
 }
 
 const SIDEBAR_ITEMS: NavItemDef[] = [
@@ -94,6 +103,14 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     label: 'My Cricket',
     icon: <LayoutDashboard className="h-4 w-4" aria-hidden />,
     requiresCapability: 'stats:read_own',
+    group: 'Home',
+  },
+  {
+    to: '/my-fees',
+    label: 'Pay Fees',
+    icon: <IndianRupee className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'billing:read_own',
+    playerOnly: true,
     group: 'Home',
   },
   {
@@ -249,6 +266,7 @@ export function AppShell() {
       if (item.superAdminOnly) return false;
       const mappedTestRole = testModeRole === 'student' ? 'player' : testModeRole;
       if (item.staffOnly && !['coach', 'academy_owner'].includes(mappedTestRole)) return false;
+      if (item.playerOnly && mappedTestRole !== 'player') return false;
       return (
         item.requiresCapability === null || hasCapability([mappedTestRole], item.requiresCapability)
       );
@@ -262,6 +280,7 @@ export function AppShell() {
     ) {
       return false;
     }
+    if (item.playerOnly && !isSuperAdmin && !roles.includes('player')) return false;
     return item.requiresCapability === null || hasCapability(roles, item.requiresCapability);
   });
 

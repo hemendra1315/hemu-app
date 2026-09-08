@@ -1,11 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { IndianRupee, CheckCircle2, ChevronRight } from 'lucide-react';
 
 import { Button, Card, CardBody, CardHeader, Badge, Avatar } from '@/components/ui';
 import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { SuperAdminAcademyActions } from '@/features/admin';
 import { useSetMyDrillAssignmentStatus } from '@/features/drills/hooks/useDrills';
+import { usePlayerFeeDetail, type PlayerFeeDetail } from '@/features/billing';
+import { toPeriodMonth } from '@/features/billing/api/billingApi';
+import { formatPaise } from '@/lib/utils/money';
 import { usePlayerDashboardAnalytics } from '../hooks/useDashboardAnalytics';
 import { SimpleBarChart, SimpleLineChart } from '@/components/charts/SimpleBarChart';
 import { SessionRow } from '../components/SessionRow';
@@ -57,6 +61,7 @@ export default function PlayerDashboardPage() {
     (academyId ?? '') as string,
     (playerId ?? '') as string,
   );
+  const feeDetailQuery = usePlayerFeeDetail(academyId, isPlayer ? playerId : null);
 
   if (!isPlayer) {
     return (
@@ -109,6 +114,8 @@ export default function PlayerDashboardPage() {
       </div>
 
       <SuperAdminAcademyActions />
+
+      {feeDetailQuery.data && <FeeStatusBanner detail={feeDetailQuery.data} />}
 
       {stats && (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-7">
@@ -377,5 +384,53 @@ export default function PlayerDashboardPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Prominent, always-visible fee status card on the player's home screen —
+ * deliberately placed above the stats grid so an unpaid fee can't be missed
+ * by scrolling past it. Links through to the full Pay Fees page (QR code +
+ * history). Renders nothing until the fee query resolves so it never flashes
+ * an "unpaid" state before data loads.
+ */
+function FeeStatusBanner({ detail }: { detail: PlayerFeeDetail }) {
+  const currentPeriod = toPeriodMonth(new Date());
+  const paidThisMonthPaise = detail.payments
+    .filter((p) => p.periodMonth === currentPeriod)
+    .reduce((sum, p) => sum + p.amountPaise, 0);
+  const monthlyFeePaise = detail.monthlyFeePaise;
+
+  // No fee set for this player yet -- nothing to show or nag about.
+  if (monthlyFeePaise === null) return null;
+
+  const isPaid = paidThisMonthPaise >= monthlyFeePaise;
+
+  return (
+    <Link
+      to="/my-fees"
+      className={`flex items-center justify-between gap-3 rounded-2xl border p-4 transition hover:opacity-90 ${
+        isPaid ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/10'
+      }`}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
+            isPaid ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+          }`}
+        >
+          {isPaid ? <CheckCircle2 className="h-5 w-5" /> : <IndianRupee className="h-5 w-5" />}
+        </div>
+        <div className="min-w-0">
+          <p className="text-fg font-semibold">
+            {isPaid ? 'This month’s fee is paid' : `${formatPaise(monthlyFeePaise)} due this month`}
+          </p>
+          <p className="text-fg-muted text-xs">
+            {isPaid ? 'Tap to view your payment history' : 'Tap to scan and pay via QR'}
+          </p>
+        </div>
+      </div>
+      <ChevronRight className="text-fg-muted h-5 w-5 shrink-0" />
+    </Link>
   );
 }

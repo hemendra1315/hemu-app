@@ -76,6 +76,7 @@ const CoachesPage = lazy(() => import('@/features/coaches/pages/CoachesPage'));
 const CoachProfilePage = lazy(() => import('@/features/coaches/pages/CoachProfilePage'));
 const BillingPage = lazy(() => import('@/features/billing/pages/BillingPage'));
 const PlayerFeeDetailPage = lazy(() => import('@/features/billing/pages/PlayerFeeDetailPage'));
+const MyFeesPage = lazy(() => import('@/features/billing/pages/MyFeesPage'));
 const ForbiddenPage = lazy(() => import('@/pages/ForbiddenPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -181,6 +182,7 @@ export const router = createBrowserRouter([
                     children: [
                       { path: '/me', element: <PlayerDashboardPage /> },
                       { path: '/player', element: <PlayerDashboardPage /> },
+                      { path: '/my-fees', element: <MyFeesPage /> },
                     ],
                   },
                   {
