@@ -47,3 +47,16 @@ export function useDeleteAnnouncement() {
     },
   });
 }
+
+// Same story as delete: announcementsApi.getTargets already existed (added
+// alongside the custom-audience picker) but nothing ever called it, so staff
+// had no way to see exactly who/which batches a "Selected People" or "One
+// Batch" announcement actually reached. Fetched lazily (only once a card is
+// expanded), not for every announcement in the list up front.
+export function useAnnouncementTargets(announcementId: string | null) {
+  return useQuery({
+    queryKey: [...ANNOUNCEMENTS_KEYS.all, announcementId, 'targets'],
+    queryFn: () => announcementsApi.getTargets([announcementId as string]),
+    enabled: !!announcementId,
+  });
+}

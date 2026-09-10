@@ -70,6 +70,18 @@ vi.mock('@/stores', () => ({
     selector({ pushToast }),
 }));
 
+// AnnouncementsPage now also fetches batches/members (to resolve "Sent to"
+// recipient names) unconditionally for any staff viewer -- without this
+// mock these tests would fire the real Supabase-backed hooks against an
+// unmocked client.
+vi.mock('@/features/batches/hooks/useBatches', () => ({
+  useBatches: () => ({ data: [] }),
+}));
+
+vi.mock('@/features/members', () => ({
+  useAcademyMembers: () => ({ data: [] }),
+}));
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
