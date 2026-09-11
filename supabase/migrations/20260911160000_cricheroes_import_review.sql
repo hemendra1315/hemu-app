@@ -75,14 +75,18 @@ begin
   v_awards     := p_payload->'awards';
   v_notes      := p_payload->'notes';
 
+  -- Authorization check: caller must be a staff member (owner or coach) of p_academy
   IF NOT is_staff(v_academy_id) THEN
     RAISE EXCEPTION 'E_FORBIDDEN: User is not authorized to save match results for this academy'
       USING errcode = '42501';
   END IF;
 
+  -- 1. Create or update the match record
   IF v_match ? 'id' AND v_match->>'id' IS NOT NULL THEN
     v_match_id := (v_match->>'id')::uuid;
 
+    -- The match must belong to the payload academy, otherwise the caller is
+    -- trying to overwrite another academy's scorecard.
     SELECT EXISTS (
       SELECT 1 FROM matches WHERE id = v_match_id AND academy_id = v_academy_id
     ) INTO v_owns_match;
@@ -129,6 +133,7 @@ begin
     ) RETURNING id INTO v_match_id;
   END IF;
 
+  -- 2. Save lineups
   IF v_lineups IS NOT NULL AND v_lineups != '[]'::jsonb THEN
     DELETE FROM match_lineups WHERE match_id = v_match_id;
     FOR rec IN SELECT * FROM jsonb_to_recordset(v_lineups)
@@ -139,6 +144,7 @@ begin
     END LOOP;
   END IF;
 
+  -- 3. Save batting scorecard
   IF v_batting IS NOT NULL AND v_batting != '[]'::jsonb THEN
     DELETE FROM match_batting WHERE match_id = v_match_id;
     FOR rec IN SELECT * FROM jsonb_to_recordset(v_batting)
@@ -151,6 +157,7 @@ begin
     END LOOP;
   END IF;
 
+  -- 4. Save bowling scorecard
   IF v_bowling IS NOT NULL AND v_bowling != '[]'::jsonb THEN
     DELETE FROM match_bowling WHERE match_id = v_match_id;
     FOR rec IN SELECT * FROM jsonb_to_recordset(v_bowling)
@@ -163,6 +170,7 @@ begin
     END LOOP;
   END IF;
 
+  -- 5. Save fielding
   IF v_fielding IS NOT NULL AND v_fielding != '[]'::jsonb THEN
     DELETE FROM match_fielding WHERE match_id = v_match_id;
     FOR rec IN SELECT * FROM jsonb_to_recordset(v_fielding)
@@ -173,6 +181,7 @@ begin
     END LOOP;
   END IF;
 
+  -- 6. Save partnerships
   IF v_partnerships IS NOT NULL AND v_partnerships != '[]'::jsonb THEN
     DELETE FROM match_partnerships WHERE match_id = v_match_id;
     FOR rec IN SELECT * FROM jsonb_to_recordset(v_partnerships)
@@ -185,6 +194,7 @@ begin
     END LOOP;
   END IF;
 
+  -- 7. Save awards
   IF v_awards IS NOT NULL AND v_awards != '{}'::jsonb THEN
     IF nullif(v_awards->>'player_of_match_id', '') IS NOT NULL OR
        nullif(v_awards->>'best_batter_id', '') IS NOT NULL OR
@@ -204,6 +214,7 @@ begin
     END IF;
   END IF;
 
+  -- 8. Refresh player statistics ONLY for non-guest academy members
   FOR v_player_id IN
     SELECT DISTINCT pm.academy_member_id
     FROM (
