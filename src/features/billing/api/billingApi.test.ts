@@ -71,10 +71,14 @@ describe('fetchFeeSummaries', () => {
       ],
       error: null,
     });
+    // fetchFeeSummaries also fetches this month's pending claims (for the
+    // owner's "pending confirmation" badge) alongside fees and payments.
+    const claimsBuilder = createMockQueryBuilder({ data: [], error: null });
 
     mockedSupabase.from
       .mockReturnValueOnce(feesBuilder as never)
-      .mockReturnValueOnce(paymentsBuilder as never);
+      .mockReturnValueOnce(paymentsBuilder as never)
+      .mockReturnValueOnce(claimsBuilder as never);
 
     const summaries = await fetchFeeSummaries(ACADEMY_ID, '2026-09-01');
 
@@ -102,9 +106,11 @@ describe('fetchFeeSummaries', () => {
       data: [{ player_id: PLAYER_1, amount_paise: 50000 }],
       error: null,
     });
+    const claimsBuilder = createMockQueryBuilder({ data: [], error: null });
     mockedSupabase.from
       .mockReturnValueOnce(feesBuilder as never)
-      .mockReturnValueOnce(paymentsBuilder as never);
+      .mockReturnValueOnce(paymentsBuilder as never)
+      .mockReturnValueOnce(claimsBuilder as never);
 
     const summaries = await fetchFeeSummaries(ACADEMY_ID, '2026-09-01');
     expect(summaries).toHaveLength(1);
