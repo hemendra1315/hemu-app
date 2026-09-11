@@ -48,6 +48,29 @@ function getDbContainer(): string {
  */
 
 /**
+ * `-t -A` suppresses the header/footer of genuine SELECT row output, but NOT
+ * the plain command-completion tag psql still prints for every non-SELECT
+ * statement in a multi-statement `-c` string -- "INSERT 0 1" after an
+ * `INSERT ... RETURNING ...`, or bare "SET" after a `SET LOCAL ...`. Which
+ * line that lands on depends on which statement comes first: an
+ * INSERT-RETURNING's tag trails the returned value, but runSqlAsUser's
+ * `SET LOCAL "request.jwt.claims" = '...'; SELECT ...` leads with "SET"
+ * before the actual result. A fixed first-line-wins (or last-line-wins) rule
+ * breaks one of the two shapes -- this filters out every line that is
+ * exactly a known command tag and returns whatever text is left, which
+ * works for both.
+ */
+const COMMAND_TAG = /^(SET|BEGIN|COMMIT|ROLLBACK|DO|INSERT \d+ \d+|UPDATE \d+|DELETE \d+)$/;
+
+function extractQueryValue(output: string): string {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !COMMAND_TAG.test(line));
+  return (lines[0] ?? '').trim();
+}
+
+/**
  * Runs SQL against the local Supabase Postgres instance. Uses execFileSync
  * (argv, no shell) rather than the execSync("...-c \"...\"") pattern the
  * rest of this repo's e2e specs use, specifically so a JSONB payload with
@@ -69,20 +92,22 @@ function runSql(sql: string): string {
       'postgres',
       '-t',
       '-A',
+      // Without this, a SQL error partway through a multi-statement `-c`
+      // string is not guaranteed to make psql exit non-zero -- which is
+      // exactly what every negative test below (the E_FORBIDDEN /
+      // E_INVALID_CODE assertions) depends on: they call runSql(As User)
+      // inside a try/catch and only pass if it throws. An error that fails
+      // to raise here would make those `catch` blocks silently never run,
+      // turning a real RLS/validation regression into a false pass instead
+      // of a caught failure.
+      '-v',
+      'ON_ERROR_STOP=1',
       '-c',
       sql,
     ],
     { encoding: 'utf8' },
   );
-  // `-t -A` suppresses the header/footer of genuine SELECT row output, but
-  // NOT the command-completion tag (e.g. "INSERT 0 1") psql still prints
-  // after an `INSERT ... RETURNING ...` statement -- that lands on its own
-  // line right after the returned value. A bare `.trim()` leaves that
-  // second line in place, so a caller capturing e.g. an id gets back
-  // "<uuid>\nINSERT 0 1", which then corrupts any subsequent SQL string
-  // interpolation. Take only the first non-empty line, matching
-  // pilot-manual-walkthrough.spec.ts's querySingleValue() helper.
-  return (output.trim().split(/[\r\n]+/)[0] ?? '').trim();
+  return extractQueryValue(output);
 }
 
 /**
