@@ -34,22 +34,19 @@ self.addEventListener('push', (event: PushEvent) => {
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close();
 
-  const targetUrl: string =
-    (event.notification.data as { url?: string })?.url ?? '/announcements';
+  const targetUrl: string = (event.notification.data as { url?: string })?.url ?? '/announcements';
 
   event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        for (const client of clientList) {
-          if ('navigate' in client) {
-            void (client as WindowClient).navigate(targetUrl);
-            return client.focus();
-          }
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('navigate' in client) {
+          void (client as WindowClient).navigate(targetUrl);
+          return client.focus();
         }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(targetUrl);
-        }
-      }),
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    }),
   );
 });

@@ -1,9 +1,4 @@
-import {
-  dehydrate,
-  MutationCache,
-  QueryCache,
-  QueryClient,
-} from '@tanstack/react-query';
+import { dehydrate, MutationCache, QueryCache, QueryClient } from '@tanstack/react-query';
 
 import { ApiErrorCode, toApiError } from '@/lib/api';
 import { reportError } from '@/lib/logger';
@@ -69,4 +64,3 @@ queryClient.getQueryCache().subscribe((event) => {
     scheduleCacheSave();
   }
 });
-

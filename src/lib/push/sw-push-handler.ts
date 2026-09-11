@@ -40,20 +40,18 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
   const targetUrl: string = (event.notification.data as { url?: string })?.url ?? '/announcements';
 
   event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientList) => {
-        // If app window is already open — focus it and navigate
-        for (const client of clientList) {
-          if ('focus' in client && 'navigate' in client) {
-            void (client as WindowClient).navigate(targetUrl);
-            return client.focus();
-          }
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If app window is already open — focus it and navigate
+      for (const client of clientList) {
+        if ('focus' in client && 'navigate' in client) {
+          void (client as WindowClient).navigate(targetUrl);
+          return client.focus();
         }
-        // Otherwise open a new window
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(targetUrl);
-        }
-      }),
+      }
+      // Otherwise open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    }),
   );
 });
