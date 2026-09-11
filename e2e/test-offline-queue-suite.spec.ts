@@ -33,26 +33,30 @@ function getSeededIds(): {
   coachUserId: string;
   coachMemberId: string;
 } {
-  try {
-    const output = execSync(
-      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN training_sessions s ON s.academy_id = a.id JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id LIMIT 1;"`,
-      { encoding: 'utf8' },
-    ).trim();
-    const parts = output.split('|');
-    return {
-      academyId: parts[0] || 'fe7498b5-a84b-404f-90f0-9b9e0d12273a',
-      sessionId: parts[1] || '086f6fda-68f0-4856-a5fc-c1b4a7b18c3b',
-      coachUserId: parts[2] || '1db413cf-a6c3-4bb0-9e64-bb3b8545c671',
-      coachMemberId: parts[3] || '5518c7c5-2636-4500-b4a8-621fcadb8c00',
-    };
-  } catch {
-    return {
-      academyId: 'fe7498b5-a84b-404f-90f0-9b9e0d12273a',
-      sessionId: '086f6fda-68f0-4856-a5fc-c1b4a7b18c3b',
-      coachUserId: '1db413cf-a6c3-4bb0-9e64-bb3b8545c671',
-      coachMemberId: '5518c7c5-2636-4500-b4a8-621fcadb8c00',
-    };
+  // Picks a session whose batch is actually coached by coach1@demo.com AND
+  // actually has at least one assigned player -- a plain `training_sessions
+  // LIMIT 1` (the previous version of this query) could just as easily
+  // return a session belonging to coach2's batch, or a batch with zero
+  // batch_members, either of which leaves the attendance page's roster
+  // empty and its Present/Absent buttons never rendering, timing out the
+  // waitForSelector below for reasons that have nothing to do with this
+  // test's own logic. This also intentionally has NO try/catch fallback:
+  // a previous version of this helper fell back to hardcoded UUIDs on any
+  // query failure, but those are guaranteed stale after `supabase db
+  // reset` regenerates every id, so silently "succeeding" with them just
+  // turned a clear seed-data error into an opaque button-timeout later.
+  const output = execSync(
+    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id JOIN batches b ON b.academy_id = a.id AND b.coach_id = am.id JOIN training_sessions s ON s.academy_id = a.id AND s.batch_id = b.id WHERE EXISTS (SELECT 1 FROM batch_members bm WHERE bm.batch_id = b.id) ORDER BY s.id LIMIT 1;"`,
+    { encoding: 'utf8' },
+  ).trim();
+  const parts = output.split('|');
+  const [academyId, sessionId, coachUserId, coachMemberId] = parts;
+  if (!academyId || !sessionId || !coachUserId || !coachMemberId) {
+    throw new Error(
+      `Could not find a seeded coach1@demo.com session with an assigned player. Got: "${output}"`,
+    );
   }
+  return { academyId, sessionId, coachUserId, coachMemberId };
 }
 
 const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';

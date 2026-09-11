@@ -56,7 +56,7 @@ function getDbContainer(): string {
  * quoting (doubled single quotes) applies.
  */
 function runSql(sql: string): string {
-  return execFileSync(
+  const output = execFileSync(
     'docker',
     [
       'exec',
@@ -73,7 +73,16 @@ function runSql(sql: string): string {
       sql,
     ],
     { encoding: 'utf8' },
-  ).trim();
+  );
+  // `-t -A` suppresses the header/footer of genuine SELECT row output, but
+  // NOT the command-completion tag (e.g. "INSERT 0 1") psql still prints
+  // after an `INSERT ... RETURNING ...` statement -- that lands on its own
+  // line right after the returned value. A bare `.trim()` leaves that
+  // second line in place, so a caller capturing e.g. an id gets back
+  // "<uuid>\nINSERT 0 1", which then corrupts any subsequent SQL string
+  // interpolation. Take only the first non-empty line, matching
+  // pilot-manual-walkthrough.spec.ts's querySingleValue() helper.
+  return (output.trim().split(/[\r\n]+/)[0] ?? '').trim();
 }
 
 /**

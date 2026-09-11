@@ -126,7 +126,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
 
     // Create a default batch for testing batch assignment
     const batchId = querySingleValue(
-      `INSERT INTO batches (academy_id, name, age_group, training_days, training_time) VALUES ('${academyId}', 'Morning Pace Elite', 'U-19', 'Mon, Wed, Fri', '06:00 - 08:00') RETURNING id;`,
+      `INSERT INTO batches (academy_id, name, age_group, training_days, training_time) VALUES ('${academyId}', 'Morning Pace Elite', 'U-19', ARRAY['Mon','Wed','Fri'], '06:00 - 08:00') RETURNING id;`,
     );
     console.log('✓ Created batch "Morning Pace Elite", ID:', batchId);
 

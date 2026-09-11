@@ -39,13 +39,24 @@ function getSeededIds(): {
   coachUserId: string;
   coachMemberId: string;
 } {
+  // Picks a session whose batch is actually coached by coach1@demo.com AND
+  // actually has at least one assigned player -- a plain `training_sessions
+  // LIMIT 1` (the previous version of this query) could just as easily
+  // return a session belonging to coach2's batch, or a batch with zero
+  // batch_members, either of which leaves the attendance page's roster
+  // empty and its Present/Absent buttons never rendering, timing out the
+  // waitForSelector below for reasons that have nothing to do with this
+  // test's own logic (see the identical fix/comment in
+  // test-offline-queue-suite.spec.ts's getSeededIds()).
   const output = execSync(
-    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN training_sessions s ON s.academy_id = a.id JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id LIMIT 1;"`,
+    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id JOIN batches b ON b.academy_id = a.id AND b.coach_id = am.id JOIN training_sessions s ON s.academy_id = a.id AND s.batch_id = b.id WHERE EXISTS (SELECT 1 FROM batch_members bm WHERE bm.batch_id = b.id) ORDER BY s.id LIMIT 1;"`,
     { encoding: 'utf8' },
   ).trim();
   const [academyId, sessionId, coachUserId, coachMemberId] = output.split('|');
   if (!academyId || !sessionId || !coachUserId || !coachMemberId) {
-    throw new Error(`Could not find a seeded academy/session/coach row. Got: "${output}"`);
+    throw new Error(
+      `Could not find a seeded coach1@demo.com session with an assigned player. Got: "${output}"`,
+    );
   }
   return { academyId, sessionId, coachUserId, coachMemberId };
 }
