@@ -14,6 +14,7 @@ import {
   BarChart2,
   Megaphone,
   IndianRupee,
+  FileText,
 } from 'lucide-react';
 import { MobilePageHeader } from '@/components/mobile';
 import { Card, Badge } from '@/components/ui';
@@ -138,6 +139,15 @@ export function MorePage() {
     },
   ];
 
+  const legalItems: (MenuItem | false)[] = [
+    {
+      to: '/privacy-policy',
+      label: 'Privacy Policy',
+      desc: 'What information we collect and how it’s used',
+      icon: FileText,
+    },
+  ];
+
   const sections = [
     {
       title: canUpdateAcademy || canManageMembers ? 'Academy Management' : 'Cricket & Stats',
@@ -150,6 +160,10 @@ export function MorePage() {
     {
       title: 'Account',
       items: accountItems.filter((x): x is MenuItem => Boolean(x)),
+    },
+    {
+      title: 'Legal',
+      items: legalItems.filter((x): x is MenuItem => Boolean(x)),
     },
   ];
 

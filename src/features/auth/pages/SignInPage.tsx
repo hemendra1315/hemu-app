@@ -245,7 +245,11 @@ export default function SignInPage() {
         </Button>
 
         <p className="text-fg-muted text-center text-xs">
-          By continuing you agree to the academy&apos;s terms of use.
+          By continuing you agree to the academy&apos;s terms of use and our{' '}
+          <Link to="/privacy-policy" className="underline-offset-4 hover:underline">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </CardBody>
     </Card>

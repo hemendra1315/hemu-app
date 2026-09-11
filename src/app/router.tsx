@@ -83,6 +83,7 @@ const MySubscriptionPage = lazy(
 );
 const ForbiddenPage = lazy(() => import('@/pages/ForbiddenPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
+const PrivacyPolicyPage = lazy(() => import('@/pages/PrivacyPolicyPage'));
 
 /**
  * Route tree. Guards compose as layout routes:
@@ -92,6 +93,10 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
  * that is exactly where users without a membership need to go.
  */
 export const router = createBrowserRouter([
+  // Public on purpose: reachable whether signed in or out, unwrapped by any
+  // auth guard, so both Play Store review and a signed-out visitor can open
+  // it — a privacy policy that requires logging in first defeats the point.
+  { path: '/privacy-policy', element: <PrivacyPolicyPage /> },
   {
     element: <AuthLayout />,
     children: [
