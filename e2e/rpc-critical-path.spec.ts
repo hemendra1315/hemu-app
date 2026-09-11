@@ -2,6 +2,33 @@ import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 
 /**
+ * The local Supabase Postgres container's name isn't a fixed string -- the
+ * Supabase CLI derives it from the working directory (or `project_id` in
+ * config.toml, which this repo doesn't set), so it's whatever folder the
+ * repo happens to be checked out into. This file used to hardcode
+ * `supabase_db_cricket` (the container name on one developer's machine,
+ * where the repo folder was named "cricket"), which meant it could never
+ * find a container in CI -- the checkout folder there is always "hemu-app".
+ * Discovering the name from `docker ps` instead works regardless of the
+ * checkout folder's name, on any machine.
+ */
+let cachedDbContainer: string | null = null;
+function getDbContainer(): string {
+  if (cachedDbContainer) return cachedDbContainer;
+  const output = execFileSync(
+    'docker',
+    ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'],
+    { encoding: 'utf8' },
+  ).trim();
+  const name = output.split('\n')[0]?.trim();
+  if (!name) {
+    throw new Error('No running supabase_db_* container found -- is `supabase start` running?');
+  }
+  cachedDbContainer = name;
+  return cachedDbContainer;
+}
+
+/**
  * Real-RPC coverage for save_match_result and redeem_parent_linking_code —
  * per the repo's own CI comments, the exact two functions whose earlier
  * breakage caused real production incidents (a broken match wizard and
@@ -34,7 +61,7 @@ function runSql(sql: string): string {
     [
       'exec',
       '-i',
-      'supabase_db_cricket',
+      getDbContainer(),
       'psql',
       '-U',
       'postgres',

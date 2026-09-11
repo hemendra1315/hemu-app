@@ -2,6 +2,31 @@ import { test, expect } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 
+/**
+ * The local Supabase Postgres container's name isn't a fixed string -- the
+ * Supabase CLI derives it from the working directory (or `project_id` in
+ * config.toml, which this repo doesn't set), so it's whatever folder the
+ * repo happens to be checked out into. This file used to hardcode
+ * `supabase_db_cricket` (the container name on one developer's machine,
+ * where the repo folder was named "cricket"), which meant it could never
+ * find a container in CI -- the checkout folder there is always "hemu-app".
+ * Discovering the name from `docker ps` instead works regardless of the
+ * checkout folder's name, on any machine.
+ */
+let cachedDbContainer: string | null = null;
+function getDbContainer(): string {
+  if (cachedDbContainer) return cachedDbContainer;
+  const output = execSync('docker ps --filter "name=supabase_db_" --format "{{.Names}}"', {
+    encoding: 'utf8',
+  }).trim();
+  const name = output.split('\n')[0]?.trim();
+  if (!name) {
+    throw new Error('No running supabase_db_* container found -- is `supabase start` running?');
+  }
+  cachedDbContainer = name;
+  return cachedDbContainer;
+}
+
 function getSeededIds(): {
   academyId: string;
   sessionId: string;
@@ -10,7 +35,7 @@ function getSeededIds(): {
 } {
   try {
     const output = execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN training_sessions s ON s.academy_id = a.id JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id LIMIT 1;"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN training_sessions s ON s.academy_id = a.id JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id LIMIT 1;"`,
       { encoding: 'utf8' },
     ).trim();
     const parts = output.split('|');
@@ -64,14 +89,14 @@ function forgeJWT(sub: string, email?: string, expSeconds = 3600): string {
 
 function resetDbAttendance(sessionId: string) {
   execSync(
-    `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "DELETE FROM attendance WHERE session_id = '${sessionId}';"`,
+    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "DELETE FROM attendance WHERE session_id = '${sessionId}';"`,
     { encoding: 'utf8' },
   );
 }
 
 function queryDbAttendance(sessionId: string) {
   const output = execSync(
-    `docker exec -i supabase_db_cricket psql -U postgres -d postgres -t -A -c "SELECT player_id, status, updated_at FROM attendance WHERE session_id = '${sessionId}';"`,
+    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -c "SELECT player_id, status, updated_at FROM attendance WHERE session_id = '${sessionId}';"`,
     { encoding: 'utf8' },
   );
   return output

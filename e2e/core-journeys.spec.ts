@@ -1,4 +1,87 @@
 import { expect, test } from '@playwright/test';
+import { execSync } from 'node:child_process';
+import { createHmac } from 'node:crypto';
+
+/**
+ * The local Supabase Postgres container's name isn't a fixed string -- the
+ * Supabase CLI derives it from the working directory (or `project_id` in
+ * config.toml, which this repo doesn't set), so it's whatever folder the
+ * repo happens to be checked out into. Discovering it from `docker ps`
+ * works regardless of the checkout folder's name, on any machine -- see the
+ * same helper in test-offline-queue-suite.spec.ts / rpc-critical-path.spec.ts
+ * / pilot-manual-walkthrough.spec.ts.
+ */
+let cachedDbContainer: string | null = null;
+function getDbContainer(): string {
+  if (cachedDbContainer) return cachedDbContainer;
+  const output = execSync('docker ps --filter "name=supabase_db_" --format "{{.Names}}"', {
+    encoding: 'utf8',
+  }).trim();
+  const name = output.split('\n')[0]?.trim();
+  if (!name) {
+    throw new Error('No running supabase_db_* container found -- is `supabase start` running?');
+  }
+  cachedDbContainer = name;
+  return cachedDbContainer;
+}
+
+/** The seeded coach's real academy/session/member ids -- same lookup as
+ * test-offline-queue-suite.spec.ts's getSeededIds(), needed because the
+ * attendance session page is a per-ID detail page: it only renders once its
+ * `sessionId`/`academyId` queries actually succeed, so (unlike the list
+ * pages tested elsewhere in this file) a fake id like "session-1" leaves it
+ * stuck on its loading skeleton forever -- `isUUID` disables the query
+ * entirely for a non-UUID param, and even a syntactically valid but
+ * nonexistent UUID would 404. */
+function getSeededIds(): {
+  academyId: string;
+  sessionId: string;
+  coachUserId: string;
+  coachMemberId: string;
+} {
+  const output = execSync(
+    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -F "|" -c "SELECT a.id, s.id, u.id, am.id FROM academies a JOIN training_sessions s ON s.academy_id = a.id JOIN auth.users u ON u.email = 'coach1@demo.com' JOIN academy_members am ON am.user_id = u.id AND am.academy_id = a.id LIMIT 1;"`,
+    { encoding: 'utf8' },
+  ).trim();
+  const [academyId, sessionId, coachUserId, coachMemberId] = output.split('|');
+  if (!academyId || !sessionId || !coachUserId || !coachMemberId) {
+    throw new Error(`Could not find a seeded academy/session/coach row. Got: "${output}"`);
+  }
+  return { academyId, sessionId, coachUserId, coachMemberId };
+}
+
+const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
+
+function b64url(buf: Buffer) {
+  return buf.toString('base64url');
+}
+
+/** Forges a Supabase-compatible JWT for a real seeded user, signed with the
+ * local Supabase instance's well-known dev JWT secret -- matching
+ * pilot-manual-walkthrough.spec.ts and test-offline-queue-suite.spec.ts.
+ * `cam.e2e_auth` alone (used by every other test in this file) only fakes
+ * this app's OWN auth/profile/membership state; it never gives supabase-js
+ * a signed session, so any page that makes a real RLS-governed Supabase
+ * query needs this too. */
+function forgeJWT(sub: string, email: string): string {
+  const header = b64url(Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
+  const now = Math.floor(Date.now() / 1000);
+  const payload = b64url(
+    Buffer.from(
+      JSON.stringify({
+        iss: 'supabase-demo',
+        aud: 'authenticated',
+        sub,
+        email,
+        role: 'authenticated',
+        iat: now,
+        exp: now + 3600,
+      }),
+    ),
+  );
+  const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest();
+  return `${header}.${payload}.${b64url(sig)}`;
+}
 
 const MOCK_USER = {
   id: 'user-123',
@@ -169,26 +252,72 @@ test.describe('5. Session Management UI', () => {
 
 test.describe('6. Attendance Session UI', () => {
   test('attendance session page renders player roster and marking controls', async ({ page }) => {
+    // Unlike every other test in this file, this is a per-ID detail page --
+    // it needs a REAL session (and a real, RLS-authenticated coach) rather
+    // than the fake `MOCK_USER`/`session-1` this test originally used, which
+    // left the page stuck on its loading skeleton forever (see the
+    // `getSeededIds`/`forgeJWT` comments above).
+    const { academyId, sessionId, coachUserId, coachMemberId } = getSeededIds();
+    const jwt = forgeJWT(coachUserId, 'coach1@demo.com');
+
     await page.addInitScript(
       (data) => {
         sessionStorage.setItem('cam.e2e_auth', JSON.stringify(data));
-        if (data.activeAcademyId) {
-          localStorage.setItem(
-            'cam.active-academy',
-            JSON.stringify({ state: { activeAcademyId: data.activeAcademyId }, version: 0 }),
-          );
-        }
+        localStorage.setItem(
+          'cam.active-academy',
+          JSON.stringify({ state: { activeAcademyId: data.activeAcademyId }, version: 0 }),
+        );
+        localStorage.setItem(
+          'cam.auth',
+          JSON.stringify({
+            access_token: data.jwt,
+            refresh_token: 'fake-refresh-token',
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            token_type: 'bearer',
+            user: data.user,
+          }),
+        );
       },
       {
-        user: MOCK_USER,
-        profile: MOCK_PROFILE,
-        memberships: [MOCK_MEMBERSHIP],
-        activeAcademyId: MOCK_MEMBERSHIP.academyId,
+        user: { id: coachUserId, email: 'coach1@demo.com', user_metadata: { full_name: 'Coach' } },
+        profile: {
+          id: coachUserId,
+          email: 'coach1@demo.com',
+          fullName: 'Coach',
+          avatarUrl: null,
+          phone: '+919876543210',
+          phoneVerified: true,
+          dateOfBirth: '1985-05-15',
+          gender: 'male',
+          locale: 'en',
+          timezone: 'Asia/Kolkata',
+          isSuperAdmin: false,
+        },
+        memberships: [
+          {
+            id: coachMemberId,
+            academyId,
+            academyName: 'Academy',
+            academySlug: 'academy',
+            logoUrl: null,
+            city: 'Bengaluru',
+            timezone: 'Asia/Kolkata',
+            role: 'coach',
+            status: 'active',
+          },
+        ],
+        activeAcademyId: academyId,
+        jwt,
       },
     );
 
-    await page.goto('/sessions/session-1/attendance');
-    await expect(page.getByRole('heading', { name: /mark attendance/i })).toBeVisible();
+    await page.goto(`/sessions/${sessionId}/attendance`);
+    // "Player roster and marking controls" is exactly what this waits for --
+    // a stronger, more direct check than a heading, and the same target
+    // test-offline-queue-suite.spec.ts already waits for on this same page.
+    await page.waitForSelector('button:has-text("Present"), button:has-text("Absent")', {
+      timeout: 10000,
+    });
   });
 });
 

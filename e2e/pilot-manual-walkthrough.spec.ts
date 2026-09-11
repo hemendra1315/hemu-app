@@ -2,6 +2,31 @@ import { test, expect } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 
+/**
+ * The local Supabase Postgres container's name isn't a fixed string -- the
+ * Supabase CLI derives it from the working directory (or `project_id` in
+ * config.toml, which this repo doesn't set), so it's whatever folder the
+ * repo happens to be checked out into. This file used to hardcode
+ * `supabase_db_cricket` (the container name on one developer's machine,
+ * where the repo folder was named "cricket"), which meant it could never
+ * find a container in CI -- the checkout folder there is always "hemu-app".
+ * Discovering the name from `docker ps` instead works regardless of the
+ * checkout folder's name, on any machine.
+ */
+let cachedDbContainer: string | null = null;
+function getDbContainer(): string {
+  if (cachedDbContainer) return cachedDbContainer;
+  const output = execSync('docker ps --filter "name=supabase_db_" --format "{{.Names}}"', {
+    encoding: 'utf8',
+  }).trim();
+  const name = output.split('\n')[0]?.trim();
+  if (!name) {
+    throw new Error('No running supabase_db_* container found -- is `supabase start` running?');
+  }
+  cachedDbContainer = name;
+  return cachedDbContainer;
+}
+
 const JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
 
 function b64url(buf: Buffer) {
@@ -30,7 +55,7 @@ function forgeJWT(sub: string, email: string): string {
 
 function querySingleValue(sql: string): string {
   const output = execSync(
-    `docker exec -i supabase_db_cricket psql -U postgres -d postgres -t -A -c "${sql}"`,
+    `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -t -A -c "${sql}"`,
     { encoding: 'utf8' },
   );
   return (output.trim().split(/[\r\n]+/)[0] ?? '').trim();
@@ -54,7 +79,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
     const ownerEmail = `pilot-owner-${Date.now()}@cricket.org`;
     // Create owner in auth.users
     execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, aud, role) VALUES ('${ownerUserId}', '${ownerEmail}', crypt('Password123!', gen_salt('bf')), now(), '{\\"full_name\\": \\"Sunil Gavaskar\\"}', 'authenticated', 'authenticated');"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, aud, role) VALUES ('${ownerUserId}', '${ownerEmail}', crypt('Password123!', gen_salt('bf')), now(), '{\\"full_name\\": \\"Sunil Gavaskar\\"}', 'authenticated', 'authenticated');"`,
       { encoding: 'utf8' },
     );
 
@@ -94,7 +119,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
 
     const joinCode = 'NCC' + Math.floor(Math.random() * 8999 + 1000);
     execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "INSERT INTO academy_members (academy_id, user_id, role, status) VALUES ('${academyId}', '${ownerUserId}', 'academy_owner', 'active'); INSERT INTO academy_join_codes (academy_id, code, role, created_by) VALUES ('${academyId}', '${joinCode}', 'player', '${ownerUserId}');"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "INSERT INTO academy_members (academy_id, user_id, role, status) VALUES ('${academyId}', '${ownerUserId}', 'academy_owner', 'active'); INSERT INTO academy_join_codes (academy_id, code, role, created_by) VALUES ('${academyId}', '${joinCode}', 'player', '${ownerUserId}');"`,
       { encoding: 'utf8' },
     );
     console.log(`✓ Academy created successfully! ID: ${academyId}, Join Code: "${joinCode}"`);
@@ -115,7 +140,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
     const studentUserId = querySingleValue(`SELECT gen_random_uuid();`);
     const studentEmail = `student-${Date.now()}@cricket.org`;
     execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, aud, role) VALUES ('${studentUserId}', '${studentEmail}', crypt('Password123!', gen_salt('bf')), now(), '{\\"full_name\\": \\"Shubman Gill\\"}', 'authenticated', 'authenticated');"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, aud, role) VALUES ('${studentUserId}', '${studentEmail}', crypt('Password123!', gen_salt('bf')), now(), '{\\"full_name\\": \\"Shubman Gill\\"}', 'authenticated', 'authenticated');"`,
       { encoding: 'utf8' },
     );
 
@@ -156,7 +181,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
 
     // Owner approves with batch assignment via RPC with auth.uid() claim set
     execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "SET LOCAL \\"request.jwt.claims\\" = '{\\"sub\\": \\"${ownerUserId}\\"}'; SELECT approve_join_request('${reqId}'::uuid, ARRAY['${batchId}'::uuid]);"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "SET LOCAL \\"request.jwt.claims\\" = '{\\"sub\\": \\"${ownerUserId}\\"}'; SELECT approve_join_request('${reqId}'::uuid, ARRAY['${batchId}'::uuid]);"`,
       { encoding: 'utf8' },
     );
     console.log('✓ Executed approve_join_request RPC with batch assignment');
@@ -176,7 +201,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
     const coachUserId = querySingleValue(`SELECT gen_random_uuid();`);
     const coachEmail = `coach-${Date.now()}@cricket.org`;
     execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, aud, role) VALUES ('${coachUserId}', '${coachEmail}', crypt('Password123!', gen_salt('bf')), now(), '{\\"full_name\\": \\"Rahul Dravid\\"}', 'authenticated', 'authenticated'); INSERT INTO academy_members (academy_id, user_id, role, status) VALUES ('${academyId}', '${coachUserId}', 'coach', 'active');"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, raw_user_meta_data, aud, role) VALUES ('${coachUserId}', '${coachEmail}', crypt('Password123!', gen_salt('bf')), now(), '{\\"full_name\\": \\"Rahul Dravid\\"}', 'authenticated', 'authenticated'); INSERT INTO academy_members (academy_id, user_id, role, status) VALUES ('${academyId}', '${coachUserId}', 'coach', 'active');"`,
       { encoding: 'utf8' },
     );
 
@@ -402,7 +427,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
       );
 
       execSync(
-        `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "INSERT INTO match_bowling (match_id, academy_member_id, overs, maidens, runs_conceded, wickets) VALUES ('${matchId}', '${memberId}', 4.7, 0, 32, 2);"`,
+        `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "INSERT INTO match_bowling (match_id, academy_member_id, overs, maidens, runs_conceded, wickets) VALUES ('${matchId}', '${memberId}', 4.7, 0, 32, 2);"`,
         { encoding: 'utf8', stdio: 'pipe' },
       );
     } catch (err: unknown) {
@@ -421,7 +446,7 @@ test.describe('Phase 3: Real-World 7-Step Pilot Readiness Manual Walkthrough', (
       `SELECT id FROM academy_members WHERE academy_id = '${academyId}' LIMIT 1;`,
     );
     execSync(
-      `docker exec -i supabase_db_cricket psql -U postgres -d postgres -c "INSERT INTO match_bowling (match_id, academy_member_id, overs, maidens, runs_conceded, wickets) VALUES ('${matchId}', '${memberId}', 4.5, 0, 32, 2);"`,
+      `docker exec -i ${getDbContainer()} psql -U postgres -d postgres -c "INSERT INTO match_bowling (match_id, academy_member_id, overs, maidens, runs_conceded, wickets) VALUES ('${matchId}', '${memberId}', 4.5, 0, 32, 2);"`,
       { encoding: 'utf8' },
     );
     console.log('✓ Saved valid bowling figures with 4.5 overs successfully!');
