@@ -166,15 +166,15 @@ begin
   -- One single-row INSERT per batch keeps v_batch_ids deterministic
   -- (v_batch_ids[1]='U14', [2]='U16', [3]='Senior').
   insert into batches (academy_id, name, age_group, coach_id, training_days, training_time)
-  values (v_academy_id, 'U14', 'Under 14', v_coach_member_ids[1], 'Mon, Wed, Fri', '16:00-18:00')
+  values (v_academy_id, 'U14', 'Under 14', v_coach_member_ids[1], ARRAY['Mon', 'Wed', 'Fri'], '16:00-18:00')
   returning id into v_batch1_id;
 
   insert into batches (academy_id, name, age_group, coach_id, training_days, training_time)
-  values (v_academy_id, 'U16', 'Under 16', v_coach_member_ids[2], 'Tue, Thu, Sat', '17:00-19:00')
+  values (v_academy_id, 'U16', 'Under 16', v_coach_member_ids[2], ARRAY['Tue', 'Thu', 'Sat'], '17:00-19:00')
   returning id into v_batch2_id;
 
   insert into batches (academy_id, name, age_group, coach_id, training_days, training_time)
-  values (v_academy_id, 'Senior', 'Senior', v_coach_member_ids[1], 'Mon, Wed, Fri, Sun', '06:00-08:00')
+  values (v_academy_id, 'Senior', 'Senior', v_coach_member_ids[1], ARRAY['Mon', 'Wed', 'Fri', 'Sun'], '06:00-08:00')
   returning id into v_batch3_id;
 
   v_batch_ids := array[v_batch1_id, v_batch2_id, v_batch3_id];
