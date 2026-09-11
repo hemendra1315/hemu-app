@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
+import { isE2ETestBuild } from '@/lib/e2eTestMode';
 import type { JoinRequest, Membership, Profile } from '@/types';
 
 /**
@@ -46,7 +47,11 @@ const signedOutState = {
 } satisfies Partial<AuthState>;
 
 const getInitialState = (): Partial<AuthState> => {
-  if (typeof window !== 'undefined') {
+  // Gated the same way as AuthProvider.tsx's E2E hook — without this, a
+  // visitor could skip window.__E2E_SET_AUTH__ entirely and just write
+  // straight to sessionStorage['cam.e2e_auth'] themselves to boot the app
+  // into a fake (e.g. super-admin) session on the real production site.
+  if (isE2ETestBuild() && typeof window !== 'undefined') {
     const storedAuth = sessionStorage.getItem('cam.e2e_auth');
     if (storedAuth) {
       try {

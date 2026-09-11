@@ -3,12 +3,27 @@ import { expect, test, type Page } from '@playwright/test';
 /**
  * PHASE 53 — MAXIMUM ADVERSARIAL PRODUCTION QA
  *
- * Runs against whatever E2E_BASE_URL points at (the deployed production app by
- * default, or `vite preview` locally) in a REAL Chromium browser. Uses the app's
- * own E2E auth affordance (`cam.e2e_auth` / `window.__E2E_SET_AUTH__` /
- * persisted `cam.active-academy`) to seed identity exactly the way the app's
- * AuthProvider + academy store persist it, then walks the real guards, stores,
- * bottom nav, routing and error handling.
+ * Runs against whatever E2E_BASE_URL points at, in a REAL Chromium browser.
+ * Uses the app's own E2E auth affordance (`cam.e2e_auth` /
+ * `window.__E2E_SET_AUTH__` / persisted `cam.active-academy`) to seed
+ * identity exactly the way the app's AuthProvider + academy store persist
+ * it, then walks the real guards, stores, bottom nav, routing and error
+ * handling.
+ *
+ * IMPORTANT: window.__E2E_SET_AUTH__ only exists in a build compiled with
+ * VITE_E2E_TEST_MODE=true (see AuthProvider.tsx) — the real cricos08.vercel.app
+ * deployment is never built that way, on purpose, so a real visitor can't use
+ * this same hook to fake a session. That means this spec can NOT run against
+ * the live production URL anymore. Point E2E_BASE_URL at one of:
+ *   - a local `VITE_E2E_TEST_MODE=true npm run build && npx vite preview`
+ *     (this is what CI does)
+ *   - a Vercel preview deployment for a branch where that env var was set
+ *     for that preview environment only (never for Production in Vercel's
+ *     project settings)
+ * Locally, build with the flag before running Playwright — its webServer
+ * (see playwright.config.ts) only serves an already-built dist/, it doesn't
+ * build one:
+ *   VITE_E2E_TEST_MODE=true npm run build && npm run test:e2e
  *
  * The Supabase REST/RPC layer is never reached with a malformed UUID: every
  * parameterized route is fuzzed and we assert (a) no raw Postgres error text in

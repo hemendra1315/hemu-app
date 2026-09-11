@@ -44,8 +44,14 @@ jobs:
       - name: Run unit & component tests with coverage
         run: npm run test:coverage
 
-      - name: Build production bundle
+      # Only this build gets the E2E auth-injection hook compiled in — it's
+      # the one Playwright serves via `vite preview` below. Every other
+      # build (including what Vercel deploys) never sets this flag, so the
+      # hook never reaches real users.
+      - name: Build test bundle for Playwright (E2E auth hook enabled)
         run: npm run build
+        env:
+          VITE_E2E_TEST_MODE: 'true'
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

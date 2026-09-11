@@ -135,7 +135,12 @@ describe('AuthProvider', () => {
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
-  it('supports window.__E2E_SET_AUTH__ hook for test harness injection', async () => {
+  it('supports window.__E2E_SET_AUTH__ hook for test harness injection, only in an E2E-flagged build', async () => {
+    // The hook is compiled in only when VITE_E2E_TEST_MODE is set (CI's
+    // Playwright build sets it; a normal/production build never does) —
+    // see AuthProvider.tsx. Stub it here to exercise that build.
+    vi.stubEnv('VITE_E2E_TEST_MODE', 'true');
+
     mockedGetSession.mockResolvedValue({
       data: { session: null },
       error: null,
@@ -161,5 +166,26 @@ describe('AuthProvider', () => {
     expect(useAuthStore.getState().identityStatus).toBe('ready');
     expect(useAuthStore.getState().user?.id).toBe('e2e-user');
     expect(requestPersistentStorage).toHaveBeenCalled();
+
+    vi.unstubAllEnvs();
+  });
+
+  it('never installs window.__E2E_SET_AUTH__ in a normal (non-E2E-flagged) build', async () => {
+    delete (window as { __E2E_SET_AUTH__?: unknown }).__E2E_SET_AUTH__;
+    mockedGetSession.mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
+
+    render(
+      <AuthProvider>
+        <div>Normal Mode</div>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(mockedGetSession).toHaveBeenCalled();
+    });
+    expect(window.__E2E_SET_AUTH__).toBeUndefined();
   });
 });

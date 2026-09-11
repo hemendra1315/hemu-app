@@ -1,5 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
 
+// Seeds identity via window.__E2E_SET_AUTH__, which only exists in a build
+// compiled with VITE_E2E_TEST_MODE=true (see AuthProvider.tsx) — CI's
+// Playwright build sets it; the real production build never does. Run this
+// spec against a build made the same way, not against real production.
+
 const UUID_USER = '11111111-1111-4111-8111-111111111111';
 const UUID_ACADEMY = 'aaaa0000-0000-4000-8000-0000000000a1';
 const UUID_MEMBERSHIP = '22222222-2222-4222-8222-222222222222';

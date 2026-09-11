@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 
+import { isE2ETestBuild } from '@/lib/e2eTestMode';
 import { logger } from '@/lib/logger';
 import { requestPersistentStorage } from '@/lib/offline/indexedDb';
 import { supabase } from '@/lib/supabase/client';
@@ -8,10 +9,6 @@ import type { TestModeRole } from '@/stores/testModeStore';
 
 import { useIdentity } from '../hooks/useIdentity';
 
-/**
- * Bridges Supabase auth events into the auth store, then loads the identity
- * (profile, memberships, pending join requests) that routing depends on.
- */
 declare global {
   interface Window {
     __E2E_SET_AUTH__?: (data: {
@@ -35,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    if (typeof window !== 'undefined') {
+    if (isE2ETestBuild() && typeof window !== 'undefined') {
       window.__E2E_SET_AUTH__ = (data) => {
         if (data.user) {
           sessionStorage.setItem('cam.e2e_auth', JSON.stringify(data));
@@ -91,7 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data }) => {
         const isE2E = Boolean(
-          typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
+          isE2ETestBuild() &&
+          typeof window !== 'undefined' &&
+          sessionStorage.getItem('cam.e2e_auth'),
         );
         if (
           active &&
@@ -108,7 +107,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch((error: unknown) => {
         logger.error('session_bootstrap_failed', { error: String(error) });
         const isE2E = Boolean(
-          typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
+          isE2ETestBuild() &&
+          typeof window !== 'undefined' &&
+          sessionStorage.getItem('cam.e2e_auth'),
         );
         if (
           active &&
@@ -123,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       logger.debug('auth_state_change', { event });
       const isE2E = Boolean(
-        typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
+        isE2ETestBuild() && typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
       );
       if (
         !isE2E &&

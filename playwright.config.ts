@@ -19,6 +19,12 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile-chrome', use: { ...devices['Pixel 7'] } },
   ],
+  // Serves whatever is already in dist/ — it does not build. CI builds
+  // dist/ with VITE_E2E_TEST_MODE=true as its own workflow step before this
+  // runs; running locally, build the same way first:
+  //   VITE_E2E_TEST_MODE=true npm run build && npm run test:e2e
+  // (that flag is what compiles in the window.__E2E_SET_AUTH__ test hook —
+  // see AuthProvider.tsx — so without it these specs can't seed identity).
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
