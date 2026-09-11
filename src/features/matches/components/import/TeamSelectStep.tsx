@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 import type { ExtractedMatchData } from '../../import/cricheroesPdfTypes';
 
 export function TeamSelectStep({
   data,
+  scorecardUrl,
+  onScorecardUrlChange,
   onConfirm,
   onBack,
 }: {
   data: ExtractedMatchData;
+  scorecardUrl: string;
+  onScorecardUrlChange: (url: string) => void;
   onConfirm: (teamId: 'A' | 'B', opponentName: string) => void;
   onBack: () => void;
 }) {
@@ -78,6 +82,21 @@ export function TeamSelectStep({
           </div>
           <p className="text-fg-muted mt-2 text-xs">Click to select as Academy Team</p>
         </button>
+      </div>
+
+      <div>
+        <label className="text-fg mb-1 block text-sm font-medium">
+          CricHeroes scorecard link <span className="text-fg-muted font-normal">(optional)</span>
+        </label>
+        <Input
+          type="url"
+          placeholder="https://cricheroes.in/scorecard/..."
+          value={scorecardUrl}
+          onChange={(e) => onScorecardUrlChange(e.target.value)}
+        />
+        <p className="text-fg-muted mt-1 text-xs">
+          Saved with the match so anyone can jump back to the original scorecard later.
+        </p>
       </div>
 
       <div className="bg-surface-subtle border-border-subtle rounded-xl border p-4 text-sm">

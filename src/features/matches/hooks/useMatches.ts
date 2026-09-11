@@ -40,6 +40,8 @@ import {
   saveMatchResult,
   updateMatch,
 } from '../api/matchesApi';
+import { fetchCricHeroesImports } from '../api/cricheroesImportsApi';
+import type { CricHeroesImportRecord } from '../api/cricheroesImportsApi';
 
 // ============================================================
 // MATCH CRUD
@@ -169,6 +171,18 @@ export function useSaveMatchResult(academyId: UUID) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.academy.all });
     },
+  });
+}
+
+// ============================================================
+// CRICHEROES IMPORT REVIEW
+// ============================================================
+
+export function useCricHeroesImports(academyId: UUID | null) {
+  return useQuery<CricHeroesImportRecord[]>({
+    queryKey: [...queryKeys.academy.matches(academyId ?? 'none'), 'cricheroes-imports'],
+    enabled: Boolean(academyId),
+    queryFn: () => fetchCricHeroesImports(academyId as UUID),
   });
 }
 

@@ -153,6 +153,17 @@ export default function MatchesPage() {
             onChange={setMatchFilter}
           />
         </div>
+        {canManage ? (
+          <div className="mb-3 px-4">
+            <button
+              type="button"
+              onClick={() => navigate('/matches/imports')}
+              className="text-primary text-xs font-medium underline"
+            >
+              Review CricHeroes imports
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Desktop Header */}
@@ -170,6 +181,9 @@ export default function MatchesPage() {
                 point at all here. */}
             <Button variant="secondary" onClick={() => navigate('/matches/new')}>
               Import from CricHeroes
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/matches/imports')}>
+              Review Imports
             </Button>
             <Button onClick={() => setShowForm((open) => !open)}>
               {showForm ? 'Hide form' : 'New match'}

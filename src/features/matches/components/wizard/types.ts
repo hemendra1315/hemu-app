@@ -1,6 +1,7 @@
 import type { UUID } from '@/types';
 import type { MatchFormat, MatchResult, MatchType } from '@/types/enums';
 import { toIsoDate } from '@/lib/utils/date';
+import type { MappedPlayer } from '../../import/cricheroesPdfTypes';
 
 /** Sentinel batting_order value meaning "Opening" */
 export const BATTING_ORDER_OPENING = 0;
@@ -84,6 +85,15 @@ export type WizardState = {
 
   // Step 5 — Awards (optional)
   awards: WizardAwards;
+
+  /** Link back to the original CricHeroes scorecard, when imported from one. */
+  cricheroesSourceUrl?: string | null;
+  /**
+   * The player-mapping decisions made during a CricHeroes import, kept only
+   * long enough to be recorded once the match itself is saved and has an id
+   * (see MatchWizard.handleSave). Not present for a manually-entered match.
+   */
+  cricheroesImportSnapshot?: { sourceFilename: string; playerMappings: MappedPlayer[] } | null;
 };
 
 export const INITIAL_WIZARD_STATE: WizardState = {

@@ -1,6 +1,7 @@
 import { Badge, Button, Select } from '@/components/ui';
 import type { AcademyPlayerCandidate } from '../../import/playerNameMatcher';
 import type { MappedPlayer } from '../../import/cricheroesPdfTypes';
+import { mappingStatusBadge } from '../../import/mappingStatusBadge';
 
 export function PlayerMappingStep({
   mappedPlayers,
@@ -62,17 +63,9 @@ export function PlayerMappingStep({
           >
             <div className="flex items-start justify-between gap-2">
               <span className="text-fg truncate text-base font-bold">{player.cricheroesName}</span>
-              {player.isIgnored ? (
-                <Badge tone="neutral">Ignored</Badge>
-              ) : player.savedMapping ? (
-                <Badge tone="success">Saved Mapping ✓</Badge>
-              ) : player.isGuest ? (
-                <Badge tone="warning">Guest Player</Badge>
-              ) : player.status === 'exact_match' ? (
-                <Badge tone="success">Exact Match</Badge>
-              ) : (
-                <Badge tone="brand">Matched</Badge>
-              )}
+              <Badge tone={mappingStatusBadge(player).tone}>
+                {mappingStatusBadge(player).label}
+              </Badge>
             </div>
 
             <div>
@@ -139,19 +132,9 @@ export function PlayerMappingStep({
                   </Select>
                 </td>
                 <td className="px-4 py-3">
-                  {player.isIgnored ? (
-                    <Badge tone="neutral">Ignored</Badge>
-                  ) : player.savedMapping ? (
-                    <Badge tone="success">Saved Mapping ✓</Badge>
-                  ) : player.isGuest ? (
-                    <Badge tone="warning">Guest Player</Badge>
-                  ) : player.status === 'exact_match' ? (
-                    <Badge tone="success">Exact Match (100%)</Badge>
-                  ) : player.status === 'high_confidence' ? (
-                    <Badge tone="success">Matched ({player.confidenceScore}%)</Badge>
-                  ) : (
-                    <Badge tone="brand">Matched</Badge>
-                  )}
+                  <Badge tone={mappingStatusBadge(player).tone}>
+                    {mappingStatusBadge(player).label}
+                  </Badge>
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button

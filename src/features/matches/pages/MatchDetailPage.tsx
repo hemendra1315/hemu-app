@@ -96,6 +96,17 @@ export default function MatchDetailPage() {
             ) : null}
           </div>
 
+          {match.cricheroesSourceUrl ? (
+            <a
+              href={match.cricheroesSourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary mt-2 inline-block text-sm hover:underline"
+            >
+              View original CricHeroes scorecard ↗
+            </a>
+          ) : null}
+
           {captain ? (
             <p className="text-fg-muted mt-2 text-sm">
               Captain: {captain.player.fullName ?? captain.player.email}

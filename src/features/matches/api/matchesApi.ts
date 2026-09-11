@@ -22,7 +22,7 @@ import type {
 const MATCH_COLUMNS = `
   id, academy_id, match_name, match_date, venue, opponent_name, tournament,
   match_type, format, overs, team_score, wickets_lost, overs_played,
-  result, winning_margin, batch_id, status, created_by, created_at, updated_at
+  result, winning_margin, batch_id, cricheroes_source_url, status, created_by, created_at, updated_at
 `;
 
 function toMatch(row: any): Match {
@@ -43,6 +43,7 @@ function toMatch(row: any): Match {
     result: row.result,
     winningMargin: row.winning_margin,
     batchId: row.batch_id,
+    cricheroesSourceUrl: row.cricheroes_source_url ?? null,
     status: row.status,
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -787,6 +788,7 @@ export async function saveMatchResult(
       result: payload.match.result || null,
       winning_margin: payload.match.winningMargin || null,
       batch_id: payload.match.batchId || null,
+      cricheroes_source_url: payload.match.cricheroesSourceUrl || null,
     },
     lineups: (payload.lineups ?? []).map((l) => ({
       academy_member_id: l.academyMemberId || null,
@@ -865,6 +867,25 @@ export async function saveMatchResult(
 export async function refreshAcademyRecords(academyId: UUID): Promise<void> {
   const { error } = await supabase.rpc('refresh_academy_records', {
     p_academy: academyId,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * `save_match_result` only recomputes stats for players who still appear in
+ * the match's rows *after* it saves. That's right for a normal save, but
+ * when a CricHeroes import fix moves a player OUT of a match (their runs
+ * were reassigned to someone else), the RPC never touches them — they'd
+ * keep counting a match they're no longer credited with. Call this for
+ * every player a fix moved a match away from.
+ */
+export async function refreshPlayerStatistics(academyId: UUID, playerId: UUID): Promise<void> {
+  const { error } = await supabase.rpc('refresh_player_statistics', {
+    p_academy: academyId,
+    p_player: playerId,
   });
 
   if (error) {

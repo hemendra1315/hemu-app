@@ -22,6 +22,8 @@ export type Match = {
   createdBy: UUID | null;
   createdAt: string;
   updatedAt: string;
+  /** Link back to the original CricHeroes scorecard, when imported from one. */
+  cricheroesSourceUrl: string | null;
 };
 
 export type MatchLineup = {
@@ -266,6 +268,7 @@ export type SaveMatchResultPayload = {
     result?: MatchResult | null;
     winningMargin?: string | null;
     batchId?: UUID | null;
+    cricheroesSourceUrl?: string | null;
   };
   lineups?: Array<{
     academyMemberId?: UUID | null;

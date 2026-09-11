@@ -29,6 +29,8 @@ export function CricHeroesImportModal({
 }) {
   const [step, setStep] = useState<'upload' | 'teams' | 'players' | 'duplicate'>('upload');
   const [extracted, setExtracted] = useState<ExtractedMatchData | null>(null);
+  const [sourceFilename, setSourceFilename] = useState<string>('');
+  const [scorecardUrl, setScorecardUrl] = useState<string>('');
   const [selectedAcademyTeamId, setSelectedAcademyTeamId] = useState<'A' | 'B'>('A');
   const [opponentName, setOpponentName] = useState<string>('');
   const [mappedPlayers, setMappedPlayers] = useState<MappedPlayer[]>([]);
@@ -47,9 +49,10 @@ export function CricHeroesImportModal({
   const existingMatches = academyMatchesQuery.data ?? [];
   const savedMappings = mappingsQuery.data ?? [];
 
-  function handleFileLoaded(text: string) {
+  function handleFileLoaded(text: string, filename: string) {
     const parsed = parseCricHeroesText(text);
     setExtracted(parsed);
+    setSourceFilename(filename);
 
     // Extract all player names from innings
     const allNames: string[] = [];
@@ -109,14 +112,19 @@ export function CricHeroesImportModal({
       // Non-blocking: continue import even if mapping save encounters a network glitch
     }
 
-    onImportReady(
-      buildImportWizardState({
+    onImportReady({
+      ...buildImportWizardState({
         extracted,
         mappedPlayers,
         selectedAcademyTeamId,
         opponentName,
       }),
-    );
+      cricheroesSourceUrl: scorecardUrl.trim() || null,
+      cricheroesImportSnapshot: {
+        sourceFilename,
+        playerMappings: mappedPlayers.filter((p) => !p.isIgnored),
+      },
+    });
   }
 
   return (
@@ -127,6 +135,8 @@ export function CricHeroesImportModal({
         {step === 'teams' && extracted && (
           <TeamSelectStep
             data={extracted}
+            scorecardUrl={scorecardUrl}
+            onScorecardUrlChange={setScorecardUrl}
             onConfirm={handleTeamsConfirmed}
             onBack={() => setStep('upload')}
           />

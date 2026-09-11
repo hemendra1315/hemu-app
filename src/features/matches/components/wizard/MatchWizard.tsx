@@ -11,6 +11,7 @@ import { ReviewStep } from './steps/ReviewStep';
 import { useSaveMatchResult } from '../../hooks/useMatches';
 import type { SaveMatchResultPayload } from '../../api/matchesTypes';
 import { useUiStore } from '@/stores';
+import { recordCricHeroesImport } from '../../api/cricheroesImportsApi';
 
 export function MatchWizard({
   academyId,
@@ -77,6 +78,7 @@ export function MatchWizard({
         teamScore: state.teamScore || null,
         overs: state.overs ? parseFloat(state.overs) : null,
         tournament: state.tournament || null,
+        cricheroesSourceUrl: state.cricheroesSourceUrl ?? null,
       },
       lineups: state.lineup.map((l) => ({
         academyMemberId: l.isGuest ? null : l.memberId,
@@ -140,6 +142,23 @@ export function MatchWizard({
 
     try {
       const res = await saveMutation.mutateAsync(payload);
+
+      // Only present for a CricHeroes-imported match (see CricHeroesImportModal).
+      // Kept non-blocking, same as the mapping-memory save in the import modal
+      // itself: a network glitch here shouldn't stop the match from saving.
+      if (state.cricheroesImportSnapshot) {
+        try {
+          await recordCricHeroesImport({
+            academyId,
+            matchId: res.matchId as UUID,
+            sourceFilename: state.cricheroesImportSnapshot.sourceFilename,
+            playerMappings: state.cricheroesImportSnapshot.playerMappings,
+          });
+        } catch {
+          // Non-blocking — see comment above.
+        }
+      }
+
       pushToast({ title: 'Match saved successfully', variant: 'success' });
       onComplete(res.matchId as UUID);
     } catch (err: unknown) {

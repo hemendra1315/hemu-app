@@ -860,6 +860,61 @@ export type Database = {
           },
         ]
       }
+      cricheroes_imports: {
+        Row: {
+          academy_id: string
+          id: string
+          imported_at: string
+          imported_by: string | null
+          match_id: string
+          player_mappings: Json
+          source_filename: string | null
+          updated_at: string
+        }
+        Insert: {
+          academy_id: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          match_id: string
+          player_mappings?: Json
+          source_filename?: string | null
+          updated_at?: string
+        }
+        Update: {
+          academy_id?: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          match_id?: string
+          player_mappings?: Json
+          source_filename?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cricheroes_imports_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cricheroes_imports_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cricheroes_imports_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cricheroes_player_mappings: {
         Row: {
           academy_id: string
@@ -1639,6 +1694,7 @@ export type Database = {
           batch_id: string | null
           created_at: string
           created_by: string | null
+          cricheroes_source_url: string | null
           format: Database["public"]["Enums"]["match_format"]
           id: string
           match_date: string
@@ -1661,6 +1717,7 @@ export type Database = {
           batch_id?: string | null
           created_at?: string
           created_by?: string | null
+          cricheroes_source_url?: string | null
           format?: Database["public"]["Enums"]["match_format"]
           id?: string
           match_date: string
@@ -1683,6 +1740,7 @@ export type Database = {
           batch_id?: string | null
           created_at?: string
           created_by?: string | null
+          cricheroes_source_url?: string | null
           format?: Database["public"]["Enums"]["match_format"]
           id?: string
           match_date?: string
