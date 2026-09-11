@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Clock, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 import { ErrorState, EmptyState } from '@/components/feedback';
 import { Avatar, Button, Card, CardBody, CardHeader, Input, Textarea } from '@/components/ui';
@@ -22,7 +22,7 @@ export default function PlayerFeeDetailPage() {
 
   const playerId: UUID | null = memberId && isUUID(memberId) ? (memberId as UUID) : null;
   const detailQuery = usePlayerFeeDetail(academyId, playerId);
-  const { setFee, addPayment, removePayment } = usePlayerFeeActions(
+  const { setFee, addPayment, removePayment, confirmClaim, dismissClaim } = usePlayerFeeActions(
     academyId as UUID,
     playerId as UUID,
   );
@@ -42,6 +42,12 @@ export default function PlayerFeeDetailPage() {
   }
 
   const detail = detailQuery.data;
+  // A player can have more than one simultaneously-pending claim -- the
+  // unique index only enforces one PENDING claim per (player, MONTH), not
+  // per player overall (e.g. they fell behind and claimed both January and
+  // February). Showing every pending claim, not just the most recent one,
+  // is what lets the owner confirm/dismiss an older unresolved month too.
+  const pendingClaims = detail.claims.filter((c) => c.status === 'pending');
 
   const handleSetFee = async (rupees: number) => {
     try {
@@ -96,6 +102,32 @@ export default function PlayerFeeDetailPage() {
     }
   };
 
+  const handleConfirmClaim = async (claimId: UUID) => {
+    try {
+      await confirmClaim.mutateAsync(claimId);
+      pushToast({ title: 'Payment confirmed', variant: 'success' });
+    } catch (error) {
+      pushToast({
+        title: 'Could not confirm payment',
+        description: errorMessage(error),
+        variant: 'error',
+      });
+    }
+  };
+
+  const handleDismissClaim = async (claimId: UUID) => {
+    try {
+      await dismissClaim.mutateAsync(claimId);
+      pushToast({ title: 'Claim dismissed', variant: 'success' });
+    } catch (error) {
+      pushToast({
+        title: 'Could not dismiss claim',
+        description: errorMessage(error),
+        variant: 'error',
+      });
+    }
+  };
+
   return (
     <div className="space-y-4 pb-24 md:pb-6">
       <div className="md:hidden">
@@ -120,6 +152,53 @@ export default function PlayerFeeDetailPage() {
           </div>
         </CardBody>
       </Card>
+
+      {pendingClaims.map((pendingClaim) => (
+        <Card key={pendingClaim.id} className="border-info/40">
+          <CardBody className="space-y-2 p-4">
+            <div className="flex items-center gap-2">
+              <Clock className="text-info h-4 w-4 shrink-0" />
+              <p className="text-fg text-sm font-semibold">
+                Says they paid for{' '}
+                {new Date(`${pendingClaim.periodMonth}T00:00:00Z`).toLocaleDateString('en-IN', {
+                  month: 'long',
+                  year: 'numeric',
+                  timeZone: 'UTC',
+                })}
+              </p>
+            </div>
+            <p className="text-fg-muted text-sm">
+              From phone number <strong className="text-fg">{pendingClaim.payerPhone}</strong>.
+              Check it against your own UPI app before confirming.
+            </p>
+            {pendingClaim.note && <p className="text-fg-muted text-xs">{pendingClaim.note}</p>}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="text-danger hover:bg-danger/10"
+                isLoading={dismissClaim.isPending && dismissClaim.variables === pendingClaim.id}
+                disabled={confirmClaim.isPending || dismissClaim.isPending}
+                onClick={() => void handleDismissClaim(pendingClaim.id)}
+              >
+                <X className="mr-1.5 h-3.5 w-3.5" />
+                Dismiss
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                isLoading={confirmClaim.isPending && confirmClaim.variables === pendingClaim.id}
+                disabled={confirmClaim.isPending || dismissClaim.isPending}
+                onClick={() => void handleConfirmClaim(pendingClaim.id)}
+              >
+                <Check className="mr-1.5 h-3.5 w-3.5" />
+                Confirm payment
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      ))}
 
       <Card>
         <CardHeader title="Monthly fee" />

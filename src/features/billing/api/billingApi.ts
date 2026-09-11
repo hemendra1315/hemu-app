@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { unwrap, unwrapMaybe, unwrapVoid } from '@/lib/api';
+import { rpc, unwrap, unwrapMaybe, unwrapVoid } from '@/lib/api';
 import { fetchAcademyMember, fetchAcademyMembers } from '@/features/members/api/membersApi';
 import { supabase } from '@/lib/supabase/client';
 import type { UUID } from '@/types';
 import type {
   FeePayment,
+  FeePaymentClaim,
   PlayerFeeDetail,
   PlayerFeeSummary,
   RecordPaymentInput,
+  SubmitFeePaymentClaimInput,
 } from './billingTypes';
 
 /** Always the 1st of the month, matching `fee_payments.period_month`'s check constraint. */
@@ -38,6 +40,18 @@ function toFeePayment(row: any): FeePayment {
   };
 }
 
+function toFeePaymentClaim(row: any): FeePaymentClaim {
+  return {
+    id: row.id,
+    playerId: row.player_id,
+    periodMonth: row.period_month,
+    payerPhone: row.payer_phone,
+    note: row.note ?? null,
+    status: row.status,
+    createdAt: row.created_at,
+  };
+}
+
 /**
  * Every active player plus their paid/unpaid status for one month. Base list
  * is `academy_members` (role=player, active) -- same reasoning as
@@ -52,7 +66,7 @@ export async function fetchFeeSummaries(
   const players = await fetchAcademyMembers(academyId, { role: 'player', status: 'active' });
   if (players.length === 0) return [];
 
-  const [feeRows, paymentRows] = await Promise.all([
+  const [feeRows, paymentRows, claimRows] = await Promise.all([
     unwrap<any[]>(
       supabase
         .from('player_fees')
@@ -68,6 +82,15 @@ export async function fetchFeeSummaries(
         .eq('period_month', periodMonth)
         .returns<any[]>(),
     ),
+    unwrap<any[]>(
+      supabase
+        .from('fee_payment_claims')
+        .select('id, player_id, period_month, payer_phone, note, status, created_at')
+        .eq('academy_id', academyId)
+        .eq('period_month', periodMonth)
+        .eq('status', 'pending')
+        .returns<any[]>(),
+    ),
   ]);
 
   const feeByPlayer = new Map(
@@ -78,6 +101,11 @@ export async function fetchFeeSummaries(
     const playerId = row.player_id as UUID;
     paidByPlayer.set(playerId, (paidByPlayer.get(playerId) ?? 0) + (row.amount_paise as number));
   }
+  // At most one pending claim per player/month (enforced by a unique index),
+  // so a straight overwrite is safe here.
+  const pendingClaimByPlayer = new Map(
+    claimRows.map((row) => [row.player_id as UUID, toFeePaymentClaim(row)]),
+  );
 
   return players
     .map((player): PlayerFeeSummary => {
@@ -90,6 +118,7 @@ export async function fetchFeeSummaries(
         monthlyFeePaise,
         paidPaiseThisMonth,
         isPaid: monthlyFeePaise !== null && paidPaiseThisMonth >= monthlyFeePaise,
+        pendingClaim: pendingClaimByPlayer.get(player.id) ?? null,
       };
     })
     .sort((a, b) => (a.fullName ?? a.email).localeCompare(b.fullName ?? b.email));
@@ -99,7 +128,7 @@ export async function fetchPlayerFeeDetail(
   academyId: UUID,
   playerId: UUID,
 ): Promise<PlayerFeeDetail> {
-  const [member, feeRow, paymentRows] = await Promise.all([
+  const [member, feeRow, paymentRows, claimRows] = await Promise.all([
     fetchAcademyMember(playerId),
     unwrapMaybe<any>(
       supabase
@@ -119,6 +148,15 @@ export async function fetchPlayerFeeDetail(
         .order('paid_on', { ascending: false })
         .returns<any[]>(),
     ),
+    unwrap<any[]>(
+      supabase
+        .from('fee_payment_claims')
+        .select('id, player_id, period_month, payer_phone, note, status, created_at')
+        .eq('academy_id', academyId)
+        .eq('player_id', playerId)
+        .order('created_at', { ascending: false })
+        .returns<any[]>(),
+    ),
   ]);
 
   return {
@@ -127,6 +165,7 @@ export async function fetchPlayerFeeDetail(
     email: member.email,
     monthlyFeePaise: feeRow?.monthly_fee_paise ?? null,
     payments: paymentRows.map(toFeePayment),
+    claims: claimRows.map(toFeePaymentClaim),
   };
 }
 
@@ -165,4 +204,54 @@ export async function recordPayment(
 
 export async function deletePayment(paymentId: UUID): Promise<void> {
   await unwrapVoid(supabase.from('fee_payments').delete().eq('id', paymentId));
+}
+
+/**
+ * A player self-reporting "I've Paid" for one month. RLS only lets this
+ * insert as the caller's own player row in this academy (`player_id =
+ * my_player_id(academy_id)`, which resolves to the caller's own membership
+ * -- a linked parent's account can't satisfy it on the child's behalf), and
+ * only as 'pending' -- a player can never mark themselves paid outright. The
+ * unique index on (player_id, period_month) where status = 'pending' means a
+ * second attempt while one is already open fails at the database, not just
+ * the UI.
+ */
+export async function submitFeePaymentClaim(
+  academyId: UUID,
+  playerId: UUID,
+  input: SubmitFeePaymentClaimInput,
+): Promise<void> {
+  await unwrapVoid(
+    supabase.from('fee_payment_claims').insert({
+      academy_id: academyId,
+      player_id: playerId,
+      period_month: input.periodMonth,
+      payer_phone: input.payerPhone,
+      note: input.note ?? null,
+    }),
+  );
+}
+
+/** The player withdrawing their own still-pending claim (e.g. submitted by
+ * mistake). RLS only allows this while the claim is still pending. */
+export async function withdrawFeePaymentClaim(claimId: UUID): Promise<void> {
+  await unwrapVoid(supabase.from('fee_payment_claims').delete().eq('id', claimId));
+}
+
+/**
+ * Owner only. Runs entirely inside `confirm_fee_payment_claim` -- the RPC
+ * locks the claim row, re-checks it's still pending, looks up the player's
+ * current fee, and writes the real `fee_payments` row, all in one
+ * transaction. That server-side row lock (rather than a client-side
+ * conditional update, the pattern platform_subscription_claims uses) is what
+ * makes a double-click or two-tabs race safe here.
+ */
+export async function confirmFeePaymentClaim(claimId: UUID): Promise<void> {
+  await rpc<{ payment_id: UUID }>('confirm_fee_payment_claim', { p_claim_id: claimId });
+}
+
+/** Owner only -- the claim turned out not to match a real payment. Same
+ * row-locked RPC pattern as confirming. */
+export async function dismissFeePaymentClaim(claimId: UUID): Promise<void> {
+  await rpc<null>('dismiss_fee_payment_claim', { p_claim_id: claimId });
 }

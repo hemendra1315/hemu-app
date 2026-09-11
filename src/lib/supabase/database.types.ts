@@ -1108,6 +1108,67 @@ export type Database = {
           },
         ]
       }
+      fee_payment_claims: {
+        Row: {
+          academy_id: string
+          created_at: string
+          id: string
+          note: string | null
+          payer_phone: string
+          period_month: string
+          player_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          academy_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          payer_phone: string
+          period_month: string
+          player_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          academy_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          payer_phone?: string
+          period_month?: string
+          player_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_payment_claims_academy_id_fkey"
+            columns: ["academy_id"]
+            isOneToOne: false
+            referencedRelation: "academies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_payment_claims_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "academy_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fee_payment_claims_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fee_payments: {
         Row: {
           academy_id: string
@@ -2786,6 +2847,7 @@ export type Database = {
       }
       batch_member_count: { Args: { p_batch_id: string }; Returns: number }
       coaches_batch: { Args: { p_batch: string }; Returns: boolean }
+      confirm_fee_payment_claim: { Args: { p_claim_id: string }; Returns: Json }
       create_academy: {
         Args: {
           p_city?: string
@@ -2883,6 +2945,10 @@ export type Database = {
           p_matches_played: number
           p_player: string
         }
+        Returns: undefined
+      }
+      dismiss_fee_payment_claim: {
+        Args: { p_claim_id: string }
         Returns: undefined
       }
       ensure_person_row: {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, IndianRupee } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, IndianRupee } from 'lucide-react';
 
 import { ErrorState, EmptyState } from '@/components/feedback';
 import { Badge } from '@/components/ui';
@@ -107,6 +107,12 @@ export default function BillingPage() {
                       ? `${formatPaise(row.monthlyFeePaise)}/month`
                       : 'No fee set'}
                   </p>
+                  {!row.isPaid && row.pendingClaim && (
+                    <p className="text-info mt-1 truncate text-xs font-medium">
+                      <Clock className="mr-1 inline h-3 w-3" />
+                      Says paid from {row.pendingClaim.payerPhone}
+                    </p>
+                  )}
                 </div>
                 {row.monthlyFeePaise === null ? (
                   <Badge tone="neutral" className="shrink-0">
@@ -115,6 +121,10 @@ export default function BillingPage() {
                 ) : row.isPaid ? (
                   <Badge tone="success" className="shrink-0">
                     Paid
+                  </Badge>
+                ) : row.pendingClaim ? (
+                  <Badge tone="neutral" className="border-info/30 bg-info/10 text-info shrink-0">
+                    Pending
                   </Badge>
                 ) : (
                   <Badge tone="danger" className="shrink-0">

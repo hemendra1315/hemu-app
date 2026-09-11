@@ -47,6 +47,8 @@ export type PlayerFeeSummary = {
   paidPaiseThisMonth: number;
   /** `paidPaiseThisMonth >= monthlyFeePaise`. Always false with no fee set. */
   isPaid: boolean;
+  /** This player's still-open "I've Paid" claim for the browsed month, if any. */
+  pendingClaim: FeePaymentClaim | null;
 };
 
 /** Full detail for one player: their fee setting plus their whole ledger. */
@@ -56,4 +58,31 @@ export type PlayerFeeDetail = {
   email: string;
   monthlyFeePaise: number | null;
   payments: FeePayment[];
+  /** Every claim this player has ever submitted, most recent first. */
+  claims: FeePaymentClaim[];
+};
+
+export type FeePaymentClaimStatus = 'pending' | 'confirmed' | 'dismissed';
+
+/**
+ * A player's self-report that they've paid -- backed by
+ * `fee_payment_claims`. Never itself proof of payment; the academy owner
+ * confirms or dismisses it against what actually shows up in their own UPI
+ * app, using `payerPhone` to match the sender. Mirrors `SubscriptionClaim`
+ * in the platform-billing feature.
+ */
+export type FeePaymentClaim = {
+  id: UUID;
+  playerId: UUID;
+  periodMonth: string;
+  payerPhone: string;
+  note: string | null;
+  status: FeePaymentClaimStatus;
+  createdAt: string;
+};
+
+export type SubmitFeePaymentClaimInput = {
+  periodMonth: string;
+  payerPhone: string;
+  note?: string | null;
 };

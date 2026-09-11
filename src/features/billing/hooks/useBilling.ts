@@ -4,13 +4,22 @@ import { queryKeys } from '@/lib/query/keys';
 import { isUUID } from '@/lib/validators';
 import type { UUID } from '@/types';
 import {
+  confirmFeePaymentClaim,
   deletePayment,
+  dismissFeePaymentClaim,
   fetchFeeSummaries,
   fetchPlayerFeeDetail,
   recordPayment,
   setPlayerFee,
+  submitFeePaymentClaim,
+  withdrawFeePaymentClaim,
 } from '../api/billingApi';
-import type { PlayerFeeDetail, PlayerFeeSummary, RecordPaymentInput } from '../api/billingTypes';
+import type {
+  PlayerFeeDetail,
+  PlayerFeeSummary,
+  RecordPaymentInput,
+  SubmitFeePaymentClaimInput,
+} from '../api/billingTypes';
 
 export function useFeeSummaries(academyId: UUID | null, periodMonth: string) {
   return useQuery<PlayerFeeSummary[]>({
@@ -62,5 +71,53 @@ export function usePlayerFeeActions(academyId: UUID, playerId: UUID) {
     onSuccess: invalidate,
   });
 
-  return { setFee, addPayment, removePayment };
+  const confirmClaim = useMutation({
+    mutationFn: (claimId: UUID) => confirmFeePaymentClaim(claimId),
+    onSuccess: invalidate,
+  });
+
+  const dismissClaim = useMutation({
+    mutationFn: (claimId: UUID) => dismissFeePaymentClaim(claimId),
+    onSuccess: invalidate,
+  });
+
+  return { setFee, addPayment, removePayment, confirmClaim, dismissClaim };
+}
+
+/**
+ * Player-side: submit or withdraw an "I've Paid" claim for the player's own
+ * academy membership (RLS requires `player_id = my_player_id(academy_id)`,
+ * so a linked parent's account can't submit on a child's behalf -- see
+ * `submitFeePaymentClaim` in billingApi.ts). Just a self-report -- it
+ * doesn't mark anything paid by itself, it only surfaces on the owner's Fees
+ * page for them to confirm. Invalidates both this player's own detail (their
+ * pending-claim banner) and every month of the owner's fee-summaries list
+ * (their pending-claim badge), mirroring `usePlayerFeeActions`'s
+ * invalidation above.
+ */
+export function useSubmitFeePaymentClaim(academyId: UUID, playerId: UUID) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SubmitFeePaymentClaimInput) =>
+      submitFeePaymentClaim(academyId, playerId, input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.playerFeeDetail(academyId, playerId),
+      });
+      void queryClient.invalidateQueries({ queryKey: ['academies', academyId, 'fee-summaries'] });
+    },
+  });
+}
+
+export function useWithdrawFeePaymentClaim(academyId: UUID, playerId: UUID) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (claimId: UUID) => withdrawFeePaymentClaim(claimId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.playerFeeDetail(academyId, playerId),
+      });
+      void queryClient.invalidateQueries({ queryKey: ['academies', academyId, 'fee-summaries'] });
+    },
+  });
 }
