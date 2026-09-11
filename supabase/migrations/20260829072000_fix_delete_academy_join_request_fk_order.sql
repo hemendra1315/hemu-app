@@ -44,7 +44,7 @@ BEGIN
   DELETE FROM match_awards WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
   DELETE FROM match_coach_notes WHERE match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
 
-  -- These two reference matches with NO ACTION, so they must go first.
+  -- Reference matches with NO ACTION, so they must go before matches.
   DELETE FROM player_milestones
     WHERE academy_id = p_academy_id
        OR match_id IN (SELECT id FROM matches WHERE academy_id = p_academy_id);
@@ -72,6 +72,7 @@ BEGIN
     WHERE academy_id = p_academy_id
        OR join_code_id IN (SELECT id FROM academy_join_codes WHERE academy_id = p_academy_id);
   DELETE FROM academy_join_codes WHERE academy_id = p_academy_id;
+
   DELETE FROM academy_members WHERE academy_id = p_academy_id;
 
   -- 4. Delete academy record
