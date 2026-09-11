@@ -581,6 +581,19 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
   // chartData was already effectively gated on this data being available.
   const matchesPromise = fetchPlayerMatches(academyId, playerId);
   const attendancePromise = fetchPlayerAttendanceSummary(academyId, playerId);
+  // Each of these is awaited twice below (once directly, once inside the
+  // chartData branch's own Promise.all). That's safe -- the real rejection
+  // still propagates normally through both consumers -- but it can trip
+  // Node/Vitest's "unhandled rejection" detector, which flags a promise
+  // that doesn't have a handler attached in the same microtask tick it
+  // rejects in, even if one is attached moments later by the second
+  // consumer. A no-op .catch() here, attached the instant the promise is
+  // created, satisfies that bookkeeping without swallowing anything: it's
+  // an independent derived promise, so the original promise -- and every
+  // other real .then/await on it -- still rejects and surfaces the actual
+  // error exactly as before.
+  void matchesPromise.catch(() => {});
+  void attendancePromise.catch(() => {});
 
   // The upcoming-sessions query below used to filter only by academy_id and
   // date, with no reference to `playerId` at all — every player's dashboard
