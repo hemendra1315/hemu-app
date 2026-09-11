@@ -47,17 +47,33 @@ vi.mock('@/features/academies', () => ({
   useAcademy: () => academyState,
 }));
 
+const submitClaimMutateAsync = vi.fn();
+const withdrawClaimMutateAsync = vi.fn();
+
 vi.mock('../hooks/useBilling', () => ({
   usePlayerFeeDetail: () => detailState,
+  // MyFeesPage calls these unconditionally (before any early return), so the
+  // mock must provide them too -- omitting them crashes every test in this
+  // file with "useSubmitFeePaymentClaim is not a function" the moment the
+  // page tries to render, not just the ones that exercise the claim UI.
+  useSubmitFeePaymentClaim: () => ({ mutateAsync: submitClaimMutateAsync, isPending: false }),
+  useWithdrawFeePaymentClaim: () => ({ mutateAsync: withdrawClaimMutateAsync, isPending: false }),
 }));
 
 vi.mock('@/features/parents/hooks/useParents', () => ({
   useLinkedChildren: () => linkedChildrenState,
 }));
 
+const pushToast = vi.fn();
+
 vi.mock('@/stores', () => ({
   useTestModeStore: (selector: (state: { activeRole: null }) => unknown) =>
     selector({ activeRole: null }),
+  // MyFeesPage also calls useUiStore (for the claim form's toasts) -- like
+  // useTestModeStore above, this mock replaces the whole '@/stores' module,
+  // so omitting this crashes every test the moment the page renders.
+  useUiStore: (selector: (state: { pushToast: typeof pushToast }) => unknown) =>
+    selector({ pushToast }),
 }));
 
 function renderPage() {
@@ -77,6 +93,7 @@ describe('MyFeesPage', () => {
         email: 'p@test.com',
         monthlyFeePaise: 150000,
         payments: [],
+        claims: [],
       },
       isPending: false,
       isError: false,
@@ -110,6 +127,7 @@ describe('MyFeesPage', () => {
             createdAt: '2026-09-05T00:00:00Z',
           },
         ],
+        claims: [],
       },
       isPending: false,
       isError: false,
@@ -150,6 +168,7 @@ describe('MyFeesPage', () => {
             createdAt: '2020-01-05T00:00:00Z',
           },
         ],
+        claims: [],
       },
       isPending: false,
       isError: false,
@@ -208,6 +227,7 @@ describe('MyFeesPage', () => {
         email: 'child@test.com',
         monthlyFeePaise: 150000,
         payments: [],
+        claims: [],
       },
       isPending: false,
       isError: false,
@@ -250,6 +270,7 @@ describe('MyFeesPage', () => {
         email: 'first@test.com',
         monthlyFeePaise: 150000,
         payments: [],
+        claims: [],
       },
       isPending: false,
       isError: false,

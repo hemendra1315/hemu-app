@@ -15,6 +15,7 @@ const ROWS: PlayerFeeSummary[] = [
     monthlyFeePaise: 200000,
     paidPaiseThisMonth: 200000,
     isPaid: true,
+    pendingClaim: null,
   },
   {
     playerId: 'player-2',
@@ -23,6 +24,7 @@ const ROWS: PlayerFeeSummary[] = [
     monthlyFeePaise: 200000,
     paidPaiseThisMonth: 0,
     isPaid: false,
+    pendingClaim: null,
   },
 ];
 
