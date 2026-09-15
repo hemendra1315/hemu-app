@@ -16,7 +16,7 @@ function toBatch(row: any): Batch {
     name: row.name,
     ageGroup: row.age_group,
     description: row.description,
-    trainingDays: row.training_days,
+    trainingDays: parseDaysFromDb(row.training_days),
     trainingTime: row.training_time,
     coachId: row.coach_id,
     createdAt: row.created_at,
@@ -71,6 +71,25 @@ export async function fetchBatchPlayers(batchId: UUID): Promise<BatchPlayer[]> {
   return rows.map(toBatchPlayer);
 }
 
+function formatDaysForDb(days: string | null | undefined, asArray: boolean): any {
+  if (!days || days.trim() === '') return asArray ? [] : null;
+  if (asArray) {
+    return days
+      .split(',')
+      .map((d) => d.trim())
+      .filter(Boolean);
+  }
+  return days.trim();
+}
+
+function parseDaysFromDb(raw: any): string | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    return raw.join(', ');
+  }
+  return String(raw);
+}
+
 export async function createBatch(input: CreateBatchInput): Promise<Batch> {
   const cleanName = input.name.trim();
   const cleanAgeGroup = input.ageGroup.trim();
@@ -82,32 +101,52 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
     input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime.trim() : null;
   let cleanCoachId = input.coachId && input.coachId.trim() !== '' ? input.coachId.trim() : null;
 
-  const standardPayload = {
-    academy_id: input.academyId,
-    name: cleanName,
-    age_group: cleanAgeGroup,
-    description: cleanDesc,
-    training_days: cleanDays,
-    training_time: cleanTime,
-    coach_id: cleanCoachId,
+  const tryInsert = async (daysVal: any, coachIdVal: any, timeVal: any) => {
+    const payload: Record<string, any> = {
+      academy_id: input.academyId,
+      name: cleanName,
+      age_group: cleanAgeGroup,
+      description: cleanDesc,
+      training_days: daysVal,
+      training_time: timeVal,
+      coach_id: coachIdVal,
+    };
+
+    return await (supabase as any)
+      .from('batches')
+      .insert(payload)
+      .select(
+        'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
+      )
+      .single();
   };
 
   let insertedRow: any = null;
+  let res = await tryInsert(cleanDays, cleanCoachId, cleanTime);
 
-  const { data, error } = await (supabase as any)
-    .from('batches')
-    .insert(standardPayload)
-    .select(
-      'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
-    )
-    .single();
+  if (res.error) {
+    const errCode = res.error.code;
+    const errMsg = String(res.error.message || '').toLowerCase();
+    const isArrayError =
+      errCode === '22P02' ||
+      errMsg.includes('array') ||
+      errMsg.includes('malformed') ||
+      errMsg.includes('dimension');
 
-  if (!error && data) {
-    insertedRow = data;
-  } else if (error) {
+    if (isArrayError) {
+      // Retry with array format for training_days
+      const daysArr = formatDaysForDb(cleanDays, true);
+      res = await tryInsert(daysArr, cleanCoachId, cleanTime);
+    }
+  }
+
+  if (!res.error && res.data) {
+    insertedRow = res.data;
+  } else if (res.error) {
     const isNotNullError =
-      error.code === '23502' ||
-      (typeof error.message === 'string' && error.message.toLowerCase().includes('not-null'));
+      res.error.code === '23502' ||
+      (typeof res.error.message === 'string' &&
+        res.error.message.toLowerCase().includes('not-null'));
 
     if (isNotNullError) {
       if (!cleanCoachId) {
@@ -125,30 +164,33 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
         }
       }
 
-      const fallbackPayload = {
-        academy_id: input.academyId,
-        name: cleanName,
-        age_group: cleanAgeGroup,
-        description: cleanDesc,
-        training_days: cleanDays ?? 'Flexible',
-        training_time: cleanTime ?? 'Flexible',
-        coach_id: cleanCoachId,
-      };
+      // Try fallback with string then array if needed
+      let fallbackRes = await tryInsert(
+        cleanDays ?? 'Flexible',
+        cleanCoachId,
+        cleanTime ?? 'Flexible',
+      );
 
-      const fallbackResult = await (supabase as any)
-        .from('batches')
-        .insert(fallbackPayload)
-        .select(
-          'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
-        )
-        .single();
-
-      if (fallbackResult.error) {
-        throw toApiError(fallbackResult.error);
+      if (
+        fallbackRes.error &&
+        (fallbackRes.error.code === '22P02' ||
+          String(fallbackRes.error.message || '')
+            .toLowerCase()
+            .includes('array'))
+      ) {
+        fallbackRes = await tryInsert(
+          formatDaysForDb(cleanDays, true),
+          cleanCoachId,
+          cleanTime ?? 'Flexible',
+        );
       }
-      insertedRow = fallbackResult.data;
+
+      if (fallbackRes.error) {
+        throw toApiError(fallbackRes.error);
+      }
+      insertedRow = fallbackRes.data;
     } else {
-      throw toApiError(error);
+      throw toApiError(res.error);
     }
   }
 
@@ -184,7 +226,7 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
     name: insertedRow.name,
     ageGroup: insertedRow.age_group,
     description: insertedRow.description ?? null,
-    trainingDays: insertedRow.training_days ?? null,
+    trainingDays: parseDaysFromDb(insertedRow.training_days),
     trainingTime: insertedRow.training_time ?? null,
     coachId: insertedRow.coach_id ?? null,
     createdAt: insertedRow.created_at,
@@ -205,50 +247,68 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
     input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime.trim() : null;
   const cleanCoachId = input.coachId && input.coachId.trim() !== '' ? input.coachId.trim() : null;
 
-  const payload: Record<string, any> = {
-    name: cleanName,
-    age_group: cleanAgeGroup,
-    description: cleanDesc,
-    training_days: cleanDays,
-    training_time: cleanTime,
-    coach_id: cleanCoachId,
+  const tryUpdate = async (daysVal: any) => {
+    const payload: Record<string, any> = {
+      name: cleanName,
+      age_group: cleanAgeGroup,
+      description: cleanDesc,
+      training_days: daysVal,
+      training_time: cleanTime,
+      coach_id: cleanCoachId,
+    };
+
+    return await (supabase as any)
+      .from('batches')
+      .update(payload)
+      .eq('id', batchId)
+      .select(
+        'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
+      )
+      .single();
   };
 
   let updatedRow: any = null;
+  let res = await tryUpdate(cleanDays);
 
-  const { data, error } = await (supabase as any)
-    .from('batches')
-    .update(payload)
-    .eq('id', batchId)
-    .select(
-      'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
-    )
-    .single();
+  if (res.error) {
+    const errCode = res.error.code;
+    const errMsg = String(res.error.message || '').toLowerCase();
+    const isArrayError =
+      errCode === '22P02' ||
+      errMsg.includes('array') ||
+      errMsg.includes('malformed') ||
+      errMsg.includes('dimension');
 
-  if (!error && data) {
-    updatedRow = data;
-  } else if (error) {
+    if (isArrayError) {
+      const daysArr = formatDaysForDb(cleanDays, true);
+      res = await tryUpdate(daysArr);
+    }
+  }
+
+  if (!res.error && res.data) {
+    updatedRow = res.data;
+  } else if (res.error) {
     const isNotNullError =
-      error.code === '23502' ||
-      (typeof error.message === 'string' && error.message.toLowerCase().includes('not-null'));
+      res.error.code === '23502' ||
+      (typeof res.error.message === 'string' &&
+        res.error.message.toLowerCase().includes('not-null'));
 
     if (isNotNullError) {
-      if (payload.training_days === null) payload.training_days = 'Flexible';
-      if (payload.training_time === null) payload.training_time = 'Flexible';
+      let fallbackRes = await tryUpdate(cleanDays ?? 'Flexible');
+      if (
+        fallbackRes.error &&
+        (fallbackRes.error.code === '22P02' ||
+          String(fallbackRes.error.message || '')
+            .toLowerCase()
+            .includes('array'))
+      ) {
+        fallbackRes = await tryUpdate(formatDaysForDb(cleanDays, true));
+      }
 
-      const retryResult = await (supabase as any)
-        .from('batches')
-        .update(payload)
-        .eq('id', batchId)
-        .select(
-          'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
-        )
-        .single();
-
-      if (retryResult.error) throw toApiError(retryResult.error);
-      updatedRow = retryResult.data;
+      if (fallbackRes.error) throw toApiError(fallbackRes.error);
+      updatedRow = fallbackRes.data;
     } else {
-      throw toApiError(error);
+      throw toApiError(res.error);
     }
   }
 
@@ -284,7 +344,7 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
     name: updatedRow.name,
     ageGroup: updatedRow.age_group,
     description: updatedRow.description ?? null,
-    trainingDays: updatedRow.training_days ?? null,
+    trainingDays: parseDaysFromDb(updatedRow.training_days),
     trainingTime: updatedRow.training_time ?? null,
     coachId: updatedRow.coach_id ?? null,
     createdAt: updatedRow.created_at,
