@@ -16,6 +16,23 @@ window.addEventListener('unhandledrejection', (event) => {
 
 async function initApp() {
   if (typeof window !== 'undefined') {
+    // Add safe area classes for Capacitor native app and standalone PWA
+    const isCapacitor = Boolean(
+      (
+        window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }
+      ).Capacitor?.isNativePlatform?.() || /capacitor/i.test(window.navigator.userAgent),
+    );
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+
+    if (isCapacitor) {
+      document.documentElement.classList.add('is-native-app');
+    }
+    if (isStandalone) {
+      document.documentElement.classList.add('is-standalone');
+    }
+
     try {
       const cached = await loadOfflineQueryCache();
       if (cached) {

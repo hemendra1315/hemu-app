@@ -11,7 +11,7 @@ export function OnboardingLayout() {
 
   return (
     <div className="bg-bg min-h-screen">
-      <header className="flex h-14 items-center justify-between px-4">
+      <header className="flex min-h-[calc(3.5rem+var(--safe-top))] items-center justify-between px-4 pt-[var(--safe-top)] pb-1">
         <div className="flex items-center gap-2.5">
           <img
             src="/logo-192.png"

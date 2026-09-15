@@ -52,6 +52,9 @@
 }
 
 :root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
   /* Athletic Pitch Precision — Light Theme */
   --bg: #f4f7f5; /* Clean light stadium background */
   --surface: #ffffff; /* Card surface */
@@ -91,6 +94,18 @@
   --info: #38bdf8;
   --turf-dark: #00a572;
   --turf-pale: #1c2e26;
+}
+
+html.is-native-app,
+body.is-native-app {
+  --safe-top: max(env(safe-area-inset-top, 0px), 36px);
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+html.is-standalone,
+body.is-standalone {
+  --safe-top: max(env(safe-area-inset-top, 0px), 24px);
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
 @layer base {

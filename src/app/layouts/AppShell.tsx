@@ -168,8 +168,8 @@ export function AppShell() {
 
   return (
     <div className="bg-bg min-h-screen w-full max-w-full overflow-x-hidden">
-      {/* HEADER: Compact & Responsive */}
-      <header className="border-border-subtle bg-surface/95 sticky top-0 z-30 flex h-14 w-full max-w-full items-center justify-between overflow-hidden border-b px-4 backdrop-blur-md">
+      {/* HEADER: Compact & Responsive with Safe-Area Inset Support */}
+      <header className="border-border-subtle bg-surface/95 sticky top-0 z-30 flex min-h-[calc(3.5rem+var(--safe-top))] w-full max-w-full items-center justify-between overflow-hidden border-b px-4 pt-[var(--safe-top)] pb-1 backdrop-blur-md">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <AcademySwitcher className="min-w-0" />
         </div>
