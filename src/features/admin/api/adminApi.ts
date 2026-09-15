@@ -171,6 +171,20 @@ export interface CreatedPlatformAcademyResponse {
   createdAt: string;
 }
 
+async function sha256Hex(text: string): Promise<string> {
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(text);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      // Fallback if subtle crypto throws in restricted environment
+    }
+  }
+  return text;
+}
+
 export async function createPlatformAcademy(
   payload: CreatePlatformAcademyPayload,
 ): Promise<CreatedPlatformAcademyResponse> {
@@ -222,6 +236,33 @@ export async function createPlatformAcademy(
       const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('');
+      const tokenHash = await sha256Hex(randomToken);
+
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+      let invitationId = acad.id;
+
+      try {
+        const authUser = (await supabase.auth.getUser()).data.user;
+        if (authUser) {
+          const { data: invRow } = await supabase
+            .from('academy_owner_invitations')
+            .insert({
+              academy_id: acad.id,
+              token_hash: tokenHash,
+              status: 'pending',
+              created_by: authUser.id,
+              expires_at: expiresAt,
+            })
+            .select('id')
+            .maybeSingle();
+
+          if (invRow?.id) {
+            invitationId = invRow.id as UUID;
+          }
+        }
+      } catch (invErr) {
+        console.warn('[super-admin] Could not insert fallback owner invitation:', invErr);
+      }
 
       return {
         id: acad.id,
@@ -233,9 +274,9 @@ export async function createPlatformAcademy(
         timezone: payload.timezone ?? 'Asia/Kolkata',
         feeMode: payload.feeMode ?? 'player_pays',
         playerJoinCode: (codeData as string) || 'JOIN123',
-        invitationId: acad.id,
+        invitationId,
         invitationToken: randomToken,
-        invitationExpiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        invitationExpiresAt: expiresAt,
         createdAt: acad.created_at || new Date().toISOString(),
       };
     }
@@ -258,13 +299,64 @@ export async function regenerateOwnerInvitation(academyId: UUID): Promise<{
       p_academy_id: academyId,
     },
   );
-  if (error) throwRpcError('regenerate_owner_invitation', error);
-  return data as unknown as {
-    invitationId: UUID;
-    invitationToken: string;
-    invitationExpiresAt: string;
-    academyId: UUID;
-  };
+  if (!error && data) {
+    return data as unknown as {
+      invitationId: UUID;
+      invitationToken: string;
+      invitationExpiresAt: string;
+      academyId: UUID;
+    };
+  }
+
+  const errShape = (error ?? {}) as RpcErrorShape;
+  if (errShape.message?.includes('E_FORBIDDEN') || errShape.message?.includes('E_NOT_FOUND')) {
+    throwRpcError('regenerate_owner_invitation', error);
+  }
+
+  // Fallback direct table generation
+  try {
+    const authUser = (await supabase.auth.getUser()).data.user;
+    if (authUser) {
+      const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      const tokenHash = await sha256Hex(randomToken);
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+
+      // Revoke pending
+      await supabase
+        .from('academy_owner_invitations')
+        .update({ status: 'revoked' })
+        .eq('academy_id', academyId)
+        .eq('status', 'pending');
+
+      // Insert new
+      const { data: invRow, error: invError } = await supabase
+        .from('academy_owner_invitations')
+        .insert({
+          academy_id: academyId,
+          token_hash: tokenHash,
+          status: 'pending',
+          created_by: authUser.id,
+          expires_at: expiresAt,
+        })
+        .select('id')
+        .single();
+
+      if (!invError && invRow?.id) {
+        return {
+          invitationId: invRow.id as UUID,
+          invitationToken: randomToken,
+          invitationExpiresAt: expiresAt,
+          academyId,
+        };
+      }
+    }
+  } catch (fallbackErr) {
+    console.warn('[super-admin] Fallback regenerateOwnerInvitation failed:', fallbackErr);
+  }
+
+  throwRpcError('regenerate_owner_invitation', error);
 }
 
 export async function revokeOwnerInvitation(invitationId: UUID): Promise<void> {

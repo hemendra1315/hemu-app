@@ -129,6 +129,8 @@ export default function PlatformDashboardPage() {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
     }
+    if (createAcademyMutation.isPending) return;
+
     if (!createName.trim()) {
       pushToast({ title: 'Academy name is required', variant: 'error' });
       return;
@@ -1409,7 +1411,6 @@ export default function PlatformDashboardPage() {
               type="submit"
               isLoading={createAcademyMutation.isPending}
               disabled={createAcademyMutation.isPending}
-              onClick={handleCreateSubmit}
             >
               Create Academy & Generate Invite
             </Button>
