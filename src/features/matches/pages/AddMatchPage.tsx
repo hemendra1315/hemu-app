@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useActiveAcademy } from '@/features/academies';
 import { MatchWizard } from '../components/wizard';
@@ -19,13 +20,24 @@ export default function AddMatchPage() {
   if (!academyId) return null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-fg text-2xl font-bold">New Match Entry</h1>
-          <p className="text-fg-muted text-sm">
-            Enter match details manually or import from a CricHeroes PDF scorecard.
-          </p>
+    <div className="mx-auto flex max-w-4xl flex-col space-y-4 pb-24 md:pb-6">
+      <div className="border-border-subtle/40 flex items-center justify-between gap-3 border-b pb-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => navigate('/matches')}
+            className="border-border-subtle bg-surface text-fg-muted hover:text-fg hover:bg-surface-muted flex h-9 w-9 items-center justify-center rounded-lg border transition-colors"
+            aria-label="Back to matches"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="font-heading text-fg text-lg font-extrabold tracking-tight uppercase md:text-xl">
+              Match Entry & Scorecard Wizard
+            </h1>
+            <p className="text-fg-muted font-sans text-xs">
+              Record match scorecard or import from CricHeroes PDF
+            </p>
+          </div>
         </div>
 
         {!showImportModal && (
@@ -33,8 +45,10 @@ export default function AddMatchPage() {
             variant="secondary"
             id="open-import-modal-btn"
             onClick={() => setShowImportModal(true)}
+            className="border-border-subtle bg-surface text-fg hover:bg-surface-muted h-9 min-h-[36px] rounded-lg px-3 text-xs font-bold"
           >
-            📥 Import CricHeroes PDF
+            <FileSpreadsheet className="text-primary mr-1.5 h-3.5 w-3.5" />
+            Import PDF
           </Button>
         )}
       </div>

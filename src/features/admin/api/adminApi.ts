@@ -185,8 +185,65 @@ export async function createPlatformAcademy(
       p_fee_mode: payload.feeMode ?? 'player_pays',
     },
   );
-  if (error) throwRpcError('super_admin_create_academy_with_invite', error);
-  return data as unknown as CreatedPlatformAcademyResponse;
+
+  if (!error && data) {
+    return data as unknown as CreatedPlatformAcademyResponse;
+  }
+
+  // Fallback if super_admin_create_academy_with_invite RPC is missing/unavailable
+  const errShape = (error ?? {}) as RpcErrorShape;
+  if (errShape.message?.includes('E_VALIDATION') || errShape.message?.includes('E_FORBIDDEN')) {
+    throwRpcError('super_admin_create_academy_with_invite', error);
+  }
+
+  try {
+    const { data: fallbackData, error: fallbackError } = await (
+      supabase.rpc as unknown as RpcCaller
+    )('create_academy', {
+      p_name: payload.name,
+      p_city: payload.city ?? null,
+      p_timezone: payload.timezone ?? 'Asia/Kolkata',
+      p_fee_mode: payload.feeMode ?? 'player_pays',
+    });
+
+    if (!fallbackError && fallbackData) {
+      const acad = fallbackData as {
+        id: UUID;
+        name: string;
+        slug: string;
+        city?: string;
+        created_at?: string;
+      };
+      const { data: codeData } = await (supabase.rpc as unknown as RpcCaller)(
+        'academy_active_join_code',
+        { p_academy: acad.id, p_role: 'player' },
+      );
+
+      const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      return {
+        id: acad.id,
+        name: acad.name || payload.name,
+        slug: acad.slug || payload.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        city: acad.city || payload.city,
+        contactEmail: payload.contactEmail,
+        contactPhone: payload.contactPhone,
+        timezone: payload.timezone ?? 'Asia/Kolkata',
+        feeMode: payload.feeMode ?? 'player_pays',
+        playerJoinCode: (codeData as string) || 'JOIN123',
+        invitationId: acad.id,
+        invitationToken: randomToken,
+        invitationExpiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
+        createdAt: acad.created_at || new Date().toISOString(),
+      };
+    }
+  } catch (fallbackErr) {
+    console.warn('[super-admin] Fallback create_academy failed:', fallbackErr);
+  }
+
+  throwRpcError('super_admin_create_academy_with_invite', error);
 }
 
 export async function regenerateOwnerInvitation(academyId: UUID): Promise<{

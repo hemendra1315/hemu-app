@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { Upload, RefreshCw } from 'lucide-react';
+import { Upload, RefreshCw, User, Sparkles } from 'lucide-react';
 
 import { FormField } from '@/components/form';
+import { MobilePageHeader } from '@/components/mobile';
 import {
   Avatar,
   Badge,
@@ -34,12 +35,12 @@ function LinkedChildrenSection() {
   if (!academyId) return null;
 
   return (
-    <Card>
+    <Card className="border-border-subtle bg-surface rounded-2xl border">
       <CardHeader
         title="Linked Children"
-        description="Children linked to your account in this academy."
+        description="Children linked to your parent account in this academy."
       />
-      <CardBody className="space-y-2">
+      <CardBody className="space-y-2.5 p-5 sm:p-6">
         {isLoading ? (
           <p className="text-fg-muted text-sm">Loading children...</p>
         ) : children.length === 0 ? (
@@ -48,12 +49,14 @@ function LinkedChildrenSection() {
           children.map((child) => (
             <div
               key={child.player.id}
-              className="border-border-subtle flex items-center gap-3 rounded-lg border p-3"
+              className="border-border-subtle bg-surface-muted/30 flex items-center gap-3 rounded-xl border p-3.5"
             >
               <Avatar name={child.player.fullName} src={child.player.avatarUrl} size="sm" />
               <div>
-                <p className="text-fg text-sm font-medium">{child.player.fullName}</p>
-                <p className="text-fg-muted text-xs">{child.player.batchName || 'No Batch'}</p>
+                <p className="text-fg text-sm font-bold">{child.player.fullName}</p>
+                <p className="text-fg-muted text-xs">
+                  {child.player.batchName || 'No Batch Assigned'}
+                </p>
               </div>
             </div>
           ))
@@ -170,17 +173,35 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-fg text-xl font-semibold">My profile</h1>
+    <div className="space-y-6 pb-24 md:pb-8">
+      <div className="md:hidden">
+        <MobilePageHeader
+          title="My Profile"
+          subtitle={profile?.email ?? 'Account & Preferences'}
+          showBack={true}
+        />
+      </div>
 
-      <Card>
+      <div className="hidden md:flex md:items-center md:justify-between">
+        <div>
+          <h1 className="text-fg flex items-center gap-2.5 text-2xl font-black tracking-tight">
+            <User className="text-primary h-6 w-6" />
+            User Account & Profile
+          </h1>
+          <p className="text-fg-muted mt-1 text-sm font-medium">
+            Manage your personal profile details, phone number, and academy memberships.
+          </p>
+        </div>
+      </div>
+
+      <Card className="border-border-subtle bg-surface rounded-2xl border">
         <CardHeader
-          title="Personal details"
-          description="Google provides your name and photo; you can correct them here."
+          title="Personal Details"
+          description="Your official profile credentials and contact information."
         />
         <form onSubmit={onSubmit} noValidate>
-          <CardBody className="space-y-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <CardBody className="space-y-5 p-5 sm:p-6">
+            <div className="border-border-subtle bg-surface-muted/30 flex flex-col gap-4 rounded-2xl border p-4 sm:flex-row sm:items-center">
               <div className="relative flex shrink-0 items-center justify-center">
                 <button
                   type="button"
@@ -197,7 +218,7 @@ export default function ProfilePage() {
                     name={profile?.fullName ?? profile?.email}
                     src={profile?.avatarUrl}
                     size="lg"
-                    className="h-20 w-20 text-2xl shadow-sm sm:h-24 sm:w-24 sm:text-3xl"
+                    className="ring-primary/30 h-20 w-20 text-2xl shadow-sm ring-2 sm:h-24 sm:w-24 sm:text-3xl"
                   />
                   {isUploadingAvatar && (
                     <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 backdrop-blur-xs">
@@ -207,9 +228,12 @@ export default function ProfilePage() {
                 </button>
               </div>
               <div className="flex-1 space-y-1.5">
-                <p className="text-fg text-sm font-medium">{profile?.email}</p>
-                <p className="text-fg-muted text-xs">Signed in with Google</p>
-                <div className="flex items-center gap-2 pt-2">
+                <p className="text-fg text-sm font-bold">{profile?.email}</p>
+                <p className="text-fg-muted flex items-center gap-1 text-xs">
+                  <Sparkles className="text-primary h-3 w-3" />
+                  Authenticated User Account
+                </p>
+                <div className="flex items-center gap-2 pt-1.5">
                   <Button
                     type="button"
                     size="sm"
@@ -281,24 +305,29 @@ export default function ProfilePage() {
             ) : null}
           </CardBody>
 
-          <CardFooter>
-            <Button type="submit" isLoading={updateProfile.isPending} disabled={!isDirty}>
-              Save changes
+          <CardFooter className="border-border-subtle border-t p-4 sm:p-5">
+            <Button
+              type="submit"
+              isLoading={updateProfile.isPending}
+              disabled={!isDirty}
+              className="bg-primary hover:bg-primary/90 min-h-[44px] font-bold text-black"
+            >
+              Save Profile Changes
             </Button>
           </CardFooter>
         </form>
       </Card>
 
-      <Card>
-        <CardHeader title="My academies" description="Every academy you belong to." />
-        <CardBody className="space-y-2">
+      <Card className="border-border-subtle bg-surface rounded-2xl border">
+        <CardHeader title="My Academies" description="Every academy you are registered with." />
+        <CardBody className="space-y-2.5 p-5 sm:p-6">
           {all.map((membership) => (
             <div
               key={membership.id}
-              className="border-border-subtle flex items-center justify-between rounded-lg border p-3"
+              className="border-border-subtle bg-surface-muted/30 flex items-center justify-between rounded-xl border p-3.5"
             >
               <div>
-                <p className="text-fg text-sm font-medium">{membership.academyName}</p>
+                <p className="text-fg text-sm font-bold">{membership.academyName}</p>
                 <p className="text-fg-muted text-xs">{ROLE_LABELS[membership.role]}</p>
               </div>
               <Badge tone={membership.status === 'active' ? 'success' : 'warning'}>
@@ -311,12 +340,12 @@ export default function ProfilePage() {
 
       {isParent && <LinkedChildrenSection />}
 
-      <Card>
+      <Card className="border-border-subtle bg-surface rounded-2xl border">
         <CardHeader
-          title="App"
-          description="Install Cricket Academy Manager on this device or share it with someone."
+          title="App Installation & Sharing"
+          description="Install Cricket Academy Manager on this device or share it with members."
         />
-        <CardBody className="flex flex-wrap items-center gap-3">
+        <CardBody className="flex flex-wrap items-center gap-3 p-5 sm:p-6">
           <InstallAppButton />
           <ShareAppButton />
         </CardBody>

@@ -13,6 +13,7 @@ dist-ssr
 dev-dist
 coverage
 *.local
+*.apk
 
 # Environment (only the example is committed)
 .env

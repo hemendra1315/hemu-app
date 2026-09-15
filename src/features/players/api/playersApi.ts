@@ -177,7 +177,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
     unwrap<any[]>(
       (supabase as any)
@@ -192,7 +192,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
     unwrap<any[]>(
       (supabase as any)
@@ -207,7 +207,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .eq('academy_member_id', playerId)
         .eq('matches.academy_id', academyId)
         .eq('matches.status', 'completed')
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
     unwrap<any[]>(
       (supabase as any)
@@ -224,7 +224,7 @@ export async function fetchPlayerMatches(academyId: UUID, playerId: UUID): Promi
         .or(
           `player_of_match_id.eq.${playerId},best_batter_id.eq.${playerId},best_bowler_id.eq.${playerId},best_fielder_id.eq.${playerId}`,
         )
-        .order('matches.match_date', { ascending: false }),
+        .order('match_date', { foreignTable: 'matches', ascending: false }),
     ),
   ]);
 
@@ -381,7 +381,7 @@ export async function fetchPlayerAwards(academyId: UUID, playerId: UUID): Promis
       .or(
         `player_of_match_id.eq.${playerId},best_batter_id.eq.${playerId},best_bowler_id.eq.${playerId},best_fielder_id.eq.${playerId}`,
       )
-      .order('matches.match_date', { ascending: false }),
+      .order('match_date', { foreignTable: 'matches', ascending: false }),
   );
 
   return rows.map((row: any) => {
@@ -395,8 +395,8 @@ export async function fetchPlayerAwards(academyId: UUID, playerId: UUID): Promis
     return {
       id: row.id,
       matchId: row.match_id,
-      matchName: match.match_name,
-      matchDate: match.match_date,
+      matchName: match?.match_name ?? 'Match',
+      matchDate: match?.match_date ?? '',
       awardType,
     };
   });
@@ -472,7 +472,7 @@ export async function fetchPlayerAttendanceSummary(
 ): Promise<PlayerAttendanceSummary> {
   const { data: records, error } = await (supabase as any)
     .from('attendance')
-    .select('status, session:training_sessions(session_date)')
+    .select('status, session:training_sessions!left(session_date)')
     .eq('academy_id', academyId)
     .eq('player_id', playerId);
 
@@ -485,7 +485,9 @@ export async function fetchPlayerAttendanceSummary(
 
   const monthlyMap = new Map<string, { attended: number; total: number }>();
   for (const record of records ?? []) {
-    const date = new Date(record.session?.session_date ?? '');
+    const dateStr = record.session?.session_date;
+    if (!dateStr) continue;
+    const date = new Date(dateStr);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const current = monthlyMap.get(key) ?? { attended: 0, total: 0 };
     current.total += 1;
@@ -663,18 +665,25 @@ export async function fetchPlayerChartData(
     }));
 
   const economyTrend = matches
-    .filter((m) => m.bowling && m.bowling.overs > 0)
-    .map((m) => ({
-      matchName: m.matchName,
-      matchDate: m.matchDate,
-      economy: parseFloat((m.bowling!.runsConceded / m.bowling!.overs).toFixed(2)),
-    }));
+    .filter((m) => m.bowling && Number(m.bowling.overs) > 0)
+    .map((m) => {
+      const ov = Number(m.bowling!.overs);
+      const fullOvers = Math.floor(ov);
+      const balls = Math.round((ov % 1) * 10);
+      const decimalOvers = fullOvers + balls / 6;
+      const econ = decimalOvers > 0 ? m.bowling!.runsConceded / decimalOvers : 0;
+      return {
+        matchName: m.matchName,
+        matchDate: m.matchDate,
+        economy: parseFloat(econ.toFixed(2)),
+      };
+    });
 
   const attendanceSummary = await fetchPlayerAttendanceSummary(academyId, playerId);
   const attendanceTrend = attendanceSummary.monthlyData.map(
     (md: { month: string; attended: number; total: number }) => ({
       month: md.month,
-      percentage: Math.round((md.attended / md.total) * 100),
+      percentage: md.total > 0 ? Math.round((md.attended / md.total) * 100) : 0,
     }),
   );
 

@@ -1,18 +1,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { Plus, BookOpen, UserCheck, Trash2, Clock } from 'lucide-react';
 
-import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardFooter,
-  CardHeader,
-  Input,
-  Select,
-  Textarea,
-} from '@/components/ui';
+import { Badge, Button, Input, Select, Textarea } from '@/components/ui';
 import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { useAcademyMembers } from '@/features/members';
@@ -48,6 +39,7 @@ export default function DrillsPage() {
   const deleteDrill = useDeleteDrill(academyId as UUID);
   const pushToast = useUiStore((state) => state.pushToast);
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'drills' | 'assignments'>('drills');
 
   const drills = drillsQuery.data ?? [];
   const assignmentsQuery = useDrillAssignments(academyId);
@@ -133,38 +125,101 @@ export default function DrillsPage() {
   if (!academyId) return null;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-fg text-xl font-semibold">Drills</h1>
-          <p className="text-fg-muted">Create and manage drills for your academy.</p>
+    <div className="flex flex-col space-y-4 pb-24 md:pb-6">
+      {/* 1. Header with Tab Switcher */}
+      <div className="border-border-subtle/40 flex flex-col gap-3 border-b pb-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="font-heading text-fg text-xl font-extrabold tracking-tight uppercase md:text-2xl">
+              Drills & Practice Library
+            </h1>
+            <p className="text-fg-muted font-sans text-xs">
+              Standardized cricket drills, routines & squad assignments
+            </p>
+          </div>
+          {canManage && (
+            <Button
+              variant={showForm ? 'secondary' : 'primary'}
+              onClick={() => setShowForm((open) => !open)}
+              className="h-9 min-h-[36px] rounded-lg px-3.5 text-xs font-bold"
+            >
+              {showForm ? (
+                'Cancel'
+              ) : (
+                <>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  New Drill
+                </>
+              )}
+            </Button>
+          )}
         </div>
-        {canManage ? (
-          <Button onClick={() => setShowForm((open) => !open)}>
-            {showForm ? 'Cancel' : 'New drill'}
-          </Button>
-        ) : null}
+
+        {/* Tab pills */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('drills')}
+            className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all ${
+              activeTab === 'drills'
+                ? 'border-primary bg-primary text-black shadow-2xs'
+                : 'border-border-subtle bg-surface text-fg-muted hover:text-fg'
+            }`}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>Drill Library ({drills.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('assignments')}
+            className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all ${
+              activeTab === 'assignments'
+                ? 'border-primary bg-primary text-black shadow-2xs'
+                : 'border-border-subtle bg-surface text-fg-muted hover:text-fg'
+            }`}
+          >
+            <UserCheck className="h-3.5 w-3.5" />
+            <span>Assignments ({assignments.length})</span>
+          </button>
+        </div>
       </div>
 
-      {showForm && canManage ? (
-        <Card>
+      {/* Create Drill Drawer / Panel */}
+      {showForm && canManage && (
+        <div className="border-border-subtle bg-surface animate-fadeIn rounded-xl border p-4 shadow-2xs">
           <form onSubmit={handleCreate} noValidate>
-            <CardHeader title="Create drill" description="Define a drill for your players." />
-            <CardBody className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+            <div className="border-border-subtle/50 mb-4 border-b pb-3">
+              <h2 className="font-heading text-fg text-base font-extrabold tracking-tight uppercase">
+                Create Practice Drill
+              </h2>
+              <p className="text-fg-muted font-sans text-xs">
+                Define a routine for your coaches and players
+              </p>
+            </div>
+            <div className="space-y-3.5">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-fg block text-sm font-medium">Title</label>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Drill Name
+                  </label>
                   <Input
-                    {...register('name', { required: 'Title is required' })}
+                    {...register('name', { required: 'Drill name is required' })}
+                    placeholder="e.g. Cover Drive Repetitions"
                     hasError={Boolean(errors.name)}
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                   />
-                  {errors.name ? (
-                    <p className="text-danger text-xs">{errors.name.message}</p>
-                  ) : null}
+                  {errors.name && (
+                    <p className="text-error mt-1 font-sans text-[11px] font-semibold">
+                      {errors.name.message}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-fg block text-sm font-medium">Category</label>
-                  <Select {...register('category')}>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Category
+                  </label>
+                  <Select
+                    {...register('category')}
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
+                  >
                     <option value="batting">Batting</option>
                     <option value="bowling">Bowling</option>
                     <option value="fielding">Fielding</option>
@@ -173,18 +228,27 @@ export default function DrillsPage() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-fg block text-sm font-medium">Duration (minutes)</label>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Duration (Minutes)
+                  </label>
                   <Input
                     {...register('durationMinutes', { valueAsNumber: true })}
                     type="number"
                     min={1}
+                    placeholder="e.g. 20"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-fg block text-sm font-medium">Difficulty</label>
-                  <Select {...register('difficulty')}>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Difficulty Level
+                  </label>
+                  <Select
+                    {...register('difficulty')}
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
+                  >
                     <option value="beginner">Beginner</option>
                     <option value="intermediate">Intermediate</option>
                     <option value="advanced">Advanced</option>
@@ -194,133 +258,263 @@ export default function DrillsPage() {
               </div>
 
               <div>
-                <label className="text-fg block text-sm font-medium">Description</label>
-                <Textarea {...register('description')} rows={4} />
-              </div>
-            </CardBody>
-            <CardFooter>
-              <Button type="submit" isLoading={createDrill.isPending} disabled={!isDirty}>
-                Save drill
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      ) : null}
-
-      {canManage ? (
-        <Card>
-          <CardHeader title="Assign drills" description="Assign drills to a player or batch." />
-          <CardBody className="space-y-4">
-            <div>
-              <label className="text-fg mb-1 block text-sm font-medium">Assign to</label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant={targetType === 'player' ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={() => {
-                    setTargetType('player');
-                    setSelectedBatchId('');
-                  }}
-                >
-                  Individual Player
-                </Button>
-                <Button
-                  type="button"
-                  variant={targetType === 'batch' ? 'primary' : 'secondary'}
-                  size="sm"
-                  onClick={() => {
-                    setTargetType('batch');
-                    setSelectedPlayerId('');
-                  }}
-                >
-                  Entire Batch
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-fg block text-sm font-medium">Drill</label>
-                <Select
-                  value={selectedDrillId}
-                  onChange={(event) => setSelectedDrillId(event.target.value)}
-                >
-                  <option value="">Select drill</option>
-                  {drills.map((drill) => (
-                    <option key={drill.id} value={drill.id}>
-                      {drill.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              {targetType === 'player' ? (
-                <div>
-                  <label className="text-fg block text-sm font-medium">Player</label>
-                  <Select
-                    value={selectedPlayerId}
-                    onChange={(event) => setSelectedPlayerId(event.target.value)}
-                  >
-                    <option value="">Select player</option>
-                    {activePlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.fullName ?? player.email}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ) : (
-                <div>
-                  <label className="text-fg block text-sm font-medium">Batch</label>
-                  <Select
-                    value={selectedBatchId}
-                    onChange={(event) => setSelectedBatchId(event.target.value)}
-                  >
-                    <option value="">Select batch</option>
-                    {batches.map((batch) => (
-                      <option key={batch.id} value={batch.id}>
-                        {batch.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-fg block text-sm font-medium">Due date</label>
-                <Input
-                  type="date"
-                  value={dueDate}
-                  onChange={(event) => setDueDate(event.target.value)}
+                <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                  Description & Execution Instructions
+                </label>
+                <Textarea
+                  {...register('description')}
+                  rows={3}
+                  placeholder="Set cones at 5m distance, 4 sets of 10 repetitions with front foot forward..."
+                  className="border-border-subtle bg-surface-container-low rounded-lg text-xs"
                 />
               </div>
-              <div className="flex items-end">
-                <Button
-                  onClick={handleAssign}
-                  isLoading={assignDrill.isPending}
-                  disabled={assignmentSaveDisabled}
-                >
-                  Assign drill
-                </Button>
+            </div>
+            <div className="border-border-subtle/40 mt-4 flex items-center justify-end gap-2.5 border-t pt-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowForm(false)}
+                className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={createDrill.isPending}
+                disabled={!isDirty}
+                className="h-9 min-h-[36px] rounded-lg px-5 text-xs font-bold"
+              >
+                Save Drill
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Tab: Drills Library */}
+      {activeTab === 'drills' && (
+        <div className="space-y-4">
+          {/* Quick Assign Section */}
+          {canManage && drills.length > 0 && (
+            <div className="border-border-subtle bg-surface rounded-xl border p-4 shadow-2xs">
+              <div className="border-border-subtle/50 mb-3 border-b pb-2.5">
+                <h2 className="font-heading text-fg text-sm font-extrabold tracking-tight uppercase">
+                  Assign Drill
+                </h2>
+                <p className="text-fg-muted font-sans text-xs">
+                  Assign a routine to an individual player or full squad
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetType('player');
+                      setSelectedBatchId('');
+                    }}
+                    className={`h-7 rounded-md border px-2.5 text-xs font-bold transition-all ${
+                      targetType === 'player'
+                        ? 'border-primary bg-primary-pale text-primary'
+                        : 'border-border-subtle bg-surface-container-low text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    Individual Player
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTargetType('batch');
+                      setSelectedPlayerId('');
+                    }}
+                    className={`h-7 rounded-md border px-2.5 text-xs font-bold transition-all ${
+                      targetType === 'batch'
+                        ? 'border-primary bg-primary-pale text-primary'
+                        : 'border-border-subtle bg-surface-container-low text-fg-muted hover:text-fg'
+                    }`}
+                  >
+                    Entire Squad
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                      Select Drill
+                    </label>
+                    <Select
+                      value={selectedDrillId}
+                      onChange={(e) => setSelectedDrillId(e.target.value)}
+                      className="border-border-subtle bg-surface-container-low h-9 min-h-[36px] rounded-lg text-xs"
+                    >
+                      <option value="">Select drill</option>
+                      {drills.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({d.category})
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  {targetType === 'player' ? (
+                    <div>
+                      <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                        Select Player
+                      </label>
+                      <Select
+                        value={selectedPlayerId}
+                        onChange={(e) => setSelectedPlayerId(e.target.value)}
+                        className="border-border-subtle bg-surface-container-low h-9 min-h-[36px] rounded-lg text-xs"
+                      >
+                        <option value="">Select player</option>
+                        {activePlayers.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.fullName ?? p.email}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                        Select Squad
+                      </label>
+                      <Select
+                        value={selectedBatchId}
+                        onChange={(e) => setSelectedBatchId(e.target.value)}
+                        className="border-border-subtle bg-surface-container-low h-9 min-h-[36px] rounded-lg text-xs"
+                      >
+                        <option value="">Select batch</option>
+                        {batches.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                      Due Date (Optional)
+                    </label>
+                    <Input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="border-border-subtle bg-surface-container-low h-9 min-h-[36px] rounded-lg font-mono text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <Button
+                    onClick={handleAssign}
+                    isLoading={assignDrill.isPending}
+                    disabled={assignmentSaveDisabled}
+                    className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
+                  >
+                    Assign Now
+                  </Button>
+                </div>
               </div>
             </div>
-            <p className="text-fg-muted text-sm">
-              Select a drill and assign to either an individual player or an entire batch.
-            </p>
-          </CardBody>
-        </Card>
-      ) : null}
+          )}
 
-      <Card>
-        <CardHeader
-          title="Training assignments"
-          description="Track the drill assignments for this academy."
-        />
-        <CardBody>
+          {/* Drill Cards Grid */}
+          {drillsQuery.isPending ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="border-border-subtle bg-surface h-32 animate-pulse rounded-xl border"
+                />
+              ))}
+            </div>
+          ) : drillsQuery.isError ? (
+            <ErrorState error={drillsQuery.error} onRetry={() => void drillsQuery.refetch()} />
+          ) : drills.length === 0 ? (
+            <EmptyState
+              title="No drills yet"
+              description="Create practice drills to build your academy library."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {drills.map((drill) => {
+                return (
+                  <div
+                    key={drill.id}
+                    className="border-border-subtle bg-surface hover:border-border flex flex-col justify-between rounded-xl border p-4 shadow-2xs transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-heading text-fg text-base font-bold tracking-tight uppercase">
+                          {drill.name}
+                        </span>
+                        <span className="border-primary/30 bg-primary-pale text-primary shrink-0 rounded-md border px-2 py-0.5 font-sans text-[10px] font-bold uppercase">
+                          {drill.category}
+                        </span>
+                      </div>
+
+                      <div className="text-fg-muted mt-2 flex items-center gap-3 font-mono text-[11px]">
+                        <span className="capitalize">{drill.difficulty}</span>
+                        {drill.durationMinutes && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="text-fg-muted h-3 w-3" />
+                            {drill.durationMinutes} min
+                          </span>
+                        )}
+                      </div>
+
+                      {drill.description && (
+                        <p className="text-fg-muted mt-2 line-clamp-2 font-sans text-xs">
+                          {drill.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="border-border-subtle/50 mt-4 flex items-center justify-end gap-2 border-t pt-3">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`/drills/${drill.id}`)}
+                        className="h-8 min-h-[32px] rounded-lg px-3 text-xs font-bold"
+                      >
+                        Edit
+                      </Button>
+                      {canManage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleDeleteDrill(drill.id)}
+                          className="text-error hover:bg-error-pale h-8 min-h-[32px] rounded-lg px-2 text-xs font-bold"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Assignments List */}
+      {activeTab === 'assignments' && (
+        <div className="space-y-3">
           {assignmentsQuery.isPending ? (
-            <p className="text-fg-muted">Loading assignments…</p>
+            <div className="space-y-2.5">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="border-border-subtle bg-surface h-20 animate-pulse rounded-xl border"
+                />
+              ))}
+            </div>
           ) : assignmentsQuery.isError ? (
             <ErrorState
               error={assignmentsQuery.error}
@@ -328,102 +522,54 @@ export default function DrillsPage() {
             />
           ) : assignments.length === 0 ? (
             <EmptyState
-              title="No assignments yet"
-              description="Assign drills to players or batches to help them train."
+              title="No active assignments"
+              description="Assign drills to players or squads to track their training progress."
             />
           ) : (
-            <div className="space-y-3">
+            <div className="divide-border-subtle/50 border-border-subtle bg-surface divide-y overflow-hidden rounded-xl border shadow-2xs">
               {assignments.map((assignment) => (
-                <div key={assignment.id} className="border-border-subtle rounded-2xl border p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-fg text-lg font-semibold">{assignment.drill.name}</p>
-                      <p className="text-fg-muted text-sm">
-                        {assignment.playerName ? `Player: ${assignment.playerName}` : ''}
-                        {assignment.playerName && assignment.batchName ? ' · ' : ''}
-                        {assignment.batchName ? `Batch: ${assignment.batchName}` : ''}
-                      </p>
-                    </div>
+                <div
+                  key={assignment.id}
+                  className="hover:bg-surface-muted/20 flex flex-col justify-between gap-3 p-3.5 transition-colors sm:flex-row sm:items-center"
+                >
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
+                      <p className="font-heading text-fg text-sm font-bold tracking-tight uppercase">
+                        {assignment.drill.name}
+                      </p>
                       <Badge tone={assignment.status === 'completed' ? 'success' : 'warning'}>
                         {assignment.status}
                       </Badge>
-                      {canManage ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => void handleDeleteAssignment(assignment.id)}
-                        >
-                          Remove
-                        </Button>
-                      ) : null}
                     </div>
-                  </div>
-                  <div className="text-fg-muted mt-3 grid gap-3 text-sm sm:grid-cols-3">
-                    <p>Assigned {new Date(assignment.assignedAt).toLocaleDateString()}</p>
-                    <p>
-                      Due{' '}
+                    <p className="text-fg-muted mt-1 font-sans text-xs">
+                      {assignment.playerName ? `Player: ${assignment.playerName}` : ''}
+                      {assignment.playerName && assignment.batchName ? ' · ' : ''}
+                      {assignment.batchName ? `Squad: ${assignment.batchName}` : ''}
+                    </p>
+                    <p className="text-fg-muted mt-0.5 font-mono text-[10px]">
+                      Due:{' '}
                       {assignment.dueDate
                         ? new Date(assignment.dueDate).toLocaleDateString()
-                        : 'No due date'}
+                        : 'Open'}
                     </p>
-                    <p>Created by {assignment.assignedBy ?? 'Coach'}</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardBody>
-      </Card>
 
-      <Card>
-        <CardHeader title="All drills" description="Your drill library for the academy." />
-        <CardBody>
-          {drillsQuery.isPending ? (
-            <p className="text-fg-muted">Loading drills…</p>
-          ) : drillsQuery.isError ? (
-            <ErrorState error={drillsQuery.error} onRetry={() => void drillsQuery.refetch()} />
-          ) : drills.length === 0 ? (
-            <EmptyState title="No drills yet" description="Create a drill to get started." />
-          ) : (
-            <div className="space-y-3">
-              {drills.map((drill) => (
-                <div key={drill.id} className="border-border-subtle rounded-2xl border p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-fg text-lg font-semibold">{drill.name}</p>
-                      <p className="text-fg-muted text-sm">
-                        {drill.category} · {drill.difficulty}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => void navigate(`/drills/${drill.id}`)}
-                      >
-                        View
-                      </Button>
-                      {canManage ? (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => void handleDeleteDrill(drill.id)}
-                        >
-                          Delete
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="text-fg-muted mt-3 text-sm">
-                    {drill.description ?? 'No description provided.'}
-                  </p>
+                  {canManage && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleDeleteAssignment(assignment.id)}
+                      className="text-error hover:bg-error-pale h-8 min-h-[32px] shrink-0 rounded-lg px-2 text-xs font-bold"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

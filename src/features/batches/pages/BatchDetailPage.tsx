@@ -2,19 +2,10 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Edit3, UserPlus, Trash2 } from 'lucide-react';
 
-import {
-  Button,
-  Card,
-  CardBody,
-  CardFooter,
-  CardHeader,
-  Input,
-  Modal,
-  Select,
-  Textarea,
-} from '@/components/ui';
+import { Button, Input, Modal, Select, Textarea } from '@/components/ui';
 import { EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import { useAcademyMembers } from '@/features/members';
@@ -60,7 +51,6 @@ export default function BatchDetailPage() {
   const [playerToRemove, setPlayerToRemove] = useState<{ id: string; name: string } | null>(null);
 
   const batch = batchesQuery.data?.find((item) => item.id === batchId);
-  const coach = membersQuery.data?.find((member) => member.id === batch?.coachId);
   const frequencyDays = batch?.trainingDays ? batch.trainingDays.split(',').length : 0;
 
   const unassignedPlayers = useMemo(() => {
@@ -76,11 +66,11 @@ export default function BatchDetailPage() {
         await addPlayer.mutateAsync({ academyMemberId: id });
         successCount++;
       } catch {
-        // ignore individual duplicate error
+        // ignore duplicate
       }
     }
     pushToast({
-      title: `${successCount} player${successCount === 1 ? '' : 's'} assigned to batch`,
+      title: `${successCount} player${successCount === 1 ? '' : 's'} assigned to squad`,
       variant: 'success',
     });
     void batchPlayersQuery.refetch();
@@ -89,7 +79,7 @@ export default function BatchDetailPage() {
   const handleConfirmRemovePlayer = async () => {
     if (!playerToRemove) return;
     await removePlayer.mutateAsync({ batchMemberId: playerToRemove.id });
-    pushToast({ title: `${playerToRemove.name} removed from batch`, variant: 'success' });
+    pushToast({ title: `${playerToRemove.name} removed from squad`, variant: 'success' });
     setPlayerToRemove(null);
     void batchPlayersQuery.refetch();
   };
@@ -108,60 +98,53 @@ export default function BatchDetailPage() {
   }
 
   return (
-    <div className="space-y-4 pb-12 sm:pb-6">
+    <div className="flex flex-col space-y-4 pb-24 md:pb-6">
       {/* 1. App Bar Header */}
-      <div className="border-border-subtle/40 flex flex-col gap-2 border-b pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void navigate('/batches')}
-              aria-label="Back to batches"
-              className="text-fg hover:bg-surface-muted/60 h-auto px-2 py-1 font-semibold"
-            >
-              &larr; Back
-            </Button>
-            <h1 className="font-heading text-fg truncate text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
-              {batch?.name ?? 'Batch Detail'}
+      <div className="border-border-subtle/40 flex items-center justify-between gap-3 border-b pb-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => navigate('/batches')}
+            className="border-border-subtle bg-surface text-fg-muted hover:text-fg hover:bg-surface-muted flex h-9 w-9 items-center justify-center rounded-lg border transition-colors"
+            aria-label="Back to batches"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="font-heading text-fg text-lg font-extrabold tracking-tight uppercase md:text-xl">
+              {batch?.name ?? 'Squad Details'}
             </h1>
+            {batch && (
+              <p className="text-fg-muted font-sans text-xs">
+                {batch.ageGroup} • {batch.trainingDays || 'Flexible Schedule'}
+              </p>
+            )}
           </div>
-          {canManage && batch && (
+        </div>
+
+        {canManage && batch && (
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/batches/${batch.id}/attendance`}
+              className="border-border-subtle bg-surface text-fg-muted hover:bg-surface-muted hover:text-fg flex h-8.5 min-h-[34px] items-center rounded-lg border px-3 text-xs font-bold transition-colors"
+            >
+              Attendance Logs
+            </Link>
             <Button
               variant="secondary"
               size="sm"
               onClick={() => setShowEditForm((open) => !open)}
-              className="h-11 min-h-[44px] rounded-[10px] px-3.5 text-xs font-bold"
+              className="h-8.5 min-h-[34px] rounded-lg px-3 text-xs font-bold"
             >
-              {showEditForm ? 'Cancel Edit' : 'Edit Batch'}
+              <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+              {showEditForm ? 'Cancel Edit' : 'Edit Squad'}
             </Button>
-          )}
-        </div>
-        {batch && (
-          <div className="text-fg-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-sans text-xs">
-            <span className="bg-surface-muted/60 border-border-subtle/40 text-fg rounded border px-2 py-0.5 font-mono text-[11px] font-bold">
-              {batch.ageGroup}
-            </span>
-            <span className="bg-surface-muted/60 border-border-subtle/40 rounded border px-2 py-0.5 font-mono text-[11px]">
-              {batch.trainingDays || 'Flexible schedule'}
-            </span>
-            {batch.trainingTime && (
-              <span className="bg-surface-muted/60 border-border-subtle/40 rounded border px-2 py-0.5 font-mono text-[11px]">
-                {batch.trainingTime}
-              </span>
-            )}
-            {coach && (
-              <span className="bg-surface-muted text-fg inline-flex items-center rounded px-2 py-0.5 font-semibold">
-                Coach: {coach.fullName ?? coach.email}
-              </span>
-            )}
           </div>
         )}
       </div>
 
       {!batch ? (
         <EmptyState
-          title="Batch not found"
+          title="Squad not found"
           description="This batch does not exist or you do not have access."
         />
       ) : (
@@ -169,47 +152,44 @@ export default function BatchDetailPage() {
           {/* 2. Stat Strip (3 Columns Scorecard) */}
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
             <div className="border-border-subtle bg-surface flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs">
-              <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
-                Active Players
+              <span className="font-heading text-fg-muted truncate text-[10px] font-bold tracking-wider uppercase">
+                Squad Size
               </span>
-              <div className="mt-2.5">
-                <p className="text-fg font-mono text-2xl font-bold">
+              <div className="mt-2">
+                <p className="text-primary font-mono text-2xl font-bold">
                   {batchPlayersQuery.data?.length ?? 0}
                 </p>
-                <p className="text-fg-muted font-heading mt-0.5 truncate text-[11px] font-medium">
-                  Enrolled Squad
-                </p>
+                <p className="text-fg-muted font-sans text-[11px]">Active Players</p>
               </div>
             </div>
 
             <div className="border-border-subtle bg-surface flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs">
-              <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
+              <span className="font-heading text-fg-muted truncate text-[10px] font-bold tracking-wider uppercase">
                 Weekly Schedule
               </span>
-              <div className="mt-2.5">
+              <div className="mt-2">
                 <p className="text-fg font-mono text-2xl font-bold">
                   {frequencyDays > 0 ? `${frequencyDays}x` : 'Flex'}
                 </p>
-                <p className="text-fg-muted font-heading mt-0.5 truncate text-[11px] font-medium">
-                  Sessions / Week
-                </p>
+                <p className="text-fg-muted font-sans text-[11px]">Sessions / Wk</p>
               </div>
             </div>
 
             <div className="border-border-subtle bg-surface flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs">
-              <span className="text-fg-muted font-heading truncate text-[10px] font-bold tracking-wider uppercase">
-                Age Group
+              <span className="font-heading text-fg-muted truncate text-[10px] font-bold tracking-wider uppercase">
+                Age Bracket
               </span>
-              <div className="mt-2.5">
-                <p className="text-fg font-mono text-2xl font-bold">{batch.ageGroup}</p>
-                <p className="text-fg-muted font-heading mt-0.5 truncate text-[11px] font-medium">
-                  Squad Tier
+              <div className="mt-2">
+                <p className="font-heading text-fg text-2xl font-extrabold uppercase">
+                  {batch.ageGroup}
                 </p>
+                <p className="text-fg-muted font-sans text-[11px]">Category</p>
               </div>
             </div>
           </div>
 
-          {showEditForm && canManage ? (
+          {/* Edit Form Panel */}
+          {showEditForm && canManage && (
             <BatchEditForm
               batch={batch}
               coaches={membersQuery.data?.filter((member) => member.role === 'coach') ?? []}
@@ -219,38 +199,35 @@ export default function BatchDetailPage() {
                 pushToast({ title: 'Batch updated', variant: 'success' });
               }}
             />
-          ) : null}
+          )}
 
           {/* 3. Assigned Players List Section */}
           <div className="border-border-subtle bg-surface overflow-hidden rounded-xl border shadow-2xs">
             <div className="border-border-subtle/50 flex items-center justify-between gap-3 border-b p-4">
-              <div className="flex flex-col gap-0.5">
-                <h3 className="font-heading text-fg text-sm font-bold tracking-wider uppercase">
-                  Assigned Players
+              <div>
+                <h3 className="font-heading text-fg text-sm font-extrabold tracking-tight uppercase">
+                  Enrolled Roster
                 </h3>
-                <p className="text-fg-muted font-sans text-[11px] font-medium">
-                  Active roster enrolled in this squad
+                <p className="text-fg-muted font-sans text-xs">
+                  Players assigned to this training squad
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="bg-surface-muted border-border-subtle text-fg-muted shrink-0 rounded border px-2.5 py-0.5 font-mono text-[11px] font-bold uppercase">
-                  {batchPlayersQuery.data?.length ?? 0} ACTIVE
-                </span>
-                {canManage && (
-                  <Button
-                    size="sm"
-                    onClick={() => setShowAddPlayersModal(true)}
-                    className="bg-primary min-h-[38px] rounded-[10px] px-3 text-xs font-bold text-white hover:opacity-90"
-                  >
-                    Add Players
-                  </Button>
-                )}
-              </div>
+              {canManage && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowAddPlayersModal(true)}
+                  className="h-8.5 min-h-[34px] rounded-lg px-3 text-xs font-bold"
+                >
+                  <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                  Add Players
+                </Button>
+              )}
             </div>
-            <div className="p-0">
+
+            <div>
               {batchPlayersQuery.isPending ? (
-                <p className="text-fg-muted py-8 text-center font-sans text-sm">
-                  Loading assigned players…
+                <p className="text-fg-muted py-8 text-center font-sans text-xs">
+                  Loading squad roster…
                 </p>
               ) : batchPlayersQuery.isError ? (
                 <ErrorState
@@ -259,21 +236,24 @@ export default function BatchDetailPage() {
                 />
               ) : batchPlayersQuery.data?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-8 text-center">
-                  <p className="text-fg text-sm font-semibold">No players assigned yet</p>
+                  <p className="font-heading text-fg text-sm font-bold uppercase">
+                    No players assigned yet
+                  </p>
                   <p className="text-fg-muted mt-1 font-sans text-xs">
-                    Assign active players to organize your squad roster.
+                    Add registered players to populate this squad roster.
                   </p>
                   {canManage && (
                     <Button
                       onClick={() => setShowAddPlayersModal(true)}
-                      className="bg-primary mt-4 h-11 min-h-[44px] rounded-[10px] px-4 text-xs font-bold text-white hover:opacity-90"
+                      className="mt-3.5 h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
                     >
-                      Add Players to Batch
+                      <UserPlus className="mr-1.5 h-3.5 w-3.5" />
+                      Add Players to Squad
                     </Button>
                   )}
                 </div>
               ) : (
-                <div className="divide-border-subtle/60 divide-y">
+                <div className="divide-border-subtle/50 divide-y">
                   {batchPlayersQuery.data.map((player) => {
                     const name = player.fullName ?? player.email;
                     const initials = name
@@ -286,14 +266,19 @@ export default function BatchDetailPage() {
                     return (
                       <div
                         key={player.id}
-                        className="hover:bg-surface-muted/20 flex min-h-[44px] items-center justify-between gap-3 p-3.5 transition-colors"
+                        className="hover:bg-surface-muted/20 flex min-h-[50px] items-center justify-between gap-3 p-3 transition-colors"
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-3">
-                          <div className="bg-surface-muted border-border-subtle text-fg-muted font-heading flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-bold">
+                          <div className="border-border-subtle bg-surface-container-low font-heading text-fg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-bold">
                             {initials}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-fg truncate text-sm font-bold">{name}</p>
+                            <Link
+                              to={`/members/${player.academyMemberId}`}
+                              className="text-fg hover:text-primary block truncate font-sans text-sm font-bold transition-colors"
+                            >
+                              {name}
+                            </Link>
                             <p className="text-fg-muted truncate font-sans text-xs">
                               {player.email}
                             </p>
@@ -301,15 +286,14 @@ export default function BatchDetailPage() {
                         </div>
 
                         {canManage && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <button
+                            type="button"
                             onClick={() => setPlayerToRemove({ id: player.id, name })}
-                            aria-label={`Remove ${name}`}
-                            className="text-error hover:bg-error-pale min-h-[44px] rounded-[10px] px-3 text-xs font-bold"
+                            aria-label={`Remove ${name} from squad`}
+                            className="text-fg-muted hover:bg-error-pale hover:text-error flex h-8 w-8 items-center justify-center rounded-lg transition-colors"
                           >
-                            Remove
-                          </Button>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         )}
                       </div>
                     );
@@ -322,7 +306,7 @@ export default function BatchDetailPage() {
       )}
 
       {/* Searchable Multi-Select Add Players Modal */}
-      {canManage && batch ? (
+      {canManage && batch && (
         <AddBatchPlayersModal
           open={showAddPlayersModal}
           onClose={() => setShowAddPlayersModal(false)}
@@ -331,19 +315,19 @@ export default function BatchDetailPage() {
           onAddPlayers={handleAddPlayersBulk}
           isLoading={addPlayer.isPending}
         />
-      ) : null}
+      )}
 
       {/* Confirmation Modal for Removing Player */}
       <Modal
         open={Boolean(playerToRemove)}
         onClose={() => setPlayerToRemove(null)}
-        title="Remove Player from Batch"
+        title="Remove Player from Squad"
         footer={
-          <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex w-full justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => setPlayerToRemove(null)}
-              className="h-12 min-h-[48px] w-full sm:w-auto"
+              className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
             >
               Cancel
             </Button>
@@ -351,17 +335,17 @@ export default function BatchDetailPage() {
               variant="danger"
               isLoading={removePlayer.isPending}
               onClick={() => void handleConfirmRemovePlayer()}
-              className="h-12 min-h-[48px] w-full sm:w-auto"
+              className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
             >
               Remove Player
             </Button>
           </div>
         }
       >
-        <p className="text-fg text-sm">
+        <p className="text-fg font-sans text-xs">
           Are you sure you want to remove{' '}
-          <strong className="text-fg font-bold">{playerToRemove?.name}</strong> from{' '}
-          <strong className="text-fg font-bold">{batch?.name}</strong>?
+          <strong className="text-fg">{playerToRemove?.name}</strong> from{' '}
+          <strong className="text-fg">{batch?.name}</strong>?
         </p>
       </Modal>
     </div>
@@ -457,110 +441,127 @@ function BatchEditForm({
   });
 
   return (
-    <Card>
+    <div className="border-border-subtle bg-surface rounded-xl border p-4 shadow-2xs">
       <form onSubmit={handleSubmitEdit} noValidate>
-        <CardHeader title="Edit Batch" description="Update details for this training batch." />
-        <CardBody className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="border-border-subtle/50 mb-4 border-b pb-3">
+          <h2 className="font-heading text-fg text-base font-extrabold tracking-tight uppercase">
+            Edit Squad Specifications
+          </h2>
+        </div>
+        <div className="space-y-3.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-fg block text-sm font-medium">Batch name</label>
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                Squad Name
+              </label>
               <Input
-                className="h-12 min-h-[44px]"
-                {...register('name', {
-                  required: 'Batch name is required',
-                })}
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
+                {...register('name', { required: 'Squad name is required' })}
               />
             </div>
             <div>
-              <label className="text-fg block text-sm font-medium">Age group</label>
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                Age Group
+              </label>
               <Input
-                className="h-12 min-h-[44px]"
-                {...register('ageGroup', {
-                  required: 'Age group is required',
-                })}
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
+                {...register('ageGroup', { required: 'Age group is required' })}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-fg block text-sm font-medium">
-              Training days <span className="text-fg-muted text-xs font-normal">(Optional)</span>
+          <div className="space-y-1.5">
+            <label className="font-heading text-fg-muted block text-[10px] font-bold tracking-wider uppercase">
+              Training Days
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {DAYS.map((day) => (
-                <Button
+                <button
                   key={day}
                   type="button"
-                  size="sm"
-                  variant={selectedDays.includes(day) ? 'primary' : 'secondary'}
                   onClick={() => toggleDay(day)}
-                  className="h-11 min-h-[44px] min-w-[44px] px-3 font-semibold"
+                  className={`h-8 min-w-[38px] rounded-md border px-2.5 font-mono text-xs font-bold transition-all ${
+                    selectedDays.includes(day)
+                      ? 'border-primary bg-primary text-black'
+                      : 'border-border-subtle bg-surface-container-low text-fg-muted hover:text-fg'
+                  }`}
                 >
                   {day}
-                </Button>
+                </button>
               ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-fg block text-sm font-medium">
-              Training time <span className="text-fg-muted text-xs font-normal">(Optional)</span>
-            </label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <DatePicker
-                selected={startTime}
-                onChange={handleStartTimeChange}
-                showTimeSelect
-                showTimeSelectOnly
-                timeIntervals={30}
-                dateFormat="h:mm aa"
-                placeholderText="Start Time"
-                className="bg-surface border-border-subtle text-fg h-12 min-h-[44px] w-full rounded-lg border px-3 py-2"
-              />
-              <DatePicker
-                selected={endTime}
-                onChange={handleEndTimeChange}
-                showTimeSelect
-                showTimeSelectOnly
-                timeIntervals={30}
-                dateFormat="h:mm aa"
-                placeholderText="End Time"
-                className="bg-surface border-border-subtle text-fg h-12 min-h-[44px] w-full rounded-lg border px-3 py-2"
-              />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                Assigned Coach
+              </label>
+              <Select
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
+                {...register('coachId')}
+              >
+                <option value="">Select coach (Optional)</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.fullName ?? c.email}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                Training Time Window
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <DatePicker
+                  selected={startTime}
+                  onChange={handleStartTimeChange}
+                  showTimeSelect
+                  showTimeSelectOnly
+                  timeIntervals={30}
+                  dateFormat="h:mm aa"
+                  placeholderText="Start Time"
+                  className="border-border-subtle bg-surface-container-low text-fg h-10 min-h-[40px] w-full rounded-lg border px-3 font-mono text-xs"
+                />
+                <DatePicker
+                  selected={endTime}
+                  onChange={handleEndTimeChange}
+                  showTimeSelect
+                  showTimeSelectOnly
+                  timeIntervals={30}
+                  dateFormat="h:mm aa"
+                  placeholderText="End Time"
+                  className="border-border-subtle bg-surface-container-low text-fg h-10 min-h-[40px] w-full rounded-lg border px-3 font-mono text-xs"
+                />
+              </div>
             </div>
           </div>
 
           <div>
-            <label className="text-fg block text-sm font-medium">
-              Assigned coach <span className="text-fg-muted text-xs font-normal">(Optional)</span>
+            <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+              Description
             </label>
-            <Select className="h-12 min-h-[44px]" {...register('coachId')}>
-              <option value="">Select coach (Optional)</option>
-              {coaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.fullName ?? coach.email}
-                </option>
-              ))}
-            </Select>
+            <Textarea
+              rows={2}
+              className="border-border-subtle bg-surface-container-low rounded-lg text-xs"
+              {...register('description')}
+            />
           </div>
+        </div>
 
-          <div>
-            <label className="text-fg block text-sm font-medium">
-              Description <span className="text-fg-muted text-xs font-normal">(Optional)</span>
-            </label>
-            <Textarea className="min-h-[80px]" {...register('description')} />
-          </div>
-        </CardBody>
-        <CardFooter className="flex-col gap-2 sm:flex-row">
+        <div className="border-border-subtle/40 mt-4 flex items-center justify-end gap-2.5 border-t pt-3">
           <Button
             type="submit"
+            variant="primary"
             isLoading={updateBatch.isPending}
-            className="h-12 min-h-[48px] w-full font-semibold sm:w-auto"
+            className="h-9 min-h-[36px] rounded-lg px-5 text-xs font-bold"
           >
-            Save changes
+            Save Changes
           </Button>
-        </CardFooter>
+        </div>
       </form>
-    </Card>
+    </div>
   );
 }

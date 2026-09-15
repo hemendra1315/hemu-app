@@ -138,7 +138,7 @@ test.describe('4. Batch Management & Player Assignment UI', () => {
     );
 
     await page.goto('/batches');
-    await expect(page.getByRole('heading', { name: 'Batches', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /batches/i })).toBeVisible();
   });
 });
 

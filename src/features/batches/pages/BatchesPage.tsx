@@ -2,20 +2,11 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Link } from 'react-router-dom';
+import { Plus, Users, Calendar, Trash2, ArrowRight } from 'lucide-react';
 
 import { TimeRangePicker } from '@/components/form';
 import { isTimeRangeValid } from '@/lib/utils/date';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardFooter,
-  CardHeader,
-  Input,
-  Modal,
-  Select,
-  Textarea,
-} from '@/components/ui';
+import { Button, Input, Modal, Select, Textarea } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
 import { MobileEmptyState } from '@/components/mobile';
 import { useActiveAcademy } from '@/features/academies';
@@ -119,17 +110,19 @@ export default function BatchesPage() {
         setEndTime(null);
         setSelectedDays([]);
         setShowForm(false);
-      } catch (error) {
+      } catch (error: unknown) {
+        const err = error as { message?: string; details?: string };
+        const msg =
+          err?.message && !err.message.startsWith('E_') ? err.message : errorMessage(error);
+
         pushToast({
           title: 'Failed to create batch',
-          description: errorMessage(error),
+          description: msg,
           variant: 'error',
         });
       }
     },
-    (errors) => {
-      console.error('Form errors:', errors);
-
+    () => {
       pushToast({
         title: 'Please fill required fields',
         variant: 'error',
@@ -184,161 +177,217 @@ export default function BatchesPage() {
   if (!academyId) return null;
 
   return (
-    <div className="space-y-4 pb-24 md:pb-6">
+    <div className="flex flex-col space-y-4 pb-24 md:pb-6">
       {/* 1. App Bar Header */}
-      <div className="border-border-subtle/40 flex flex-col gap-2 border-b pb-4">
+      <div className="border-border-subtle/40 flex flex-col gap-3 border-b pb-3">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="font-heading text-fg text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
-            Batches
-          </h1>
+          <div>
+            <h1 className="font-heading text-fg text-xl font-extrabold tracking-tight uppercase md:text-2xl">
+              Batches & Squads
+            </h1>
+            <p className="text-fg-muted font-sans text-xs">
+              Training cohorts, schedules & player group assignments
+            </p>
+          </div>
           {canManage && (
             <Button
               variant={showForm ? 'secondary' : 'primary'}
               onClick={() => setShowForm((prev) => !prev)}
-              className="min-h-[44px] rounded-[10px] px-4 text-xs font-bold"
+              className="h-9 min-h-[36px] rounded-lg px-3.5 text-xs font-bold"
             >
-              {showForm ? 'Cancel' : 'New Batch'}
+              {showForm ? (
+                'Cancel'
+              ) : (
+                <>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  New Batch
+                </>
+              )}
             </Button>
           )}
         </div>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="bg-surface-muted border-border-subtle/50 text-fg-muted rounded border px-2 py-0.5 font-mono text-[11px] font-bold uppercase">
-              {batchesQuery.data?.length ?? 0} BATCHES
-            </span>
-          </div>
-          <div className="overflow-x-auto pb-1 sm:pb-0">
-            <div className="flex items-center gap-1.5">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'morning', label: 'Morning' },
-                { id: 'afternoon', label: 'Afternoon' },
-                { id: 'evening', label: 'Evening' },
-              ].map((chip) => {
-                const isActive = selectedFilter === chip.id;
-                return (
-                  <button
-                    key={chip.id}
-                    onClick={() =>
-                      setSelectedFilter(chip.id as 'all' | 'morning' | 'afternoon' | 'evening')
-                    }
-                    className={`h-8 min-h-[32px] rounded-full border px-3 text-xs font-bold transition-all ${
-                      isActive
-                        ? 'bg-primary border-primary text-white shadow-2xs'
-                        : 'bg-surface text-fg-muted border-border-subtle hover:bg-surface-muted/50'
+
+        {/* Filter Chips */}
+        <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          {[
+            { id: 'all', label: 'All Squads', count: batchesQuery.data?.length },
+            { id: 'morning', label: 'Morning' },
+            { id: 'afternoon', label: 'Afternoon' },
+            { id: 'evening', label: 'Evening' },
+          ].map((chip) => {
+            const isActive = selectedFilter === chip.id;
+            return (
+              <button
+                key={chip.id}
+                onClick={() =>
+                  setSelectedFilter(chip.id as 'all' | 'morning' | 'afternoon' | 'evening')
+                }
+                className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition-all ${
+                  isActive
+                    ? 'border-primary bg-primary font-extrabold text-black shadow-2xs'
+                    : 'border-border-subtle bg-surface text-fg-muted hover:border-border hover:bg-surface-muted/50'
+                }`}
+              >
+                <span>{chip.label}</span>
+                {chip.count !== undefined && (
+                  <span
+                    className={`py-0.2 rounded-full px-1.5 text-[10px] ${
+                      isActive ? 'bg-black/20 text-black' : 'bg-surface-muted text-fg-muted'
                     }`}
                   >
-                    {chip.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                    {chip.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {showForm && canManage ? (
-        <Card>
+      {/* Create Batch Collapsible Panel */}
+      {showForm && canManage && (
+        <div className="border-border-subtle bg-surface animate-fadeIn rounded-xl border p-4 shadow-2xs">
           <form onSubmit={handleCreate} noValidate>
-            <CardHeader
-              title="Create Batch"
-              description="Set up a new training group with schedule & coach."
-            />
-            <CardBody className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="border-border-subtle/50 mb-4 border-b pb-3">
+              <h2 className="font-heading text-fg text-base font-extrabold tracking-tight uppercase">
+                Create Training Squad
+              </h2>
+              <p className="text-fg-muted font-sans text-xs">
+                Set up a new cohort with age group, schedule & coach
+              </p>
+            </div>
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-fg block text-sm font-medium">Batch name</label>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Batch Name
+                  </label>
                   <Input
-                    className="h-12 min-h-[44px]"
+                    placeholder="e.g. Under-16 Elite"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                     {...register('name', { required: 'Batch name is required' })}
                     hasError={Boolean(errors.name)}
                   />
-                  {errors.name ? (
-                    <p className="text-danger mt-1 text-xs">{errors.name.message}</p>
-                  ) : null}
+                  {errors.name && (
+                    <p className="text-error mt-1 font-sans text-[11px] font-semibold">
+                      {errors.name.message}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="text-fg block text-sm font-medium">Age group</label>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Age Group
+                  </label>
                   <Input
-                    className="h-12 min-h-[44px]"
+                    placeholder="e.g. U-16 or Seniors"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                     {...register('ageGroup', { required: 'Age group is required' })}
                     hasError={Boolean(errors.ageGroup)}
                   />
-                  {errors.ageGroup ? (
-                    <p className="text-danger mt-1 text-xs">{errors.ageGroup.message}</p>
-                  ) : null}
+                  {errors.ageGroup && (
+                    <p className="text-error mt-1 font-sans text-[11px] font-semibold">
+                      {errors.ageGroup.message}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-fg block text-sm font-medium">
-                  Training days{' '}
-                  <span className="text-fg-muted text-xs font-normal">(Optional)</span>
+              <div className="space-y-1.5">
+                <label className="font-heading text-fg-muted block text-[10px] font-bold tracking-wider uppercase">
+                  Training Days
                 </label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {DAYS.map((day) => (
-                    <Button
+                    <button
                       key={day}
                       type="button"
-                      variant={selectedDays.includes(day) ? 'primary' : 'secondary'}
-                      size="sm"
                       onClick={() => toggleDay(day)}
-                      className="h-11 min-h-[44px] min-w-[44px] px-3 font-semibold"
+                      className={`h-8 min-w-[38px] rounded-md border px-2.5 font-mono text-xs font-bold transition-all ${
+                        selectedDays.includes(day)
+                          ? 'border-primary bg-primary text-black'
+                          : 'border-border-subtle bg-surface-container-low text-fg-muted hover:text-fg'
+                      }`}
                     >
                       {day}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-fg block text-sm font-medium">
-                  Assign coach <span className="text-fg-muted text-xs font-normal">(Optional)</span>
-                </label>
-                <Select className="h-12 min-h-[44px]" {...register('coachId')}>
-                  <option value="">Select coach (Optional)</option>
-                  {coaches.map((coach) => (
-                    <option key={coach.id} value={coach.id}>
-                      {coach.fullName ?? coach.email}
-                    </option>
-                  ))}
-                </Select>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Lead Coach
+                  </label>
+                  <Select
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
+                    {...register('coachId')}
+                  >
+                    <option value="">Select coach (Optional)</option>
+                    {coaches.map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.fullName ?? coach.email}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <TimeRangePicker
+                    label="Training Time"
+                    startTime={startTime}
+                    endTime={endTime}
+                    onStartTimeChange={setStartTime}
+                    onEndTimeChange={setEndTime}
+                  />
+                </div>
               </div>
 
               <div>
-                <TimeRangePicker
-                  label="Training time (Optional)"
-                  startTime={startTime}
-                  endTime={endTime}
-                  onStartTimeChange={setStartTime}
-                  onEndTimeChange={setEndTime}
+                <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                  Description & Focus
+                </label>
+                <Textarea
+                  placeholder="Focus areas, skill prerequisites, or session notes..."
+                  rows={2}
+                  className="border-border-subtle bg-surface-container-low rounded-lg text-xs"
+                  {...register('description')}
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="text-fg block text-sm font-medium">
-                  Description <span className="text-fg-muted text-xs font-normal">(Optional)</span>
-                </label>
-                <Textarea className="min-h-[80px]" {...register('description')} />
-              </div>
-            </CardBody>
-            <CardFooter className="flex-col gap-2 sm:flex-row">
+            <div className="border-border-subtle/40 mt-4 flex items-center justify-end gap-2.5 border-t pt-3">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowForm(false)}
+                className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
+              >
+                Cancel
+              </Button>
               <Button
                 type="submit"
+                variant="primary"
                 isLoading={createBatch.isPending}
-                className="h-12 min-h-[48px] w-full font-semibold sm:w-auto"
+                className="h-9 min-h-[36px] rounded-lg px-5 text-xs font-bold"
               >
-                Create Batch
+                Create Squad
               </Button>
-            </CardFooter>
+            </div>
           </form>
-        </Card>
-      ) : null}
+        </div>
+      )}
 
       {/* 2. All Batches Grid */}
       <div className="min-w-0">
         {batchesQuery.isPending ? (
-          <p className="text-fg-muted py-8 text-center font-sans text-sm">Loading squads...</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="border-border-subtle bg-surface h-36 animate-pulse rounded-xl border"
+              />
+            ))}
+          </div>
         ) : batchesQuery.isError ? (
           <ErrorState error={batchesQuery.error} onRetry={() => void batchesQuery.refetch()} />
         ) : filteredBatches.length === 0 ? (
@@ -350,69 +399,71 @@ export default function BatchesPage() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {filteredBatches.map((batch) => (
               <div
                 key={batch.id}
-                className="border-border-subtle bg-surface hover:border-border flex flex-col gap-3.5 rounded-xl border p-4 shadow-2xs transition-all"
+                className="group border-border-subtle bg-surface hover:border-border flex flex-col justify-between rounded-xl border p-4 shadow-2xs transition-all"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/batches/${batch.id}`}
-                      className="text-fg font-heading block truncate text-base font-extrabold tracking-tight uppercase hover:underline"
-                    >
-                      {batch.name}
-                    </Link>
-                    <span className="text-fg bg-surface-muted border-border-subtle/50 mt-1.5 inline-flex items-center rounded border px-2 py-0.5 font-sans text-[10px] font-bold tracking-wider uppercase">
-                      {batch.ageGroup}
-                    </span>
-                  </div>
-
-                  <div className="bg-surface-muted/80 text-fg border-border-subtle flex min-h-[30px] shrink-0 items-center justify-center rounded-full border px-3 py-1 font-mono text-xs font-bold">
-                    {batch.playerCount ?? 0} PLAYERS
-                  </div>
-                </div>
-
-                <div className="text-fg-muted border-border-subtle/50 grid grid-cols-1 gap-2 border-t pt-3 text-xs">
-                  {batch.trainingDays ? (
-                    <div className="flex flex-wrap items-center gap-1.5 font-sans">
-                      <span className="text-fg text-[10px] font-bold tracking-wider uppercase">
-                        Schedule:
-                      </span>
-                      <span className="text-fg font-mono text-xs font-medium">
-                        {batch.trainingDays} {batch.trainingTime ? `• ${batch.trainingTime}` : ''}
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to={`/batches/${batch.id}`}
+                        className="font-heading text-fg group-hover:text-primary block truncate text-base font-extrabold tracking-tight uppercase transition-colors"
+                      >
+                        {batch.name}
+                      </Link>
+                      <span className="border-border-subtle/70 bg-surface-container-low py-0.2 text-fg-muted mt-1 inline-flex items-center rounded border px-2 font-sans text-[10px] font-bold uppercase">
+                        {batch.ageGroup}
                       </span>
                     </div>
-                  ) : null}
-                  <div className="flex flex-wrap items-center gap-1.5 font-sans">
-                    <span className="text-fg text-[10px] font-bold tracking-wider uppercase">
-                      Coach:
-                    </span>
-                    <span className="text-fg text-xs font-medium">
-                      {batch.coach.fullName ?? batch.coach.email}
-                    </span>
+
+                    <div className="border-primary/20 bg-primary-pale text-primary flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold">
+                      <Users className="h-3 w-3" />
+                      <span>{batch.playerCount ?? 0}</span>
+                    </div>
+                  </div>
+
+                  <div className="border-border-subtle/50 text-fg-muted mt-3 space-y-1.5 border-t pt-3 text-xs">
+                    {batch.trainingDays && (
+                      <div className="flex items-center gap-1.5 font-sans">
+                        <Calendar className="text-primary h-3.5 w-3.5 shrink-0" />
+                        <span className="text-fg font-mono text-[11px]">
+                          {batch.trainingDays} {batch.trainingTime ? `• ${batch.trainingTime}` : ''}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 font-sans">
+                      <span className="font-heading text-fg-muted text-[10px] font-bold tracking-wider uppercase">
+                        Coach:
+                      </span>
+                      <span className="text-fg font-sans text-xs">
+                        {batch.coach.fullName ?? batch.coach.email}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="border-border-subtle/40 flex items-center justify-between gap-2 border-t pt-2">
+                <div className="border-border-subtle/40 mt-3.5 flex items-center justify-between border-t pt-2.5">
                   <Link
                     to={`/batches/${batch.id}`}
-                    className="text-primary inline-flex min-h-[44px] items-center font-sans text-xs font-bold hover:underline"
+                    className="text-primary flex items-center gap-1 font-sans text-xs font-bold hover:underline"
                   >
-                    View Batch & Roster &rarr;
+                    <span>View Roster</span>
+                    <ArrowRight className="h-3 w-3" />
                   </Link>
 
-                  {canManage ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
+                  {canManage && (
+                    <button
+                      type="button"
                       onClick={() => setBatchToDelete({ id: batch.id, name: batch.name })}
-                      className="text-error hover:bg-error-pale h-10 min-h-[44px] rounded-[10px] px-3 font-bold"
+                      className="text-fg-muted hover:bg-error-pale hover:text-error flex h-7 w-7 items-center justify-center rounded-md transition-colors"
+                      aria-label="Delete batch"
                     >
-                      Delete
-                    </Button>
-                  ) : null}
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -424,13 +475,13 @@ export default function BatchesPage() {
       <Modal
         open={Boolean(batchToDelete)}
         onClose={() => setBatchToDelete(null)}
-        title="Delete Training Batch"
+        title="Delete Training Squad"
         footer={
-          <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="flex w-full justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => setBatchToDelete(null)}
-              className="h-12 min-h-[48px] w-full sm:w-auto"
+              className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
             >
               Cancel
             </Button>
@@ -438,17 +489,16 @@ export default function BatchesPage() {
               variant="danger"
               isLoading={deleteBatch.isPending}
               onClick={() => void handleConfirmDelete()}
-              className="h-12 min-h-[48px] w-full font-semibold sm:w-auto"
+              className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
             >
               Confirm Delete
             </Button>
           </div>
         }
       >
-        <p className="text-fg text-sm">
-          Are you sure you want to delete{' '}
-          <strong className="text-fg font-bold">{batchToDelete?.name}</strong>? This action will
-          unassign all players from this batch.
+        <p className="text-fg font-sans text-xs">
+          Are you sure you want to delete <strong className="text-fg">{batchToDelete?.name}</strong>
+          ? All players in this batch will be unassigned.
         </p>
       </Modal>
     </div>

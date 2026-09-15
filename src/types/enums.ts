@@ -32,6 +32,10 @@ export const FEE_MODE_LABELS: Record<FeeMode, string> = {
 export const JOINABLE_ROLES = ['player', 'coach'] as const;
 export type JoinableRole = (typeof JOINABLE_ROLES)[number];
 
+/** Roles an academy owner can assign or switch members between. */
+export const ASSIGNABLE_MEMBER_ROLES = ['coach', 'player', 'parent'] as const;
+export type AssignableMemberRole = (typeof ASSIGNABLE_MEMBER_ROLES)[number];
+
 export const THEMES = ['light', 'dark', 'system'] as const;
 export type Theme = (typeof THEMES)[number];
 

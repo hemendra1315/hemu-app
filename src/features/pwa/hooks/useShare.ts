@@ -6,8 +6,8 @@ import { canUseWebShare } from '../detect';
 
 /** Public production data shared via the Web Share / copy fallback. */
 export const SHARE_APP_DATA = {
-  title: 'Cricket Academy Manager',
-  text: 'Cricket Academy Manager',
+  title: 'CAM',
+  text: 'CAM - Cricket Academy Manager',
   url: 'https://cricos08.vercel.app',
 };
 

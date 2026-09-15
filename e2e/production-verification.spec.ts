@@ -434,10 +434,11 @@ test.describe('6. Logout & no auth resurrection', () => {
     const audit = attachAudit(page);
     await seedAuth(page, OWNER());
     await page.goto('/more');
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible({
+    const signOutBtn = page.locator('main').getByRole('button', { name: /sign out/i });
+    await expect(signOutBtn).toBeVisible({
       timeout: 15000,
     });
-    await page.getByRole('button', { name: /sign out/i }).click();
+    await signOutBtn.click();
     await expect(page.getByRole('button', { name: /continue with google/i })).toBeVisible({
       timeout: 15000,
     });

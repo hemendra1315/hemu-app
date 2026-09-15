@@ -53,6 +53,7 @@ const DrillsPage = lazy(() => import('@/features/drills/pages/DrillsPage'));
 const DrillDetailPage = lazy(() => import('@/features/drills/pages/DrillDetailPage'));
 const StatsPage = lazy(() => import('@/features/stats/pages/StatsPage'));
 const AcademySettingsPage = lazy(() => import('@/features/academies/pages/AcademySettingsPage'));
+const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'));
 const NotificationsPage = lazy(() =>
   import('@/features/notifications/pages/NotificationsPage').then((m) => ({
     default: m.NotificationsPage,
@@ -196,6 +197,7 @@ export const router = createBrowserRouter([
                       { path: '/batches/:batchId', element: <BatchDetailPage /> },
                       { path: '/batches/:batchId/attendance', element: <BatchAttendancePage /> },
                       { path: '/attendance', element: <AttendanceOverviewPage /> },
+                      { path: '/reports', element: <ReportsPage /> },
                       { path: '/matches/new', element: <AddMatchPage /> },
                       {
                         path: '/sessions/:sessionId/attendance',

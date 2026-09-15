@@ -12,7 +12,19 @@ export function OnboardingLayout() {
   return (
     <div className="bg-bg min-h-screen">
       <header className="flex h-14 items-center justify-between px-4">
-        <span className="text-fg font-semibold">Cricket Academy Manager</span>
+        <div className="flex items-center gap-2.5">
+          <img
+            src="/logo-192.png"
+            alt="CAM Logo"
+            className="h-7 w-7 rounded-lg object-contain shadow-xs"
+          />
+          <div className="flex items-center gap-1.5">
+            <span className="text-primary font-mono text-base font-black">CAM</span>
+            <span className="text-fg-muted hidden text-xs font-medium sm:inline">
+              Cricket Academy Manager
+            </span>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
           {isAuthenticated ? (

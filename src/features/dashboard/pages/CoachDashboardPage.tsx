@@ -1,5 +1,15 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Layers, ArrowRight, CheckCircle2, ChevronRight } from 'lucide-react';
+import {
+  Layers,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  User,
+  AlertCircle,
+  CalendarCheck,
+  Clock,
+  Users,
+} from 'lucide-react';
 
 import { Card, CardBody, CardHeader, Button, Badge } from '@/components/ui';
 import { ErrorState } from '@/components/feedback';
@@ -20,7 +30,11 @@ export default function CoachDashboardPage() {
   const analytics = analyticsQuery.data;
 
   if (analyticsQuery.isPending) {
-    return <p className="text-fg-muted py-8 text-center text-sm">Loading dashboard...</p>;
+    return (
+      <div className="flex min-h-[300px] items-center justify-center p-6 text-center">
+        <p className="text-fg-muted text-sm font-medium">Loading coach dashboard...</p>
+      </div>
+    );
   }
 
   if (analyticsQuery.isError || !analytics) {
@@ -31,6 +45,7 @@ export default function CoachDashboardPage() {
 
   const todaySessions = analytics.todaySessions ?? [];
   const topBatches = analytics.assignedBatches?.slice(0, 3) ?? [];
+  const playersNeedingAttention = analytics.playersNeedingAttention ?? [];
 
   const activities: ActivityItem[] =
     analytics.recentMatches?.slice(0, 3).map((m) => ({
@@ -49,180 +64,185 @@ export default function CoachDashboardPage() {
 
   return (
     <div className="space-y-4 pb-20 md:pb-6">
-      {/* 1. Floodlit Turf + Scorebook App Bar */}
-      <div className="border-border-subtle/40 flex flex-col gap-1 border-b pb-4">
-        <h1 className="font-heading text-fg text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
-          Coach Dashboard
-        </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold tracking-tight transition-colors ${
-              hasFixtures
-                ? 'bg-saffron-pale text-saffron border-saffron/20'
-                : 'bg-surface-muted/80 text-fg-muted border-border-subtle/50'
-            }`}
-          >
-            {hasFixtures && (
-              <span className="bg-saffron h-1.5 w-1.5 animate-pulse rounded-full" aria-hidden />
-            )}
-            {todayStr}
-          </span>
-          {hasFixtures && (
-            <span className="bg-saffron-pale text-saffron border-saffron/20 inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight uppercase">
-              Fixture Slated
+      {/* 1. Header with Coach Profile Link */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-fg truncate text-xl font-extrabold tracking-tight md:text-2xl">
+              Coach Dashboard
+            </h1>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-xs font-bold tracking-tight ${
+                hasFixtures
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-border-subtle/60 bg-surface-muted/60 text-fg-muted'
+              }`}
+            >
+              {hasFixtures && (
+                <span className="bg-primary h-1.5 w-1.5 animate-pulse rounded-full" aria-hidden />
+              )}
+              {todayStr}
             </span>
-          )}
+            {hasFixtures && (
+              <span className="border-primary/20 bg-primary/10 text-primary inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase">
+                Sessions Slated
+              </span>
+            )}
+          </div>
         </div>
+
+        <Link
+          to="/coaches/me"
+          className="hover:bg-surface-muted/80 border-border-subtle bg-surface text-fg inline-flex h-10 min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-bold shadow-2xs transition-all active:scale-[0.98]"
+        >
+          <User className="text-primary h-4 w-4" />
+          <span>My Coach Profile</span>
+        </Link>
       </div>
 
       <SuperAdminAcademyActions />
 
-      {/* 2. Today's Overview (Grid of stat cards) */}
+      {/* 2. Today's Overview (KPIs) */}
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
         <div className="border-border-subtle bg-surface flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs">
-          <span className="text-fg-muted font-heading truncate text-xs font-bold tracking-wider uppercase">
+          <span className="text-fg-muted truncate text-[11px] font-bold tracking-wider uppercase">
             Sessions Today
           </span>
-          <div className="mt-2.5">
-            <p className="text-fg font-mono text-2xl font-bold">{todaySessions.length}</p>
-            <p className="text-fg-muted font-heading mt-0.5 truncate text-[11px] font-medium">
+          <div className="mt-2">
+            <p className="text-fg font-mono text-2xl font-extrabold tracking-tight">
+              {todaySessions.length}
+            </p>
+            <p className="text-fg-muted mt-0.5 truncate text-[11px] font-medium">
               {todaySessions.reduce((acc, s) => acc + (s.playerCount || 0), 0)} expected
             </p>
           </div>
         </div>
 
         <div className="border-border-subtle bg-surface flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs">
-          <span className="text-fg-muted font-heading truncate text-xs font-bold tracking-wider uppercase">
+          <span className="text-fg-muted truncate text-[11px] font-bold tracking-wider uppercase">
             Coached Players
           </span>
-          <div className="mt-2.5">
-            <p className="text-fg font-mono text-2xl font-bold">{totalAssignedPlayers}</p>
-            <p className="text-fg-muted font-heading mt-0.5 truncate text-[11px] font-medium">
-              Squad Roster
+          <div className="mt-2">
+            <p className="text-fg font-mono text-2xl font-extrabold tracking-tight">
+              {totalAssignedPlayers}
             </p>
+            <p className="text-fg-muted mt-0.5 truncate text-[11px] font-medium">Squad Roster</p>
           </div>
         </div>
 
         <div className="border-border-subtle bg-surface flex flex-col justify-between rounded-xl border p-3.5 shadow-2xs">
-          <span className="text-fg-muted font-heading truncate text-xs font-bold tracking-wider uppercase">
+          <span className="text-fg-muted truncate text-[11px] font-bold tracking-wider uppercase">
             My Batches
           </span>
-          <div className="mt-2.5">
-            <p className="text-fg font-mono text-2xl font-bold">
+          <div className="mt-2">
+            <p className="text-fg font-mono text-2xl font-extrabold tracking-tight">
               {analytics.assignedBatches?.length ?? 0}
             </p>
-            <p className="text-fg-muted font-heading mt-0.5 truncate text-[11px] font-medium">
-              Active Squads
-            </p>
+            <p className="text-fg-muted mt-0.5 truncate text-[11px] font-medium">Active Squads</p>
           </div>
         </div>
       </div>
 
-      {/* 3. Actions */}
-      <div className="flex gap-2.5 sm:gap-3">
+      {/* 3. Primary Actions */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         <Button
           variant="primary"
-          className="bg-primary text-primary-fg min-h-[44px] flex-1 rounded-[10px] font-semibold hover:opacity-90"
+          className="h-11 min-h-[44px] justify-center gap-2 rounded-xl text-xs font-bold shadow-2xs transition-all active:scale-[0.98]"
           onClick={() => navigate('/sessions')}
         >
-          Take Attendance
+          <CalendarCheck className="h-4 w-4" />
+          <span>Take Attendance</span>
         </Button>
         <Button
           variant="secondary"
-          className="bg-surface text-fg border-border-subtle hover:bg-surface-muted/50 min-h-[44px] flex-1 rounded-[10px] border font-semibold"
+          className="hover:bg-surface-muted/80 border-border-subtle bg-surface h-11 min-h-[44px] justify-center gap-2 rounded-xl border text-xs font-bold shadow-2xs transition-all active:scale-[0.98]"
           onClick={() => navigate('/sessions')}
         >
-          View Sessions
+          <Clock className="h-4 w-4" />
+          <span>View Sessions</span>
         </Button>
       </div>
 
-      {/* 4. Today's Sessions List (Scorebook-Ruled) */}
-      <Card className="border-border-subtle bg-surface min-w-0 rounded-xl border shadow-2xs">
+      {/* 4. Today's Schedule */}
+      <Card className="border-border-subtle bg-surface shadow-2xs">
         <CardHeader
           title={
-            <span className="font-heading text-fg-muted text-sm font-bold tracking-wider uppercase">
-              Today's Schedule
-            </span>
+            <div className="flex items-center gap-2">
+              <Clock className="text-primary h-4 w-4 shrink-0" />
+              <span>Today's Schedule</span>
+            </div>
           }
           action={
             <Link
               to="/sessions"
-              className="text-primary flex shrink-0 items-center gap-1 font-sans text-xs font-bold hover:underline"
+              className="text-primary flex shrink-0 items-center gap-1 text-xs font-bold hover:underline"
             >
               <span>View All</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           }
         />
-        <CardBody className="min-w-0 px-4 py-2 pt-0">
+        <CardBody className="p-3 pt-0 sm:p-4 sm:pt-0">
           {todaySessions.length === 0 ? (
-            <div className="py-6 text-center">
-              <p className="text-fg-muted font-sans text-xs font-medium">
-                No sessions scheduled for today.
-              </p>
+            <div className="py-8 text-center">
+              <p className="text-fg-muted text-xs font-medium">No sessions scheduled for today.</p>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/sessions/new')}
-                className="text-primary mt-2 font-sans text-xs"
+                className="text-primary mt-2 text-xs font-bold"
               >
-                Schedule Session ?
+                Schedule Session &rarr;
               </Button>
             </div>
           ) : (
-            <div className="divide-border-subtle/60 min-w-0 divide-y">
+            <div className="space-y-2.5">
               {todaySessions.map((session) => (
                 <div
                   key={session.id}
-                  className="flex min-h-[44px] items-center justify-between gap-3 py-3.5"
+                  className="border-border-subtle hover:border-primary/40 bg-surface flex min-h-[52px] flex-col gap-3 rounded-xl border p-3.5 transition-colors sm:flex-row sm:items-center sm:justify-between"
                 >
-                  {/* Session Time (IBM Plex Mono) */}
-                  <div className="text-fg w-24 shrink-0 font-mono text-xs font-bold">
-                    {session.startAt || 'TBD'}
-                    {session.endAt && (
-                      <span className="text-fg-muted font-normal"> - {session.endAt}</span>
-                    )}
-                  </div>
-
-                  {/* Batch & Title (IBM Plex Sans) */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-fg truncate font-sans text-sm font-bold">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <p className="text-fg truncate text-sm font-bold">
                         {session.batchName || 'No Batch'}
                       </p>
                       {session.attendanceMarked ? (
-                        <Badge
-                          tone="success"
-                          className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold tracking-tight uppercase"
-                        >
+                        <Badge tone="success" className="shrink-0 text-[10px] font-bold uppercase">
                           Marked
                         </Badge>
                       ) : (
-                        <Badge
-                          tone="neutral"
-                          className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold tracking-tight uppercase"
-                        >
+                        <Badge tone="neutral" className="shrink-0 text-[10px] font-bold uppercase">
                           Pending
                         </Badge>
                       )}
                     </div>
-                    <p className="text-fg-muted mt-0.5 truncate font-sans text-xs">
-                      {session.title} &middot; {session.playerCount || 0} players expected
+                    <p className="text-fg-muted truncate text-xs">
+                      {session.title} · {session.playerCount || 0} players expected
                     </p>
+                    <div className="text-fg-muted flex items-center gap-1 font-mono text-xs">
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        {session.startAt || 'TBD'}
+                        {session.endAt ? ` - ${session.endAt}` : ''}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* CTA Button */}
                   <Button
                     variant={session.attendanceMarked ? 'secondary' : 'primary'}
                     onClick={() => navigate(`/sessions/${session.id}/attendance`)}
-                    className="h-11 min-h-[44px] shrink-0 px-3.5 text-xs font-bold"
+                    className="h-10 min-h-[40px] shrink-0 px-4 text-xs font-bold sm:w-auto"
                   >
                     {session.attendanceMarked ? (
-                      <span className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> View
-                      </span>
+                      <>
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                        View Attendance
+                      </>
                     ) : (
-                      'Mark'
+                      'Mark Attendance'
                     )}
                   </Button>
                 </div>
@@ -232,13 +252,58 @@ export default function CoachDashboardPage() {
         </CardBody>
       </Card>
 
-      {/* 5. My Batches (Compact List Rows) */}
-      <Card className="border-border-subtle bg-surface min-w-0 shadow-2xs">
+      {/* 5. Players Needing Attention */}
+      {playersNeedingAttention.length > 0 && (
+        <Card className="border-border-subtle bg-surface shadow-2xs">
+          <CardHeader
+            title={
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                <span>Players Needing Attention</span>
+              </div>
+            }
+          />
+          <CardBody className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="space-y-2">
+              {playersNeedingAttention.map((player) => (
+                <Link
+                  key={player.id}
+                  to={`/members/${player.id}`}
+                  className="border-border-subtle hover:border-primary/40 bg-surface flex min-h-[50px] items-center justify-between gap-3 rounded-xl border p-3 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-fg truncate text-sm font-bold">{player.name}</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {player.issues.map((issue, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-500"
+                        >
+                          {issue}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-fg-muted font-mono text-xs font-semibold">
+                      {player.attendanceRate}% att.
+                    </span>
+                    <ChevronRight className="text-fg-muted/60 h-4 w-4" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* 6. My Batches (Top 3) */}
+      <Card className="border-border-subtle bg-surface shadow-2xs">
         <CardHeader
           title={
-            <div className="flex min-w-0 items-center gap-2">
-              <Layers className="text-warning h-4 w-4 shrink-0" />
-              <span className="truncate">My Batches</span>
+            <div className="flex items-center gap-2">
+              <Layers className="text-primary h-4 w-4 shrink-0" />
+              <span>My Batches</span>
             </div>
           }
           action={
@@ -251,31 +316,36 @@ export default function CoachDashboardPage() {
             </Link>
           }
         />
-        <CardBody className="min-w-0 p-3 pt-0">
+        <CardBody className="p-3 pt-0 sm:p-4 sm:pt-0">
           {topBatches.length === 0 ? (
-            <p className="text-fg-muted py-6 text-center text-xs">No batches assigned yet.</p>
+            <div className="py-6 text-center">
+              <p className="text-fg-muted text-xs font-medium">No batches assigned yet.</p>
+            </div>
           ) : (
-            <div className="min-w-0 space-y-2">
+            <div className="space-y-2.5">
               {topBatches.map((batch) => (
                 <Link
                   key={batch.id}
                   to={`/batches/${batch.id}`}
-                  className="border-border-subtle hover:border-primary/50 bg-surface flex min-h-[52px] min-w-0 items-center justify-between gap-3 rounded-xl border p-3 transition-colors"
+                  className="border-border-subtle hover:border-primary/40 bg-surface flex min-h-[52px] items-center justify-between gap-3 rounded-xl border p-3.5 transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <p className="text-fg truncate text-sm font-bold">{batch.name}</p>
-                      <Badge tone="brand" className="shrink-0 px-1.5 py-0.5 text-[10px]">
-                        {batch.ageGroup}
-                      </Badge>
+                      {batch.ageGroup && (
+                        <Badge tone="brand" className="shrink-0 px-1.5 py-0.5 text-[10px]">
+                          {batch.ageGroup}
+                        </Badge>
+                      )}
                     </div>
-                    <p className="text-fg-muted mt-0.5 truncate text-xs">
-                      {batch.trainingDays || 'Flexible schedule'} � {batch.trainingTime || 'TBD'}
+                    <p className="text-fg-muted mt-0.5 truncate text-xs font-medium">
+                      {batch.trainingDays || 'Flexible schedule'} · {batch.trainingTime || 'TBD'}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-fg-muted text-xs font-semibold">
-                      {batch.playerCount} players
+                    <span className="text-fg-muted inline-flex items-center gap-1 text-xs font-semibold">
+                      <Users className="h-3.5 w-3.5" />
+                      {batch.playerCount}
                     </span>
                     <ChevronRight className="text-fg-muted/60 h-4 w-4" />
                   </div>
@@ -286,7 +356,7 @@ export default function CoachDashboardPage() {
         </CardBody>
       </Card>
 
-      {/* 6. Recent Activity (Latest 2-3 items) */}
+      {/* 7. Recent Activity (Matches) */}
       <ActivityFeed title="Recent Activity" activities={activities} />
     </div>
   );

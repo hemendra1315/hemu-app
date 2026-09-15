@@ -165,7 +165,7 @@ Deno.serve(async (req: Request) => {
     // 4. Build VAPID auth
     const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY')!;
     const vapidPrivateKeyB64 = Deno.env.get('VAPID_PRIVATE_KEY')!;
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@cricketacademy.app';
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:hemendra0820@gmail.com';
     const privateKey = await importVapidPrivateKey(vapidPrivateKeyB64);
 
     const payload = JSON.stringify({

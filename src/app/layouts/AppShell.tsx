@@ -21,6 +21,7 @@ import { AcademySwitcher, useActiveAcademy } from '@/features/academies';
 import { useAuth } from '@/features/auth';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { InstallAppButton } from '@/features/pwa/components/InstallAppButton';
+import { OfflineSyncBanner } from '@/features/pwa/components/OfflineSyncBanner';
 import { useOnlineStatus } from '@/hooks';
 import { hasCapability, useActiveRoles, useCan, type Capability } from '@/lib/rbac';
 import { useAcademyStore, useTestModeStore } from '@/stores';
@@ -166,9 +167,9 @@ export function AppShell() {
   const targetSettingsRoute = canUpdateAcademy ? '/settings/academy' : '/profile';
 
   return (
-    <div className="bg-bg min-h-screen">
+    <div className="bg-bg min-h-screen w-full max-w-full overflow-x-hidden">
       {/* HEADER: Compact & Responsive */}
-      <header className="border-border-subtle bg-surface/95 sticky top-0 z-30 flex h-14 items-center justify-between border-b px-4 backdrop-blur-md">
+      <header className="border-border-subtle bg-surface/95 sticky top-0 z-30 flex h-14 w-full max-w-full items-center justify-between overflow-hidden border-b px-4 backdrop-blur-md">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <AcademySwitcher className="min-w-0" />
         </div>
@@ -207,6 +208,9 @@ export function AppShell() {
           </Button>
         </div>
       </header>
+
+      {/* OFFLINE SYNC STATUS BANNER */}
+      <OfflineSyncBanner />
 
       {/* TEST MODE BANNER */}
       {testModeRole ? (

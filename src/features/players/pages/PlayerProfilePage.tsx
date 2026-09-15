@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { UserCog } from 'lucide-react';
 
 import { Badge, Button } from '@/components/ui';
 import { EmptyState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
+import { ChangeRoleModal } from '@/features/members';
+import { useCan } from '@/lib/rbac';
 import { isUUID } from '@/lib/validators';
 import {
   usePlayerProfile,
@@ -51,6 +54,9 @@ export default function PlayerProfilePage() {
   const { memberId } = useParams<{ memberId: string }>();
   const { academyId, membership } = useActiveAcademy();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [isChangeRoleOpen, setIsChangeRoleOpen] = useState(false);
+
+  const canManage = useCan('members:manage');
 
   const profileQuery = usePlayerProfile(academyId, memberId ?? null);
   const statsQuery = usePlayerStatistics(academyId, memberId ?? null);
@@ -198,6 +204,18 @@ export default function PlayerProfilePage() {
                 </span>
               </div>
             </div>
+
+            {canManage && profileQuery.data.role !== 'academy_owner' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsChangeRoleOpen(true)}
+                className="text-fg hover:border-primary/50 hover:text-primary h-8 min-h-[32px] shrink-0 rounded-lg px-3 text-xs font-bold"
+              >
+                <UserCog className="text-primary mr-1.5 h-3.5 w-3.5" />
+                Change Role
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -268,6 +286,21 @@ export default function PlayerProfilePage() {
 
           {renderTabContent()}
         </>
+      )}
+
+      {profileQuery.data && isChangeRoleOpen && (
+        <ChangeRoleModal
+          open={isChangeRoleOpen}
+          onClose={() => setIsChangeRoleOpen(false)}
+          member={{
+            id: memberId,
+            fullName: profileQuery.data.fullName,
+            email: profileQuery.data.email,
+            avatarUrl: profileQuery.data.avatarUrl,
+            role: profileQuery.data.role,
+          }}
+          academyId={academyId}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Calendar, User, CheckCircle2, XCircle, Trash2, Edit3 } from 'lucide-react';
 
 import { Button, Input, Select, Textarea } from '@/components/ui';
 import { EmptyState, ErrorState } from '@/components/feedback';
@@ -95,51 +96,45 @@ export default function TrainingSessionDetailPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* 1. App Bar Header */}
-      <div className="border-border-subtle/40 flex flex-col gap-2 border-b pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void navigate('/sessions')}
-              aria-label="Back to sessions"
-              className="text-fg hover:bg-surface-muted/60 h-auto px-2 py-1 font-semibold"
-            >
-              &larr; Back
-            </Button>
-            <h1 className="font-heading text-fg truncate text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
-              {session?.title ?? 'Session Detail'}
+    <div className="flex flex-col space-y-4 pb-24 md:pb-6">
+      {/* 1. Header with Back Button and Quick Actions */}
+      <div className="border-border-subtle/40 flex items-center justify-between gap-3 border-b pb-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => navigate('/sessions')}
+            className="border-border-subtle bg-surface text-fg-muted hover:text-fg hover:bg-surface-muted flex h-9 w-9 items-center justify-center rounded-lg border transition-colors"
+            aria-label="Back to sessions"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="font-heading text-fg text-lg font-extrabold tracking-tight uppercase md:text-xl">
+              {session?.title ?? 'Session Details'}
             </h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {canManage && session && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowEditForm((open) => !open)}
-                className="h-11 min-h-[44px] rounded-[10px] px-3.5 text-xs font-bold"
-              >
-                {showEditForm ? 'Cancel Edit' : 'Edit Session'}
-              </Button>
+            {session && (
+              <p className="text-fg-muted font-sans text-xs">
+                {session.batch?.name ? `${session.batch.name} • ` : ''}
+                {formatDate(session.sessionDate)}
+              </p>
             )}
           </div>
         </div>
-        {session && (
-          <div className="text-fg-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-sans text-xs">
-            <span className="bg-surface-muted/60 border-border-subtle/40 text-fg-muted rounded border px-2 py-0.5 font-mono text-[11px] font-bold">
-              BATCH: {session.batch.name}
-            </span>
-            <span className="bg-surface-muted/60 border-border-subtle/40 rounded border px-2 py-0.5 font-mono text-[11px]">
-              {formatDate(session.sessionDate)}
-            </span>
-          </div>
+
+        {canManage && session && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowEditForm((open) => !open)}
+            className="h-8.5 min-h-[34px] rounded-lg px-3 text-xs font-bold"
+          >
+            <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+            {showEditForm ? 'Cancel Edit' : 'Edit'}
+          </Button>
         )}
       </div>
 
       {sessionQuery.isPending ? (
-        <p className="text-fg-muted py-8 text-center font-sans text-sm">Loading session…</p>
+        <div className="border-border-subtle bg-surface h-64 animate-pulse rounded-xl border" />
       ) : sessionQuery.isError ? (
         <ErrorState error={sessionQuery.error} onRetry={() => void sessionQuery.refetch()} />
       ) : !session ? (
@@ -149,82 +144,89 @@ export default function TrainingSessionDetailPage() {
         />
       ) : (
         <>
-          {/* 2. Session Detail Scorecard */}
-          <div className="border-border-subtle bg-surface divide-border-subtle/50 divide-y overflow-hidden rounded-xl border shadow-2xs">
-            <div className="flex flex-col gap-1.5 p-4">
-              <span className="text-fg-muted font-sans text-[10px] font-bold tracking-wider uppercase">
-                Topic & Focus
-              </span>
-              <p className="text-fg font-heading text-lg font-bold tracking-tight uppercase">
-                {session.title}
-              </p>
-              {session.focusArea && (
-                <p className="text-fg-muted mt-0.5 font-sans text-xs">Focus: {session.focusArea}</p>
-              )}
-            </div>
-
-            <div className="bg-border-subtle/50 grid grid-cols-1 gap-px sm:grid-cols-2">
-              <div className="bg-surface flex flex-col gap-1 p-4">
-                <span className="text-fg-muted font-sans text-[10px] font-bold tracking-wider uppercase">
-                  Date & Time
+          {/* 2. Athletic Session Card */}
+          <div className="divide-border-subtle/50 border-border-subtle bg-surface divide-y overflow-hidden rounded-xl border shadow-2xs">
+            {/* Title & Status */}
+            <div className="flex flex-col gap-2 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-heading text-fg-muted text-[10px] font-bold tracking-wider uppercase">
+                  Topic & Squad Focus
                 </span>
-                <p className="text-fg mt-1 font-mono text-sm font-bold">
-                  {formatDate(session.sessionDate)}
-                </p>
-                <p className="text-fg-muted mt-0.5 font-mono text-xs">
-                  {formatDateTime(session.startAt)} – {formatDateTime(session.endAt)}
-                </p>
-              </div>
-
-              <div className="bg-surface flex flex-col justify-center gap-1 p-4">
-                <span className="text-fg-muted font-sans text-[10px] font-bold tracking-wider uppercase">
-                  Assigned Coach
-                </span>
-                <p className="text-fg mt-1 text-sm font-semibold">
-                  {session.coach.fullName ?? session.coach.email}
-                </p>
-                <p className="text-fg-muted mt-0.5 font-sans text-xs">{session.coach.email}</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1 p-4">
-              <span className="text-fg-muted font-sans text-[10px] font-bold tracking-wider uppercase">
-                Status
-              </span>
-              <div className="mt-1">
                 <span
-                  className={`inline-flex items-center rounded border px-2.5 py-0.5 font-sans text-[10px] font-bold uppercase ${
+                  className={`inline-flex items-center rounded border px-2 py-0.5 font-sans text-[10px] font-bold uppercase ${
                     session.status === 'completed'
-                      ? 'bg-success-pale text-success border-success/30'
+                      ? 'border-success/30 bg-success-pale text-success'
                       : session.status === 'cancelled'
-                        ? 'bg-error-pale text-error border-error/30'
-                        : 'bg-saffron-pale text-saffron border-saffron/30'
+                        ? 'border-error/30 bg-error-pale text-error'
+                        : 'border-saffron/30 bg-saffron-pale text-saffron'
                   }`}
                 >
                   {session.status}
                 </span>
               </div>
+              <p className="font-heading text-fg text-lg font-extrabold tracking-tight uppercase">
+                {session.title}
+              </p>
+              {session.focusArea && (
+                <div className="text-primary flex items-center gap-1.5 font-sans text-xs">
+                  <span className="font-bold">Focus:</span>
+                  <span>{session.focusArea}</span>
+                </div>
+              )}
             </div>
 
+            {/* Date & Time + Coach Details */}
+            <div className="divide-border-subtle/50 bg-surface-container-low/30 grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+              <div className="flex flex-col gap-1 p-3.5">
+                <div className="text-fg-muted flex items-center gap-1.5">
+                  <Calendar className="text-primary h-3.5 w-3.5" />
+                  <span className="font-heading text-[10px] font-bold tracking-wider uppercase">
+                    Schedule
+                  </span>
+                </div>
+                <p className="text-fg mt-1 font-mono text-sm font-bold">
+                  {formatDate(session.sessionDate)}
+                </p>
+                <p className="text-fg-muted font-mono text-xs">
+                  {formatDateTime(session.startAt)} – {formatDateTime(session.endAt)}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-1 p-3.5">
+                <div className="text-fg-muted flex items-center gap-1.5">
+                  <User className="text-info h-3.5 w-3.5" />
+                  <span className="font-heading text-[10px] font-bold tracking-wider uppercase">
+                    Assigned Coach
+                  </span>
+                </div>
+                <p className="text-fg mt-1 font-sans text-sm font-bold">
+                  {session.coach?.fullName ?? session.coach?.email}
+                </p>
+                <p className="text-fg-muted font-sans text-xs">{session.coach?.email}</p>
+              </div>
+            </div>
+
+            {/* Notes Section */}
             {session.notes && (
-              <div className="flex flex-col gap-1 p-4">
-                <span className="text-fg-muted font-sans text-[10px] font-bold tracking-wider uppercase">
+              <div className="flex flex-col gap-1 p-3.5">
+                <span className="font-heading text-fg-muted text-[10px] font-bold tracking-wider uppercase">
                   Training Notes
                 </span>
-                <p className="text-fg mt-1 font-sans text-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-fg mt-0.5 font-sans text-xs leading-relaxed whitespace-pre-wrap">
                   {session.notes}
                 </p>
               </div>
             )}
 
+            {/* Actions Bar */}
             {canManage && (
-              <div className="bg-surface-muted/30 flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="bg-surface-container-low/50 flex flex-wrap items-center justify-between gap-2.5 p-3.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={() => void navigate(`/sessions/${session.id}/attendance`)}
-                    className="min-h-[40px] rounded-[10px] px-4 text-xs font-bold"
+                    onClick={() => navigate(`/sessions/${session.id}/attendance`)}
+                    className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold text-black"
                   >
                     Manage Attendance
                   </Button>
@@ -235,39 +237,45 @@ export default function TrainingSessionDetailPage() {
                         size="sm"
                         isLoading={updateSession.isPending}
                         onClick={() => void handleStatusChange('completed')}
-                        className="min-h-[40px] rounded-[10px] px-4 text-xs font-bold"
+                        className="border-border-subtle bg-surface text-fg hover:bg-surface-muted h-9 min-h-[36px] rounded-lg px-3 text-xs font-bold"
                       >
-                        Mark Completed
+                        <CheckCircle2 className="text-success mr-1.5 h-3.5 w-3.5" />
+                        Completed
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         isLoading={updateSession.isPending}
                         onClick={() => void handleStatusChange('cancelled')}
-                        className="text-error hover:bg-error-pale min-h-[40px] rounded-[10px] px-4 text-xs font-bold"
+                        className="text-error hover:bg-error-pale h-9 min-h-[36px] rounded-lg px-3 text-xs font-bold"
                       >
-                        Cancel Session
+                        <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                        Cancel
                       </Button>
                     </>
                   )}
                 </div>
+
                 <Button
                   variant="ghost"
+                  size="sm"
                   onClick={() => {
                     if (window.confirm('Are you sure you want to delete this training session?')) {
                       void handleDelete();
                     }
                   }}
                   isLoading={deleteSession.isPending}
-                  className="text-error hover:bg-error-pale min-h-[40px] rounded-[10px] px-4 text-xs font-bold"
+                  className="text-error hover:bg-error-pale h-9 min-h-[36px] rounded-lg px-3 text-xs font-bold"
                 >
-                  Delete Session
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete
                 </Button>
               </div>
             )}
           </div>
 
-          {showEditForm && canManage ? (
+          {/* Edit Form Modal/Drawer */}
+          {showEditForm && canManage && (
             <SessionEditForm
               session={session}
               updateSession={updateSession}
@@ -277,7 +285,7 @@ export default function TrainingSessionDetailPage() {
               }}
               onCancel={() => setShowEditForm(false)}
             />
-          ) : null}
+          )}
         </>
       )}
     </div>
@@ -299,9 +307,7 @@ function SessionEditForm({
   const batchesQuery = useBatches(academyId);
   const membersQuery = useAcademyMembers(academyId, { status: 'active' });
 
-  const coaches = membersQuery.data?.filter((member) => member.role === 'coach') ?? [];
-
-  const pushToast = useUiStore((state) => state.pushToast);
+  const coaches = membersQuery.data?.filter((m) => m.role === 'coach') ?? [];
 
   const {
     register,
@@ -320,7 +326,7 @@ function SessionEditForm({
     },
   });
 
-  const handleSubmitEdit = handleSubmit(async (values) => {
+  const onSubmit = handleSubmit(async (values) => {
     try {
       await updateSession.mutateAsync({
         sessionId: session.id,
@@ -338,161 +344,92 @@ function SessionEditForm({
       });
       onSuccess();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to update session';
-      pushToast({ title: 'Update Failed', description: msg, variant: 'error' });
+      console.error('Update failed:', err);
     }
   });
 
   return (
-    <div className="border-border-subtle bg-surface mt-4 rounded-xl border p-4 shadow-2xs">
-      <form onSubmit={handleSubmitEdit} noValidate>
+    <div className="border-border-subtle bg-surface rounded-xl border p-4 shadow-2xs">
+      <form onSubmit={onSubmit} noValidate>
         <div className="border-border-subtle/50 mb-4 border-b pb-3">
-          <h2 className="font-heading text-fg text-lg font-extrabold tracking-tight uppercase">
+          <h2 className="font-heading text-fg text-base font-extrabold tracking-tight uppercase">
             Edit Session
           </h2>
-          <p className="text-fg-muted mt-0.5 font-sans text-xs">Update the session details</p>
         </div>
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-3.5">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                Batch
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                Squad / Batch
               </label>
               <Select
                 {...register('batchId', { required: 'Batch is required' })}
-                hasError={Boolean(errors.batchId)}
-                className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
               >
-                <option value="">Select batch</option>
-                {batchesQuery.data?.map((batch) => (
-                  <option key={batch.id} value={batch.id}>
-                    {batch.name}
+                {batchesQuery.data?.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.ageGroup})
                   </option>
                 ))}
               </Select>
-              {errors.batchId ? (
-                <p className="text-error mt-1 font-sans text-[11px] font-semibold">
-                  {errors.batchId.message}
-                </p>
-              ) : null}
             </div>
             <div>
-              <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
                 Coach
               </label>
               <Select
                 {...register('coachId', { required: 'Coach is required' })}
-                hasError={Boolean(errors.coachId)}
-                className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
               >
-                <option value="">Select coach</option>
-                {coaches.map((coach) => (
-                  <option key={coach.id} value={coach.id}>
-                    {coach.fullName ?? coach.email}
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.fullName ?? c.email}
                   </option>
                 ))}
               </Select>
-              {errors.coachId ? (
-                <p className="text-error mt-1 font-sans text-[11px] font-semibold">
-                  {errors.coachId.message}
-                </p>
-              ) : null}
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
                 Title
               </label>
               <Input
                 {...register('title', { required: 'Title is required' })}
                 hasError={Boolean(errors.title)}
-                className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
               />
-              {errors.title ? (
-                <p className="text-error mt-1 font-sans text-[11px] font-semibold">
-                  {errors.title.message}
-                </p>
-              ) : null}
             </div>
             <div>
-              <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                Focus area
+              <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                Focus Area
               </label>
               <Input
                 {...register('focusArea')}
-                className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
               />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                Session date
-              </label>
-              <Input
-                {...register('sessionDate', { required: 'Session date is required' })}
-                type="date"
-                hasError={Boolean(errors.sessionDate)}
-                className="border-border-subtle h-11 min-h-[44px] rounded-lg font-mono"
-              />
-              {errors.sessionDate ? (
-                <p className="text-error mt-1 font-sans text-[11px] font-semibold">
-                  {errors.sessionDate.message}
-                </p>
-              ) : null}
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                  Start time
-                </label>
-                <Input
-                  {...register('startAt', { required: 'Start time is required' })}
-                  type="datetime-local"
-                  hasError={Boolean(errors.startAt)}
-                  className="border-border-subtle h-11 min-h-[44px] rounded-lg font-mono"
-                />
-                {errors.startAt ? (
-                  <p className="text-error mt-1 font-sans text-[11px] font-semibold">
-                    {errors.startAt.message}
-                  </p>
-                ) : null}
-              </div>
-              <div>
-                <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                  End time
-                </label>
-                <Input
-                  {...register('endAt', { required: 'End time is required' })}
-                  type="datetime-local"
-                  hasError={Boolean(errors.endAt)}
-                  className="border-border-subtle h-11 min-h-[44px] rounded-lg font-mono"
-                />
-                {errors.endAt ? (
-                  <p className="text-error mt-1 font-sans text-[11px] font-semibold">
-                    {errors.endAt.message}
-                  </p>
-                ) : null}
-              </div>
             </div>
           </div>
 
           <div>
-            <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
+            <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
               Notes
             </label>
-            <Textarea {...register('notes')} rows={4} className="border-border-subtle rounded-lg" />
+            <Textarea
+              {...register('notes')}
+              rows={3}
+              className="border-border-subtle bg-surface-container-low rounded-lg text-xs"
+            />
           </div>
         </div>
-        <div className="border-border-subtle/40 mt-6 flex items-center justify-end gap-3 border-t pt-4">
+
+        <div className="border-border-subtle/40 mt-4 flex items-center justify-end gap-2.5 border-t pt-3">
           <Button
             type="button"
             variant="secondary"
             onClick={onCancel}
-            className="h-11 min-h-[44px] rounded-[10px] px-4 text-xs font-bold"
+            className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
           >
             Cancel
           </Button>
@@ -501,9 +438,9 @@ function SessionEditForm({
             variant="primary"
             isLoading={updateSession.isPending}
             disabled={!isDirty}
-            className="h-11 min-h-[44px] rounded-[10px] px-5 text-xs font-bold"
+            className="h-9 min-h-[36px] rounded-lg px-5 text-xs font-bold"
           >
-            Save changes
+            Save Changes
           </Button>
         </div>
       </form>

@@ -92,7 +92,7 @@ describe('Phase 51 — Test App As Student Home Fix Verification', () => {
       { wrapper: queryWrapper },
     );
 
-    expect(screen.getByText(/my cricket dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText(/player dashboard/i)).toBeInTheDocument();
     expect(screen.getByText(/super cricket academy/i)).toBeInTheDocument();
 
     // Verify key student dashboard stat cards are present

@@ -45,6 +45,8 @@ export type WizardFieldingEntry = {
   memberId: UUID;
   catches: number;
   runOuts: number;
+  runOutsDirect?: number;
+  runOutsAssisted?: number;
   stumpings: number;
   isGuest?: boolean;
   guestName?: string | null;
@@ -56,6 +58,12 @@ export type WizardAwards = {
   bestBowlerId: UUID | null;
   bestFielderId: UUID | null;
 };
+
+export type MatchLineupEntry = WizardLineupEntry;
+export type MatchPlayerLineup = WizardLineupEntry;
+export type MatchBattingEntry = WizardBattingEntry;
+export type MatchBowlingEntry = WizardBowlingEntry;
+export type MatchFieldingEntry = WizardFieldingEntry;
 
 export type WizardState = {
   // Step 1 — Match details

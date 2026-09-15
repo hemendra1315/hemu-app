@@ -1,24 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import 'tailwindcss';
 
 /* Dark mode is class-driven (`<html class="dark">`) and controlled by the theme store. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ---------------------------------------------------------------------------
-   Design tokens. Semantic CSS variables are swapped for the dark theme, so
-   components only ever reference semantic names (bg-surface, text-fg, ...).
+   Design tokens from Google Stitch Design System (Athletic Pitch Precision).
+   Semantic CSS variables are swapped for the dark theme.
 --------------------------------------------------------------------------- */
 @theme {
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-300: #5eead4;
-  --color-brand-400: #2dd4bf;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
-  --color-brand-900: #134e4a;
+  --color-brand-50: #f1ffef;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-400: #4edea3;
+  --color-brand-500: #00ff87;
+  --color-brand-600: #00e478;
+  --color-brand-700: #00a572;
+  --color-brand-800: #007138;
+  --color-brand-900: #003919;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -39,69 +39,84 @@
   --color-turf-dark: var(--turf-dark);
   --color-turf-pale: var(--turf-pale);
 
-  /* Typography Configuration */
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-heading: 'Manrope', sans-serif;
+  /* Typography Configuration from Google Stitch */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Outfit', 'Space Grotesk', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   /* Geometry & Radius Configuration */
   --radius-lg: 10px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
-  --radius-card: 12px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-card: 16px;
 }
 
 :root {
-  /* Floodlit Turf + Scorebook Light Theme Palette */
-  --bg: #f7f8f4; /* Chalk (App Background) */
-  --surface: #ffffff; /* Surface (Cards, Sheets) */
-  --surface-muted: #e7f3ec; /* Turf pale (Selected/Brand surfaces) */
-  --fg: #10201b; /* Ink (Primary Text, Icons) */
-  --fg-muted: #65736c; /* Muted (Secondary Text) */
-  --border-subtle: #d9e2db; /* Line (Dividers, Scorecard rules) */
-  --primary: #0b6b4b; /* Turf (Primary brand action green) */
-  --primary-fg: #ffffff; /* Primary button text color */
-  --danger: #c4493d; /* Error */
-  --success: #218a5b; /* Success */
-  --warning: #b86b16; /* Warning */
+  /* Athletic Pitch Precision — Light Theme */
+  --bg: #f4f7f5; /* Clean light stadium background */
+  --surface: #ffffff; /* Card surface */
+  --surface-muted: #e6f6ee; /* Light turf pale */
+  --fg: #0d1a14; /* Deep crisp ink */
+  --fg-muted: #576b61; /* Secondary text */
+  --border-subtle: #d3e0d8; /* Structural border */
+  --primary: #00a859; /* High-contrast emerald green for light mode */
+  --primary-fg: #ffffff; /* Primary button text */
+  --danger: #dc2626; /* Error */
+  --success: #16a34a; /* Success */
+  --warning: #d97706; /* Warning */
 
-  --saffron: #e39a32; /* Saffron (Accent highlight) */
-  --saffron-pale: #fff3da; /* Saffron pale (Badge backgrounds) */
-  --info: #2a6f9b; /* Info */
-  --turf-dark: #074735; /* Turf dark (Pressed/active green) */
-  --turf-pale: #e7f3ec; /* Turf pale */
+  --saffron: #e39a32;
+  --saffron-pale: #fff3da;
+  --info: #0284c7;
+  --turf-dark: #007138;
+  --turf-pale: #e6f6ee;
 }
 
 .dark {
-  /* Floodlit Turf + Scorebook Dark Theme Palette */
-  --bg: #0d1713; /* Dark Background */
-  --surface: #14221c; /* Dark Surface */
-  --surface-muted: #1f352c; /* Dark Turf Pale */
-  --fg: #f4f7f1; /* Dark Text */
-  --fg-muted: #8da399; /* Dark Muted Text */
-  --border-subtle: #294138; /* Dark Line */
-  --primary: #0b6b4b; /* Turf Green */
-  --primary-fg: #ffffff; /* Primary button text color */
-  --danger: #c4493d; /* Error */
-  --success: #218a5b; /* Success */
-  --warning: #b86b16; /* Warning */
+  /* Google Stitch Athletic Pitch Precision — Dark Mode */
+  --bg: #10141a; /* Pitch Obsidian Canvas */
+  --surface: #181c22; /* Card Container */
+  --surface-muted: #262a31; /* Elevated Container */
+  --fg: #dfe2eb; /* Bright Contrast Text */
+  --fg-muted: #849585; /* Telemetry Muted Text */
+  --border-subtle: #31353c; /* Razor-thin structural border */
+  --primary: #00ff87; /* Electric Pitch Green */
+  --primary-fg: #003919; /* Obsidian bold text on electric green */
+  --danger: #ffb4ab; /* Boundary red */
+  --success: #4edea3; /* Turf emerald */
+  --warning: #f59e0b; /* Amber gold */
 
-  --saffron: #e39a32; /* Saffron (Accent highlight) */
-  --saffron-pale: #3d2e16; /* Saffron pale (Badge backgrounds) */
-  --info: #2a6f9b; /* Info */
-  --turf-dark: #053326; /* Turf dark */
-  --turf-pale: #1f352c; /* Turf pale */
+  --saffron: #f59e0b;
+  --saffron-pale: #312513;
+  --info: #38bdf8;
+  --turf-dark: #00a572;
+  --turf-pale: #1c2e26;
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    position: relative;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     touch-action: manipulation;
+    overscroll-behavior-x: none;
   }
 
   body {
     @apply bg-bg text-fg font-sans antialiased;
-    touch-action: manipulation;
+    touch-action: pan-y;
+    overscroll-behavior-x: none;
+    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
   h1,

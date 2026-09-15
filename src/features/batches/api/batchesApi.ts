@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { unwrap, unwrapVoid } from '@/lib/api';
+import { toApiError, unwrap, unwrapVoid } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import type { AcademyMember, UUID } from '@/types';
 import type { Batch, BatchPlayer, CreateBatchInput, UpdateBatchInput } from './batchesTypes';
@@ -72,27 +72,85 @@ export async function fetchBatchPlayers(batchId: UUID): Promise<BatchPlayer[]> {
 }
 
 export async function createBatch(input: CreateBatchInput): Promise<Batch> {
-  const payload = {
+  const cleanName = input.name.trim();
+  const cleanAgeGroup = input.ageGroup.trim();
+  const cleanDesc =
+    input.description && input.description.trim() !== '' ? input.description.trim() : null;
+  const cleanDays =
+    input.trainingDays && input.trainingDays.trim() !== '' ? input.trainingDays.trim() : null;
+  const cleanTime =
+    input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime.trim() : null;
+  let cleanCoachId = input.coachId && input.coachId.trim() !== '' ? input.coachId.trim() : null;
+
+  const standardPayload = {
     academy_id: input.academyId,
-    name: input.name,
-    age_group: input.ageGroup,
-    description: input.description && input.description.trim() !== '' ? input.description : null,
-    training_days:
-      input.trainingDays && input.trainingDays.trim() !== '' ? input.trainingDays : null,
-    training_time:
-      input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime : null,
-    coach_id: input.coachId && input.coachId.trim() !== '' ? input.coachId : null,
+    name: cleanName,
+    age_group: cleanAgeGroup,
+    description: cleanDesc,
+    training_days: cleanDays,
+    training_time: cleanTime,
+    coach_id: cleanCoachId,
   };
 
-  const insertedRow = await unwrap<any>(
-    (supabase as any)
-      .from('batches')
-      .insert(payload)
-      .select(
-        'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
-      )
-      .single(),
-  );
+  let insertedRow: any = null;
+
+  const { data, error } = await (supabase as any)
+    .from('batches')
+    .insert(standardPayload)
+    .select(
+      'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
+    )
+    .single();
+
+  if (!error && data) {
+    insertedRow = data;
+  } else if (error) {
+    const isNotNullError =
+      error.code === '23502' ||
+      (typeof error.message === 'string' && error.message.toLowerCase().includes('not-null'));
+
+    if (isNotNullError) {
+      if (!cleanCoachId) {
+        const { data: fallbackStaff } = await (supabase as any)
+          .from('academy_members')
+          .select('id')
+          .eq('academy_id', input.academyId)
+          .in('role', ['academy_owner', 'coach'])
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+
+        if (fallbackStaff?.id) {
+          cleanCoachId = fallbackStaff.id;
+        }
+      }
+
+      const fallbackPayload = {
+        academy_id: input.academyId,
+        name: cleanName,
+        age_group: cleanAgeGroup,
+        description: cleanDesc,
+        training_days: cleanDays ?? 'Flexible',
+        training_time: cleanTime ?? 'Flexible',
+        coach_id: cleanCoachId,
+      };
+
+      const fallbackResult = await (supabase as any)
+        .from('batches')
+        .insert(fallbackPayload)
+        .select(
+          'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
+        )
+        .single();
+
+      if (fallbackResult.error) {
+        throw toApiError(fallbackResult.error);
+      }
+      insertedRow = fallbackResult.data;
+    } else {
+      throw toApiError(error);
+    }
+  }
 
   let coachObj = {
     id: null,
@@ -101,7 +159,7 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
     avatarUrl: null,
   };
 
-  if (insertedRow.coach_id) {
+  if (insertedRow?.coach_id) {
     const { data: coachRow } = await (supabase as any)
       .from('academy_members')
       .select(
@@ -137,27 +195,62 @@ export async function createBatch(input: CreateBatchInput): Promise<Batch> {
 }
 
 export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promise<Batch> {
-  const payload = {
-    name: input.name,
-    age_group: input.ageGroup,
-    description: input.description && input.description.trim() !== '' ? input.description : null,
-    training_days:
-      input.trainingDays && input.trainingDays.trim() !== '' ? input.trainingDays : null,
-    training_time:
-      input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime : null,
-    coach_id: input.coachId && input.coachId.trim() !== '' ? input.coachId : null,
+  const cleanName = input.name.trim();
+  const cleanAgeGroup = input.ageGroup.trim();
+  const cleanDesc =
+    input.description && input.description.trim() !== '' ? input.description.trim() : null;
+  const cleanDays =
+    input.trainingDays && input.trainingDays.trim() !== '' ? input.trainingDays.trim() : null;
+  const cleanTime =
+    input.trainingTime && input.trainingTime.trim() !== '' ? input.trainingTime.trim() : null;
+  const cleanCoachId = input.coachId && input.coachId.trim() !== '' ? input.coachId.trim() : null;
+
+  const payload: Record<string, any> = {
+    name: cleanName,
+    age_group: cleanAgeGroup,
+    description: cleanDesc,
+    training_days: cleanDays,
+    training_time: cleanTime,
+    coach_id: cleanCoachId,
   };
 
-  const updatedRow = await unwrap<any>(
-    (supabase as any)
-      .from('batches')
-      .update(payload)
-      .eq('id', batchId)
-      .select(
-        'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
-      )
-      .single(),
-  );
+  let updatedRow: any = null;
+
+  const { data, error } = await (supabase as any)
+    .from('batches')
+    .update(payload)
+    .eq('id', batchId)
+    .select(
+      'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
+    )
+    .single();
+
+  if (!error && data) {
+    updatedRow = data;
+  } else if (error) {
+    const isNotNullError =
+      error.code === '23502' ||
+      (typeof error.message === 'string' && error.message.toLowerCase().includes('not-null'));
+
+    if (isNotNullError) {
+      if (payload.training_days === null) payload.training_days = 'Flexible';
+      if (payload.training_time === null) payload.training_time = 'Flexible';
+
+      const retryResult = await (supabase as any)
+        .from('batches')
+        .update(payload)
+        .eq('id', batchId)
+        .select(
+          'id, academy_id, name, age_group, description, training_days, training_time, coach_id, created_at, updated_at',
+        )
+        .single();
+
+      if (retryResult.error) throw toApiError(retryResult.error);
+      updatedRow = retryResult.data;
+    } else {
+      throw toApiError(error);
+    }
+  }
 
   let coachObj = {
     id: null,
@@ -166,7 +259,7 @@ export async function updateBatch(batchId: UUID, input: UpdateBatchInput): Promi
     avatarUrl: null,
   };
 
-  if (updatedRow.coach_id) {
+  if (updatedRow?.coach_id) {
     const { data: coachRow } = await (supabase as any)
       .from('academy_members')
       .select(

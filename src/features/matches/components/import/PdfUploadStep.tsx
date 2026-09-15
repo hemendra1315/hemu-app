@@ -37,9 +37,11 @@ export function PdfUploadStep({
         return;
       }
       onFileLoaded(result, file.name);
-    } catch {
+    } catch (err) {
       setIsParsing(false);
-      setError('Failed to process PDF. Please check the file and try again.');
+      console.error('[PdfUploadStep] Failed to extract PDF text:', err);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Failed to process PDF: ${msg}. Please check the file and try again.`);
     }
   }
 

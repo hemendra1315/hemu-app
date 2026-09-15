@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -11,6 +12,7 @@ import {
   UserPlus,
   Clock,
   CheckCircle2,
+  QrCode,
 } from 'lucide-react';
 
 import { Avatar, Card, CardBody, CardHeader, Button, Badge } from '@/components/ui';
@@ -21,11 +23,15 @@ import { KpiCard } from '../components/KpiCard';
 import { ActivityFeed } from '../components/ActivityFeed';
 import { JoinCodeCard } from '@/features/academies';
 import { SuperAdminAcademyActions } from '@/features/admin';
+import { StudentMonthlyFeeModal, STUDENT_MONTHLY_FEE_AMOUNT } from '@/features/billing';
+import { useAuth } from '@/features/auth';
 import type { ActivityItem } from '../components/ActivityFeed';
 import { useCan } from '@/lib/rbac';
 
 export default function OwnerDashboardPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
   const { academyId, membership } = useActiveAcademy();
   const analyticsQuery = useOwnerDashboardAnalytics(academyId);
 
@@ -36,7 +42,11 @@ export default function OwnerDashboardPage() {
   const analytics = analyticsQuery.data;
 
   if (analyticsQuery.isPending) {
-    return <p className="text-fg-muted py-8 text-center text-sm">Loading dashboard...</p>;
+    return (
+      <div className="flex min-h-[300px] items-center justify-center p-6 text-center">
+        <p className="text-fg-muted text-sm font-medium">Loading dashboard...</p>
+      </div>
+    );
   }
 
   if (analyticsQuery.isError || !analytics) {
@@ -54,30 +64,70 @@ export default function OwnerDashboardPage() {
     })) ?? [];
 
   const todaySessions = analytics.todaySessions ?? [];
+  const expectedPlayersCount = todaySessions.reduce((acc, s) => acc + (s.playerCount || 0), 0);
 
   return (
     <div className="space-y-4 pb-20 md:pb-6">
       {/* 1. Header with Academy Branding */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-3.5">
           <Avatar
             name={membership?.academyName}
             src={membership?.logoUrl}
             shape="rounded"
-            className="h-10 w-10 shrink-0 text-base sm:h-12 sm:w-12 sm:text-lg"
+            className="border-border-subtle/80 h-12 w-12 shrink-0 border text-base shadow-xs sm:h-14 sm:w-14 sm:text-lg"
           />
           <div className="min-w-0 flex-1">
-            <h1 className="text-fg truncate text-xl font-bold tracking-tight md:text-2xl">
+            <h1 className="text-fg truncate text-xl font-extrabold tracking-tight md:text-2xl">
               {membership?.academyName ?? 'Academy Dashboard'}
             </h1>
-            <p className="text-fg-muted truncate text-xs font-medium">
-              {membership?.city ? `${membership.city} � ` : ''}Academy Operations & Performance
+            <p className="text-fg-muted truncate text-xs font-semibold tracking-wide">
+              {membership?.city ? `${membership.city} · ` : ''}Academy Operations & Performance
             </p>
           </div>
         </div>
       </div>
 
       <SuperAdminAcademyActions />
+
+      {/* Student Monthly App Pass (₹200 FamPay QR) Notice */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 shadow-2xs">
+        <div className="text-fg flex min-w-0 items-center gap-2.5 text-xs">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 font-black text-white shadow-2xs">
+            <QrCode className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-fg truncate font-bold">
+              Student Monthly App Pass:{' '}
+              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                ₹{STUDENT_MONTHLY_FEE_AMOUNT}/mo
+              </span>
+            </p>
+            <p className="text-fg-muted truncate text-[11px]">
+              Owners & Coaches free lifetime. Students pay ₹{STUDENT_MONTHLY_FEE_AMOUNT} directly to
+              app via FamPay QR.
+            </p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="h-8 shrink-0 gap-1.5 border-emerald-500/30 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
+          onClick={() => setIsFeeModalOpen(true)}
+        >
+          <QrCode className="h-3.5 w-3.5" /> Preview FamPay QR
+        </Button>
+      </div>
+
+      <StudentMonthlyFeeModal
+        open={isFeeModalOpen}
+        onClose={() => setIsFeeModalOpen(false)}
+        studentId={profile?.id || 'demo_student'}
+        studentName={profile?.fullName || 'Student Player'}
+        studentEmail={profile?.email || 'player@cam.app'}
+        academyId={(academyId || 'academy_1') as string}
+        academyName={membership?.academyName || 'Cricket Academy'}
+      />
 
       {/* 2. Today's Overview (KPIs) */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
@@ -88,7 +138,7 @@ export default function OwnerDashboardPage() {
         />
         <KpiCard
           title="Players Expected"
-          value={todaySessions.reduce((acc, s) => acc + (s.playerCount || 0), 0)}
+          value={expectedPlayersCount}
           icon={<Users className="text-info h-4 w-4" />}
         />
         <KpiCard
@@ -108,58 +158,58 @@ export default function OwnerDashboardPage() {
         {canManagePlayers ? (
           <Button
             variant="secondary"
-            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+            className="hover:bg-surface-muted/80 border-border-subtle bg-surface hover:border-primary/40 h-auto min-h-[76px] flex-col justify-center gap-2 rounded-xl border p-3 text-xs font-bold shadow-2xs transition-all active:scale-[0.98] sm:p-4"
             onClick={() => navigate('/members')}
           >
-            <div className="bg-primary/10 rounded-full p-2">
+            <div className="bg-primary/10 rounded-full p-2.5">
               <UserPlus className="text-primary h-5 w-5" />
             </div>
-            Add Player
+            <span>Add Player</span>
           </Button>
         ) : null}
         {canManageSessions ? (
           <Button
             variant="secondary"
-            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+            className="hover:bg-surface-muted/80 border-border-subtle bg-surface hover:border-primary/40 h-auto min-h-[76px] flex-col justify-center gap-2 rounded-xl border p-3 text-xs font-bold shadow-2xs transition-all active:scale-[0.98] sm:p-4"
             onClick={() => navigate('/sessions/new')}
           >
-            <div className="bg-info/10 rounded-full p-2">
+            <div className="bg-info/10 rounded-full p-2.5">
               <Plus className="text-info h-5 w-5" />
             </div>
-            Create Session
+            <span>Create Session</span>
           </Button>
         ) : null}
         <Button
           variant="secondary"
-          className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+          className="hover:bg-surface-muted/80 border-border-subtle bg-surface hover:border-primary/40 h-auto min-h-[76px] flex-col justify-center gap-2 rounded-xl border p-3 text-xs font-bold shadow-2xs transition-all active:scale-[0.98] sm:p-4"
           onClick={() => navigate('/sessions')}
         >
-          <div className="bg-success/10 rounded-full p-2">
+          <div className="bg-success/10 rounded-full p-2.5">
             <CalendarCheck className="text-success h-5 w-5" />
           </div>
-          Mark Attendance
+          <span>Mark Attendance</span>
         </Button>
         {canManageMatches ? (
           <Button
             variant="secondary"
-            className="hover:bg-surface-muted h-auto flex-col gap-2 p-3 text-xs font-semibold sm:p-4"
+            className="hover:bg-surface-muted/80 border-border-subtle bg-surface hover:border-primary/40 h-auto min-h-[76px] flex-col justify-center gap-2 rounded-xl border p-3 text-xs font-bold shadow-2xs transition-all active:scale-[0.98] sm:p-4"
             onClick={() => navigate('/matches/new')}
           >
-            <div className="rounded-full bg-amber-500/10 p-2">
+            <div className="rounded-full bg-amber-500/10 p-2.5">
               <Trophy className="h-5 w-5 text-amber-500" />
             </div>
-            Add Match
+            <span>Add Match</span>
           </Button>
         ) : null}
       </div>
 
       {/* 4. Today's Sessions List */}
-      <Card className="border-border-subtle bg-surface min-w-0 shadow-2xs">
+      <Card className="border-border-subtle bg-surface shadow-2xs">
         <CardHeader
           title={
-            <div className="flex min-w-0 items-center gap-2">
-              <Clock className="text-info h-4 w-4 shrink-0" />
-              <span className="truncate">Today's Sessions</span>
+            <div className="flex items-center gap-2">
+              <Clock className="text-primary h-4 w-4 shrink-0" />
+              <span>Today's Sessions</span>
             </div>
           }
           action={
@@ -172,37 +222,37 @@ export default function OwnerDashboardPage() {
             </Link>
           }
         />
-        <CardBody className="min-w-0 p-3 pt-0">
+        <CardBody className="p-3 pt-0 sm:p-4 sm:pt-0">
           {todaySessions.length === 0 ? (
-            <div className="py-6 text-center">
+            <div className="py-8 text-center">
               <p className="text-fg-muted text-xs font-medium">No sessions scheduled for today.</p>
               {canManageSessions && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => navigate('/sessions/new')}
-                  className="text-primary mt-2 text-xs"
+                  className="text-primary mt-2 text-xs font-bold"
                 >
-                  Create Session ?
+                  Create Session &rarr;
                 </Button>
               )}
             </div>
           ) : (
-            <div className="min-w-0 space-y-2">
+            <div className="space-y-2.5">
               {todaySessions.map((session) => (
                 <div
                   key={session.id}
-                  className="border-border-subtle hover:border-primary/50 bg-surface flex min-w-0 flex-col gap-3 rounded-xl border p-3 transition-colors sm:flex-row sm:items-center sm:justify-between"
+                  className="border-border-subtle hover:border-primary/40 bg-surface flex min-w-0 flex-col gap-3 rounded-xl border p-3.5 transition-colors sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="min-w-0 flex-1 space-y-1">
+                  <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex min-w-0 items-center gap-2">
                       <p className="text-fg truncate text-sm font-bold">{session.title}</p>
                       {session.attendanceMarked ? (
-                        <Badge tone="success" className="shrink-0 text-[10px] uppercase">
+                        <Badge tone="success" className="shrink-0 text-[10px] font-bold uppercase">
                           Marked
                         </Badge>
                       ) : (
-                        <Badge tone="neutral" className="shrink-0 text-[10px] uppercase">
+                        <Badge tone="neutral" className="shrink-0 text-[10px] font-bold uppercase">
                           Pending
                         </Badge>
                       )}
@@ -229,7 +279,7 @@ export default function OwnerDashboardPage() {
                   <Button
                     variant={session.attendanceMarked ? 'secondary' : 'primary'}
                     onClick={() => navigate(`/sessions/${session.id}/attendance`)}
-                    className="h-9 w-full shrink-0 px-3.5 text-xs font-bold sm:w-auto"
+                    className="h-10 min-h-[40px] w-full shrink-0 px-4 text-xs font-bold sm:w-auto"
                   >
                     {session.attendanceMarked ? (
                       <>

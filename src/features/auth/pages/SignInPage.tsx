@@ -125,7 +125,12 @@ export default function SignInPage() {
   return (
     <Card className="border-border-subtle w-full max-w-md shadow-lg">
       <CardBody className="space-y-5 p-6">
-        <div className="text-center">
+        <div className="flex flex-col items-center text-center">
+          <img
+            src="/logo.png"
+            alt="CAM - Cricket Academy Manager"
+            className="mb-3 h-20 w-20 rounded-2xl object-contain shadow-md"
+          />
           <h1 className="text-fg text-2xl font-bold tracking-tight">{env.appName}</h1>
           <p className="text-fg-muted mt-1 text-sm">
             {isSignUp

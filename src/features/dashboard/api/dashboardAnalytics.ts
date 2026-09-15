@@ -533,7 +533,24 @@ export async function fetchCoachDashboardAnalytics(academyId: UUID, coachId: UUI
 
 export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: UUID) {
   if (!isUUID(academyId) || !isUUID(playerId)) {
-    return null;
+    return {
+      stats: {
+        matchesPlayed: 0,
+        battingRuns: 0,
+        bowlingWickets: 0,
+        battingAverage: '0.00',
+        strikeRate: '0.00',
+        economy: '0.00',
+        attendancePercentage: 0,
+      },
+      recentMatches: [],
+      upcomingSessions: [],
+      pendingAssignments: [],
+      completedAssignments: [],
+      recentAwards: [],
+      careerHighlights: [],
+      runsTrend: [],
+    };
   }
 
   const [
@@ -559,7 +576,7 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
         .select(
           `
           id, title, session_date, start_at, end_at,
-          academy_members!training_sessions_coach_id_fkey(id, profiles!academy_members_user_id_fkey(full_name))
+          coach:academy_members!training_sessions_coach_id_fkey!left(id, profiles!academy_members_user_id_fkey!left(full_name))
         `,
         )
         .eq('academy_id', academyId)
@@ -567,35 +584,33 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
         .gte('session_date', new Date().toISOString().split('T')[0])
         .order('session_date', { ascending: true })
         .limit(3),
-    ),
+    ).catch(() => []),
   ]);
 
   const dismissals = statistics ? statistics.battingInnings - statistics.battingNotOuts : 0;
 
-  const stats = statistics
-    ? {
-        matchesPlayed: statistics.matchesPlayed,
-        battingRuns: statistics.battingRuns,
-        bowlingWickets: statistics.bowlingWickets,
-        battingAverage:
-          statistics.battingInnings > 0
-            ? dismissals > 0
-              ? (statistics.battingRuns / dismissals).toFixed(2)
-              : statistics.battingRuns.toFixed(2)
-            : '0.00',
-        strikeRate:
-          statistics.ballsFacedSum > 0
-            ? ((statistics.battingRuns / statistics.ballsFacedSum) * 100).toFixed(2)
-            : '0.00',
-        economy:
-          statistics.bowlingOvers > 0
-            ? (statistics.bowlingRunsConceded / statistics.bowlingOvers).toFixed(2)
-            : '0.00',
-        attendancePercentage: attendance.attendancePercentage,
-      }
-    : null;
+  const stats = {
+    matchesPlayed: statistics?.matchesPlayed ?? 0,
+    battingRuns: statistics?.battingRuns ?? 0,
+    bowlingWickets: statistics?.bowlingWickets ?? 0,
+    battingAverage:
+      statistics && statistics.battingInnings > 0
+        ? dismissals > 0
+          ? (statistics.battingRuns / dismissals).toFixed(2)
+          : statistics.battingRuns.toFixed(2)
+        : '0.00',
+    strikeRate:
+      statistics && statistics.ballsFacedSum > 0
+        ? ((statistics.battingRuns / statistics.ballsFacedSum) * 100).toFixed(2)
+        : '0.00',
+    economy:
+      statistics && statistics.bowlingOvers > 0
+        ? (statistics.bowlingRunsConceded / statistics.bowlingOvers).toFixed(2)
+        : '0.00',
+    attendancePercentage: attendance?.attendancePercentage ?? 0,
+  };
 
-  const recentMatches = matches.slice(0, 5).map((m: any) => ({
+  const recentMatches = (matches ?? []).slice(0, 5).map((m: any) => ({
     id: m.id,
     matchName: m.matchName,
     matchDate: m.matchDate,
@@ -606,10 +621,10 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
       ? { wickets: m.bowling.wickets, runsConceded: m.bowling.runsConceded }
       : null,
     awards: {
-      playerOfMatch: m.awards.playerOfMatch,
-      bestBatter: m.awards.bestBatter,
-      bestBowler: m.awards.bestBowler,
-      bestFielder: m.awards.bestFielder,
+      playerOfMatch: m.awards?.playerOfMatch ?? false,
+      bestBatter: m.awards?.bestBatter ?? false,
+      bestBowler: m.awards?.bestBowler ?? false,
+      bestFielder: m.awards?.bestFielder ?? false,
     },
   }));
 
@@ -620,42 +635,44 @@ export async function fetchPlayerDashboardAnalytics(academyId: UUID, playerId: U
     startAt: session.start_at,
     endAt: session.end_at,
     coach: {
-      fullName: session.academy_members?.profiles?.full_name ?? null,
+      fullName:
+        session.coach?.profiles?.full_name ?? session.academy_members?.profiles?.full_name ?? null,
       email: '',
       avatarUrl: null,
     },
   }));
 
-  const pendingAssignments = drillSummary.recentAssignments
+  const recentAssignments = drillSummary?.recentAssignments ?? [];
+  const pendingAssignments = recentAssignments
     .filter((a: any) => a.status === 'assigned')
     .map((a: any) => ({
       ...a,
       drill: { name: a.drillName, category: a.category },
     }));
 
-  const completedAssignments = drillSummary.recentAssignments
+  const completedAssignments = recentAssignments
     .filter((a: any) => a.status === 'completed')
     .map((a: any) => ({
       ...a,
       drill: { name: a.drillName, category: a.category },
     }));
 
-  const recentAwards = awards.slice(0, 5).map((award: any) => ({
+  const recentAwards = (awards ?? []).slice(0, 5).map((award: any) => ({
     id: award.id,
     matchId: award.matchId,
     matchName: award.matchName,
     matchDate: award.matchDate,
   }));
 
-  const careerHighlights = milestones.slice(0, 10).map((milestone: any) => ({
+  const careerHighlights = (milestones ?? []).slice(0, 10).map((milestone: any) => ({
     type: milestone.milestoneType,
-    label: milestone.milestoneType.replace(/_/g, ' '),
+    label: (milestone.milestoneType || '').replace(/_/g, ' '),
     value: null,
     matchId: milestone.matchId,
     matchName: null,
   }));
 
-  const runsTrend = chartData.runsByMatch.slice(0, 10).map((row: any) => ({
+  const runsTrend = (chartData?.runsByMatch ?? []).slice(0, 10).map((row: any) => ({
     matchName: row.matchName,
     matchDate: row.matchDate,
     runs: row.runs,

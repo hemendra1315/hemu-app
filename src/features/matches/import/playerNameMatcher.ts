@@ -65,11 +65,21 @@ export function calculateSimilarity(name1: string, name2: string): number {
   const words1 = norm1.split(' ');
   const words2 = norm2.split(' ');
 
+  // Initial matching (e.g., "R Sharma" vs "Rohit Sharma", "V Kohli" vs "Virat Kohli")
+  if (words1.length === 2 && words2.length === 2) {
+    const lastNameMatch = words1[1] === words2[1];
+    if (lastNameMatch) {
+      const firstInitial1 = words1[0]?.charAt(0);
+      const firstInitial2 = words2[0]?.charAt(0);
+      if (firstInitial1 && firstInitial2 && firstInitial1 === firstInitial2) {
+        if (words1[0]?.length === 1 || words2[0]?.length === 1) {
+          return 90;
+        }
+      }
+    }
+  }
+
   // Single-word overlap: return a moderate baseline (70) rather than a hard 90.
-  // 70 is intentionally below the 80-point high_confidence threshold so that
-  // matchPlayers() — which has full roster visibility — decides the final status.
-  // If the match is genuinely unambiguous it stays low_confidence; if it is
-  // ambiguous (multiple roster players share the word) it gets capped there too.
   const matchingWords = words1.filter((w) => words2.includes(w));
   if (matchingWords.length > 0 && (words1.length === 1 || words2.length === 1)) {
     return 70;

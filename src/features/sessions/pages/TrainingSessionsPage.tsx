@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import 'react-datepicker/dist/react-datepicker.css';
 import { Link } from 'react-router-dom';
+import { Plus, User } from 'lucide-react';
 
 import { TimeRangePicker } from '@/components/form';
 import { Button, Input, Select, Textarea } from '@/components/ui';
@@ -102,13 +103,14 @@ export default function TrainingSessionsPage() {
     }
   });
 
-  const [sessionFilter, setSessionFilter] = useState<'today' | 'upcoming' | 'completed' | 'all'>(
+  const [sessionFilter, setSessionFilter] = useState<'all' | 'today' | 'upcoming' | 'completed'>(
     'all',
   );
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const filteredSessions = useMemo(() => {
     if (!sessionsQuery.data) return [];
-    const todayStr = new Date().toISOString().split('T')[0];
     if (sessionFilter === 'today') {
       return sessionsQuery.data.filter((s) => s.sessionDate === todayStr);
     }
@@ -119,118 +121,114 @@ export default function TrainingSessionsPage() {
       return sessionsQuery.data.filter((s) => s.status === 'completed');
     }
     return sessionsQuery.data;
-  }, [sessionsQuery.data, sessionFilter]);
+  }, [sessionsQuery.data, sessionFilter, todayStr]);
 
   if (!academyId) return null;
 
-  const todayStr = new Date().toISOString().split('T')[0];
-
   return (
-    <div className="space-y-4 pb-24 md:pb-6">
-      {/* 1. App Bar Header */}
-      <div className="border-border-subtle/40 flex flex-col gap-2 border-b pb-4">
+    <div className="flex flex-col space-y-4 pb-24 md:pb-6">
+      {/* 1. Header with Title & New Session Trigger */}
+      <div className="border-border-subtle/40 flex flex-col gap-3 border-b pb-3">
         <div className="flex items-center justify-between gap-3">
-          <h1 className="font-heading text-fg text-2xl font-extrabold tracking-tight uppercase md:text-3xl">
-            Sessions
-          </h1>
+          <div>
+            <h1 className="font-heading text-fg text-xl font-extrabold tracking-tight uppercase md:text-2xl">
+              Training Sessions
+            </h1>
+            <p className="text-fg-muted font-sans text-xs">
+              Drill blocks, net practice & squad training sessions
+            </p>
+          </div>
           {canManage && (
             <Button
               variant={showForm ? 'secondary' : 'primary'}
               onClick={() => setShowForm((prev) => !prev)}
-              className="min-h-[44px] rounded-[10px] px-4 text-xs font-bold"
+              className="h-9 min-h-[36px] rounded-lg px-3.5 text-xs font-bold"
             >
-              {showForm ? 'Cancel' : 'New Session'}
+              {showForm ? (
+                'Cancel'
+              ) : (
+                <>
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  New Session
+                </>
+              )}
             </Button>
           )}
         </div>
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="bg-surface-muted border-border-subtle/50 text-fg-muted rounded border px-2 py-0.5 font-mono text-[11px] font-bold uppercase">
-              {sessionsQuery.data?.length ?? 0} SESSIONS
-            </span>
-            <span className="text-fg-muted font-mono text-[10px] font-bold tracking-wider uppercase">
-              {new Date().toLocaleDateString([], {
-                weekday: 'short',
-                year: 'numeric',
-                month: 'short',
-                day: '2-digit',
-              })}
-            </span>
-          </div>
-          <div className="overflow-x-auto pb-1 sm:pb-0">
-            <div className="flex items-center gap-1.5">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'today', label: 'Today' },
-                { id: 'upcoming', label: 'Upcoming' },
-                { id: 'completed', label: 'Completed' },
-              ].map((chip) => {
-                const isActive = sessionFilter === chip.id;
-                return (
-                  <button
-                    key={chip.id}
-                    onClick={() =>
-                      setSessionFilter(chip.id as 'today' | 'upcoming' | 'completed' | 'all')
-                    }
-                    className={`h-8 min-h-[32px] rounded-full border px-3 text-xs font-bold transition-all ${
-                      isActive
-                        ? 'bg-primary border-primary text-white shadow-2xs'
-                        : 'bg-surface text-fg-muted border-border-subtle hover:bg-surface-muted/50'
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+
+        {/* Filter Pills Bar */}
+        <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          {[
+            { id: 'all', label: 'All Sessions' },
+            { id: 'today', label: 'Today' },
+            { id: 'upcoming', label: 'Upcoming' },
+            { id: 'completed', label: 'Completed' },
+          ].map((chip) => {
+            const isActive = sessionFilter === chip.id;
+            return (
+              <button
+                key={chip.id}
+                onClick={() =>
+                  setSessionFilter(chip.id as 'all' | 'today' | 'upcoming' | 'completed')
+                }
+                className={`flex h-8 shrink-0 items-center justify-center rounded-full border px-3 text-xs font-bold transition-all ${
+                  isActive
+                    ? 'border-primary bg-primary font-extrabold text-black shadow-2xs'
+                    : 'border-border-subtle bg-surface text-fg-muted hover:border-border hover:bg-surface-muted/50'
+                }`}
+              >
+                {chip.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {showForm && canManage ? (
-        <div className="border-border-subtle bg-surface rounded-xl border p-4 shadow-2xs">
+      {/* Collapsible Create Session Drawer / Panel */}
+      {showForm && canManage && (
+        <div className="border-border-subtle bg-surface animate-fadeIn rounded-xl border p-4 shadow-2xs">
           <form onSubmit={handleCreate} noValidate>
             <div className="border-border-subtle/50 mb-4 border-b pb-3">
-              <h2 className="font-heading text-fg text-lg font-extrabold tracking-tight uppercase">
-                Create Session
+              <h2 className="font-heading text-fg text-base font-extrabold tracking-tight uppercase">
+                Schedule Training Session
               </h2>
-              <p className="text-fg-muted mt-0.5 font-sans text-xs">
-                Schedule a practice or training session for a batch
+              <p className="text-fg-muted font-sans text-xs">
+                Create a practice or nets session for a squad
               </p>
             </div>
-            <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-3.5">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                    Batch
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Batch / Squad
                   </label>
                   <Select
                     {...register('batchId', { required: 'Batch is required' })}
                     hasError={Boolean(errors.batchId)}
-                    className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                   >
-                    <option value="">Select batch</option>
+                    <option value="">Select squad</option>
                     {batchesQuery.data?.map((batch) => (
                       <option key={batch.id} value={batch.id}>
                         {batch.name} ({batch.ageGroup})
                       </option>
                     ))}
                   </Select>
-                  {errors.batchId ? (
+                  {errors.batchId && (
                     <p className="text-error mt-1 font-sans text-[11px] font-semibold">
                       {errors.batchId.message}
                     </p>
-                  ) : null}
+                  )}
                 </div>
 
                 <div>
-                  <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                    Coach
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Lead Coach
                   </label>
                   <Select
                     {...register('coachId', { required: 'Coach is required' })}
                     hasError={Boolean(errors.coachId)}
-                    className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                   >
                     <option value="">Select coach</option>
                     {coaches.map((coach) => (
@@ -239,60 +237,62 @@ export default function TrainingSessionsPage() {
                       </option>
                     ))}
                   </Select>
-                  {errors.coachId ? (
+                  {errors.coachId && (
                     <p className="text-error mt-1 font-sans text-[11px] font-semibold">
                       {errors.coachId.message}
                     </p>
-                  ) : null}
+                  )}
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                    Title
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Session Title
                   </label>
                   <Input
                     {...register('title', { required: 'Title is required' })}
+                    placeholder="e.g. Batting Nets & Spin Defense"
                     hasError={Boolean(errors.title)}
-                    className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                   />
-                  {errors.title ? (
+                  {errors.title && (
                     <p className="text-error mt-1 font-sans text-[11px] font-semibold">
                       {errors.title.message}
                     </p>
-                  ) : null}
+                  )}
                 </div>
                 <div>
-                  <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                    Focus area
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Focus Area
                   </label>
                   <Input
                     {...register('focusArea')}
-                    className="border-border-subtle h-11 min-h-[44px] rounded-lg"
+                    placeholder="e.g. Backfoot Drive & Catching"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg text-xs"
                   />
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                    Session date
+                  <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                    Session Date
                   </label>
                   <Input
-                    {...register('sessionDate', { required: 'Session date is required' })}
+                    {...register('sessionDate', { required: 'Date is required' })}
                     type="date"
                     hasError={Boolean(errors.sessionDate)}
-                    className="border-border-subtle h-11 min-h-[44px] rounded-lg font-mono"
+                    className="border-border-subtle bg-surface-container-low h-10 min-h-[40px] rounded-lg font-mono text-xs"
                   />
-                  {errors.sessionDate ? (
+                  {errors.sessionDate && (
                     <p className="text-error mt-1 font-sans text-[11px] font-semibold">
                       {errors.sessionDate.message}
                     </p>
-                  ) : null}
+                  )}
                 </div>
                 <TimeRangePicker
-                  label="Session time"
+                  label="Session Time"
                   startTime={startTime}
                   endTime={endTime}
                   onStartTimeChange={setStartTime}
@@ -300,39 +300,24 @@ export default function TrainingSessionsPage() {
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                    Status
-                  </label>
-                  <Select
-                    {...register('status')}
-                    className="border-border-subtle h-11 min-h-[44px] rounded-lg"
-                  >
-                    <option value="scheduled">Scheduled</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </Select>
-                </div>
-              </div>
-
               <div>
-                <label className="font-heading text-fg-muted mb-1.5 block text-[10px] font-bold tracking-wider uppercase">
-                  Notes
+                <label className="font-heading text-fg-muted mb-1 block text-[10px] font-bold tracking-wider uppercase">
+                  Training Notes
                 </label>
                 <Textarea
                   {...register('notes')}
-                  rows={4}
-                  className="border-border-subtle rounded-lg"
+                  rows={3}
+                  placeholder="Equipment required, drill sequencing, or focus remarks..."
+                  className="border-border-subtle bg-surface-container-low rounded-lg text-xs"
                 />
               </div>
             </div>
-            <div className="border-border-subtle/40 mt-6 flex items-center justify-end gap-3 border-t pt-4">
+            <div className="border-border-subtle/40 mt-4 flex items-center justify-end gap-2.5 border-t pt-3">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => setShowForm(false)}
-                className="h-11 min-h-[44px] rounded-[10px] px-4 text-xs font-bold"
+                className="h-9 min-h-[36px] rounded-lg px-4 text-xs font-bold"
               >
                 Cancel
               </Button>
@@ -341,84 +326,103 @@ export default function TrainingSessionsPage() {
                 variant="primary"
                 isLoading={createSession.isPending}
                 disabled={!isDirty}
-                className="h-11 min-h-[44px] rounded-[10px] px-5 text-xs font-bold"
+                className="h-9 min-h-[36px] rounded-lg px-5 text-xs font-bold"
               >
                 Create Session
               </Button>
             </div>
           </form>
         </div>
-      ) : null}
+      )}
 
       {/* 2. Sessions List */}
       <div className="min-w-0">
         {sessionsQuery.isPending ? (
-          <p className="text-fg-muted py-8 text-center font-sans text-sm">Loading sessions…</p>
+          <div className="space-y-2.5">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="border-border-subtle bg-surface h-24 animate-pulse rounded-xl border"
+              />
+            ))}
+          </div>
         ) : sessionsQuery.isError ? (
           <ErrorState error={sessionsQuery.error} onRetry={() => void sessionsQuery.refetch()} />
         ) : filteredSessions.length === 0 ? (
           <MobileEmptyState
-            title="No sessions"
+            title="No sessions found"
             description="No training sessions match your selected filter."
             action={
-              canManage ? { label: 'Create Session', onClick: () => setShowForm(true) } : undefined
+              canManage
+                ? { label: 'Schedule Session', onClick: () => setShowForm(true) }
+                : undefined
             }
           />
         ) : (
-          <div className="border-border-subtle bg-surface divide-border-subtle/50 divide-y overflow-hidden rounded-xl border shadow-2xs">
+          <div className="divide-border-subtle/50 border-border-subtle bg-surface divide-y overflow-hidden rounded-xl border shadow-2xs">
             {filteredSessions.map((session) => {
               const isToday = session.sessionDate === todayStr;
-              const isPast = session.status === 'completed' || session.status === 'cancelled';
-              const rowBg = isToday
-                ? 'bg-saffron-pale hover:bg-saffron-pale/80'
-                : isPast
-                  ? 'opacity-85 hover:bg-surface-muted/20'
-                  : 'hover:bg-surface-muted/10';
 
               return (
                 <div
                   key={session.id}
-                  className={`flex flex-col justify-between gap-4 p-4 transition-colors sm:flex-row sm:items-center ${rowBg}`}
+                  className={`flex flex-col justify-between gap-3.5 p-3.5 transition-colors sm:flex-row sm:items-center ${
+                    isToday ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-surface-muted/20'
+                  }`}
                 >
-                  <div className="flex min-w-0 flex-1 items-start gap-4">
-                    <div className="flex shrink-0 flex-col items-start gap-1 pt-0.5">
-                      <span className="text-fg font-mono text-xs font-bold tracking-wider uppercase">
-                        {formatTime(session.startAt)} - {formatTime(session.endAt)}
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    {/* Time block */}
+                    <div className="border-border-subtle/70 bg-surface-container-low flex shrink-0 flex-col items-start rounded-lg border px-2.5 py-1.5 font-mono">
+                      <span className="text-fg text-[11px] font-bold">
+                        {formatTime(session.startAt)}
                       </span>
-                      <span className="text-fg-muted font-mono text-[10px] uppercase">
+                      <span className="text-fg-muted text-[10px]">
                         {formatDate(session.sessionDate)}
                       </span>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <Link
-                        to={`/sessions/${session.id}`}
-                        className="text-fg font-heading block truncate text-sm font-bold tracking-tight uppercase hover:underline"
-                      >
-                        {session.title}
-                      </Link>
-                      <div className="text-fg-muted mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs">
-                        {session.batch?.name && (
-                          <span className="bg-surface-muted border-border-subtle/50 text-fg-muted rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold">
-                            BATCH: {session.batch.name}
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/sessions/${session.id}`}
+                          className="font-heading text-fg hover:text-primary truncate text-sm font-bold tracking-tight uppercase transition-colors"
+                        >
+                          {session.title}
+                        </Link>
+                        {isToday && (
+                          <span className="border-primary/30 bg-primary-pale py-0.2 text-primary shrink-0 rounded-full border px-1.5 text-[9px] font-bold uppercase">
+                            Today
                           </span>
                         )}
-                        {session.coach?.fullName && <span>• Coach: {session.coach.fullName}</span>}
+                      </div>
+
+                      <div className="text-fg-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-sans text-xs">
+                        {session.batch?.name && (
+                          <span className="border-border-subtle/60 bg-surface-container-low text-fg-muted rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold">
+                            {session.batch.name}
+                          </span>
+                        )}
+                        {session.coach?.fullName && (
+                          <span className="flex items-center gap-1">
+                            <User className="text-fg-muted h-3 w-3" />
+                            {session.coach.fullName}
+                          </span>
+                        )}
                         {session.focusArea && (
-                          <span className="truncate">• Focus: {session.focusArea}</span>
+                          <span className="text-fg-muted truncate">• {session.focusArea}</span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                  <div className="flex shrink-0 items-center justify-between gap-2.5 sm:justify-end">
                     <span
                       className={`inline-flex items-center rounded border px-2 py-0.5 font-sans text-[10px] font-bold uppercase ${
                         session.status === 'completed'
-                          ? 'bg-success-pale text-success border-success/30'
+                          ? 'border-success/30 bg-success-pale text-success'
                           : session.status === 'cancelled'
-                            ? 'bg-error-pale text-error border-error/30'
-                            : 'bg-saffron-pale text-saffron border-saffron/30'
+                            ? 'border-error/30 bg-error-pale text-error'
+                            : 'border-saffron/30 bg-saffron-pale text-saffron'
                       }`}
                     >
                       {session.status}
@@ -427,14 +431,14 @@ export default function TrainingSessionsPage() {
                     {canManage ? (
                       <Link
                         to={`/sessions/${session.id}/attendance`}
-                        className="bg-primary flex min-h-[38px] shrink-0 items-center justify-center rounded-[10px] px-3.5 text-xs font-bold text-white shadow-2xs transition hover:opacity-90"
+                        className="bg-primary flex h-8.5 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-bold text-black shadow-2xs transition hover:opacity-90"
                       >
                         Attendance
                       </Link>
                     ) : (
                       <Link
                         to={`/sessions/${session.id}`}
-                        className="bg-surface border-border-subtle hover:bg-surface-muted text-fg-muted flex min-h-[38px] shrink-0 items-center justify-center rounded-[10px] border px-3.5 text-xs font-bold transition"
+                        className="border-border-subtle bg-surface text-fg-muted hover:bg-surface-muted hover:text-fg flex h-8.5 shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-bold transition"
                       >
                         View
                       </Link>

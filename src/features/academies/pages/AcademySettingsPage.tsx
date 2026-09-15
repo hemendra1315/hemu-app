@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
-import { Copy, RefreshCw, Check, Upload, Trash2, Building2, AlertCircle } from 'lucide-react';
+import {
+  Copy,
+  RefreshCw,
+  Check,
+  Upload,
+  Trash2,
+  Building2,
+  AlertCircle,
+  Sparkles,
+} from 'lucide-react';
 
 import {
   Avatar,
@@ -192,39 +201,45 @@ export default function AcademySettingsPage() {
   const currentLogoUrl = academy?.logoUrl;
 
   return (
-    <div className="space-y-6 pb-24 md:pb-6">
+    <div className="space-y-6 pb-24 md:pb-8">
       <div className="md:hidden">
         <MobilePageHeader
           title="Academy Settings"
           subtitle={membership?.academyName ?? 'Manage Academy'}
+          showBack={true}
         />
       </div>
 
-      <div className="hidden md:block">
-        <h1 className="text-fg text-2xl font-bold tracking-tight">Academy Settings</h1>
-        <p className="text-fg-muted mt-1 text-sm">
-          Update your academy branding, profile details, and student join codes.
-        </p>
+      <div className="hidden md:flex md:items-center md:justify-between">
+        <div>
+          <h1 className="text-fg flex items-center gap-2.5 text-2xl font-black tracking-tight">
+            <Building2 className="text-primary h-6 w-6" />
+            Academy Settings
+          </h1>
+          <p className="text-fg-muted mt-1 text-sm font-medium">
+            Update your academy branding, profile details, and student join codes.
+          </p>
+        </div>
       </div>
 
       {/* 1. ACADEMY BRANDING & LOGO */}
-      <Card>
+      <Card className="border-border-subtle bg-surface rounded-2xl border">
         <CardHeader
-          title="Academy Branding"
-          description="Your academy's identity, visible to coaches, players, and platform administrators."
+          title="Academy Branding & Logo"
+          description="Your academy's identity, visible across mobile app and web scorecards."
         />
-        <CardBody className="space-y-6">
+        <CardBody className="space-y-6 p-5 sm:p-6">
           {/* Logo & Live Preview Box */}
-          <div className="border-border-subtle bg-surface-elevated/60 flex flex-col gap-5 rounded-2xl border p-4 sm:flex-row sm:items-center sm:gap-6">
+          <div className="border-border-subtle bg-surface-muted/30 flex flex-col gap-5 rounded-2xl border p-4 sm:flex-row sm:items-center sm:gap-6">
             <div className="relative flex shrink-0 items-center justify-center">
               <Avatar
                 name={currentDisplayName}
                 src={currentLogoUrl}
                 shape="rounded"
-                className="h-20 w-20 text-2xl shadow-sm sm:h-24 sm:w-24 sm:text-3xl"
+                className="ring-primary/30 h-20 w-20 text-2xl shadow-sm ring-2 sm:h-24 sm:w-24 sm:text-3xl"
               />
               {isUploadingLogo && (
-                <div className="bg-bg/70 absolute inset-0 flex items-center justify-center rounded-xl backdrop-blur-xs">
+                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60 backdrop-blur-xs">
                   <RefreshCw className="text-primary h-6 w-6 animate-spin" />
                 </div>
               )}
@@ -238,7 +253,7 @@ export default function AcademySettingsPage() {
                 </h3>
               </div>
               <p className="text-fg-muted text-xs">
-                {academy?.city ? `${academy.city} • ` : ''}Branding active across CAM mobile & web
+                {academy?.city ? `${academy.city} • ` : ''}Active on CAM pitch-precision platform
               </p>
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -295,13 +310,13 @@ export default function AcademySettingsPage() {
       </Card>
 
       {/* 2. GENERAL INFORMATION FORM */}
-      <Card>
+      <Card className="border-border-subtle bg-surface rounded-2xl border">
         <form onSubmit={onSubmit} noValidate>
           <CardHeader
             title="General Information"
-            description="Academy name, location, and official contact information."
+            description="Academy name, operational location, and official contact details."
           />
-          <CardBody className="space-y-4">
+          <CardBody className="space-y-4 p-5 sm:p-6">
             <FormField label="Academy Name" required error={errors.name?.message}>
               {(field) => (
                 <Input
@@ -356,32 +371,33 @@ export default function AcademySettingsPage() {
               </FormField>
             </div>
           </CardBody>
-          <CardFooter>
+          <CardFooter className="border-border-subtle border-t p-4 sm:p-5">
             <Button
               type="submit"
               isLoading={updateAcademy.isPending}
               disabled={!isDirty || updateAcademy.isPending}
-              className="min-h-[44px]"
+              className="bg-primary hover:bg-primary/90 min-h-[44px] font-bold text-black"
             >
-              Save changes
+              Save Academy Changes
             </Button>
           </CardFooter>
         </form>
       </Card>
 
       {/* 3. STUDENT JOIN CODE */}
-      <Card>
+      <Card className="border-border-subtle bg-surface rounded-2xl border">
         <CardHeader
           title="Student Join Code"
-          description="Share this code with players to let them request joining your academy."
+          description="Share this code with players and parents to let them request joining your academy."
         />
-        <CardBody className="space-y-4">
-          <div className="border-border-subtle bg-surface-elevated flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4">
+        <CardBody className="space-y-4 p-5 sm:p-6">
+          <div className="border-border-subtle bg-surface-muted/40 flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5">
             <div>
-              <p className="text-fg-muted text-xs font-semibold tracking-wider uppercase">
-                Active Code
-              </p>
-              <p className="text-primary mt-1 font-mono text-2xl font-bold tracking-widest">
+              <div className="text-fg-muted flex items-center gap-1.5 text-xs font-bold tracking-wider uppercase">
+                <Sparkles className="text-primary h-3.5 w-3.5" />
+                Active Join Code
+              </div>
+              <p className="text-primary mt-1 font-mono text-3xl font-black tracking-widest">
                 {joinCodeQuery.isLoading ? '...' : (joinCodeQuery.data ?? 'N/A')}
               </p>
             </div>
@@ -393,7 +409,11 @@ export default function AcademySettingsPage() {
                 onClick={() => void handleCopyCode()}
                 disabled={!joinCodeQuery.data}
               >
-                {copied ? <Check className="text-success h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied ? (
+                  <Check className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </Button>
               <Button

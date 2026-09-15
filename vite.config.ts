@@ -17,8 +17,8 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Cricket Academy Manager',
-        short_name: 'Academy',
+        name: 'CAM - Cricket Academy Manager',
+        short_name: 'CAM',
         description: 'Manage cricket academies: batches, sessions, attendance and more.',
         theme_color: '#0f766e',
         background_color: '#ffffff',

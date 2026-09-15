@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send } from 'lucide-react';
+import { Send, Megaphone, ArrowLeft } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button, Card, Input, Textarea, Select } from '@/components/ui';
+import { MobilePageHeader } from '@/components/mobile';
 import { useCreateAnnouncement } from '../hooks/useAnnouncements';
 import { useActiveAcademy } from '@/features/academies/hooks/useAcademies';
 import { useBatches } from '@/features/batches/hooks/useBatches';
@@ -100,43 +101,58 @@ export function CreateAnnouncementPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">New Announcement</h1>
-        <p className="text-fg-muted mt-1 text-sm">
-          Create and send an announcement to academy members.
-        </p>
+    <div className="mx-auto max-w-2xl space-y-6 pb-24 md:pb-8">
+      <div className="md:hidden">
+        <MobilePageHeader
+          title="New Announcement"
+          subtitle="Broadcast to academy members"
+          showBack={true}
+        />
       </div>
 
-      <Card className="p-6">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div className="hidden md:flex md:items-center md:justify-between">
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            <button
+              onClick={() => navigate(-1)}
+              className="text-fg-muted hover:text-fg flex items-center gap-1 text-sm font-medium transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+          </div>
+          <h1 className="text-fg flex items-center gap-2.5 text-2xl font-black tracking-tight">
+            <Megaphone className="text-primary h-6 w-6" />
+            Create Announcement
+          </h1>
+          <p className="text-fg-muted mt-1 text-sm font-medium">
+            Broadcast updates, notices, and match schedules to members.
+          </p>
+        </div>
+      </div>
+
+      <Card className="border-border-subtle bg-surface rounded-2xl border p-5 sm:p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-4">
             <div>
-              <label className="text-fg mb-1.5 block text-sm font-medium">Title</label>
+              <label className="text-fg mb-1.5 block text-xs font-bold tracking-wider uppercase">
+                Title
+              </label>
               <Input
                 {...register('title')}
-                placeholder="E.g. Ground closed tomorrow"
+                placeholder="E.g. Ground maintenance & training rescheduled"
                 disabled={isSubmitting}
                 className={errors.title ? 'border-danger' : ''}
               />
-              {errors.title && <p className="text-danger mt-1 text-sm">{errors.title.message}</p>}
-            </div>
-
-            <div>
-              <label className="text-fg mb-1.5 block text-sm font-medium">Message</label>
-              <Textarea
-                {...register('message')}
-                placeholder="Type your announcement here..."
-                disabled={isSubmitting}
-                className={`min-h-[150px] resize-y ${errors.message ? 'border-danger' : ''}`}
-              />
-              {errors.message && (
-                <p className="text-danger mt-1 text-sm">{errors.message.message}</p>
+              {errors.title && (
+                <p className="text-danger mt-1 text-xs font-medium">{errors.title.message}</p>
               )}
             </div>
 
             <div>
-              <label className="text-fg mb-1.5 block text-sm font-medium">Audience</label>
+              <label className="text-fg mb-1.5 block text-xs font-bold tracking-wider uppercase">
+                Target Audience
+              </label>
               <Select
                 {...register('audience')}
                 disabled={isSubmitting}
@@ -150,7 +166,7 @@ export function CreateAnnouncementPage() {
                   }
                 }}
               >
-                {isOwner && <option value="all">Entire Academy</option>}
+                {isOwner && <option value="all">Entire Academy (All Members)</option>}
                 {isOwner && <option value="coaches">All Coaches</option>}
                 {isOwner && <option value="players">All Players</option>}
                 {isOwner && <option value="all_parents">All Parents</option>}
@@ -160,13 +176,15 @@ export function CreateAnnouncementPage() {
 
             {audience === 'batch' && (
               <div>
-                <label className="text-fg mb-1.5 block text-sm font-medium">Select Batch</label>
+                <label className="text-fg mb-1.5 block text-xs font-bold tracking-wider uppercase">
+                  Select Batch
+                </label>
                 <Select
                   {...register('batch_id')}
                   disabled={isSubmitting}
                   className={errors.batch_id ? 'border-danger' : ''}
                 >
-                  <option value="">Select a batch...</option>
+                  <option value="">Choose a squad/batch...</option>
                   {filteredBatches.map((batch) => (
                     <option key={batch.id} value={batch.id}>
                       {batch.name}
@@ -174,13 +192,28 @@ export function CreateAnnouncementPage() {
                   ))}
                 </Select>
                 {errors.batch_id && (
-                  <p className="text-danger mt-1 text-sm">{errors.batch_id.message}</p>
+                  <p className="text-danger mt-1 text-xs font-medium">{errors.batch_id.message}</p>
                 )}
               </div>
             )}
+
+            <div>
+              <label className="text-fg mb-1.5 block text-xs font-bold tracking-wider uppercase">
+                Message Content
+              </label>
+              <Textarea
+                {...register('message')}
+                placeholder="Write your announcement details here..."
+                disabled={isSubmitting}
+                className={`min-h-[160px] resize-y ${errors.message ? 'border-danger' : ''}`}
+              />
+              {errors.message && (
+                <p className="text-danger mt-1 text-xs font-medium">{errors.message.message}</p>
+              )}
+            </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="border-border-subtle flex items-center justify-end gap-3 border-t pt-4">
             <Button
               type="button"
               variant="secondary"
@@ -189,12 +222,16 @@ export function CreateAnnouncementPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-primary hover:bg-primary/90 font-bold text-black"
+            >
               {isSubmitting ? (
-                'Sending...'
+                'Broadcasting...'
               ) : (
                 <>
-                  <Send className="mr-2 h-4 w-4" />
+                  <Send className="mr-1.5 h-4 w-4" />
                   Send Announcement
                 </>
               )}

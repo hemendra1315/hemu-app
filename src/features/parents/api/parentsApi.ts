@@ -25,9 +25,12 @@ export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[
 
   const children: LinkedChild[] = [];
   for (const row of rows) {
-    if (!row.academy_members?.[0]?.id) continue;
+    const memberId = Array.isArray(row.academy_members)
+      ? row.academy_members[0]?.id
+      : row.academy_members?.id;
+    if (!memberId) continue;
     try {
-      const profile = await fetchPlayerProfile(academyId, row.academy_members[0].id);
+      const profile = await fetchPlayerProfile(academyId, memberId);
       children.push({
         linkId: row.id,
         relationshipType: row.relationship_type,

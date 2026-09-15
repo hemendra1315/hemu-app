@@ -10,16 +10,18 @@ import {
   getDefaultOversForFormat,
 } from '../../import/cricheroesPdfTypes';
 import { parseCricHeroesText } from '../../import/cricheroesPdfParser';
+import { parseCricHeroesCsv } from '../../import/cricheroesCsvParser';
+import { calculateMatchMvp } from '../../import/cricketMvpCalculator';
 import { matchPlayers } from '../../import/playerNameMatcher';
 import { checkDuplicateMatch } from '../../import/duplicateMatchChecker';
 import {
   fetchCricHeroesPlayerMappings,
   saveCricHeroesPlayerMappings,
 } from '../../api/cricheroesMappingsApi';
-import { PdfUploadStep } from './PdfUploadStep';
+import { FileUploadStep } from './FileUploadStep';
 import { TeamSelectStep } from './TeamSelectStep';
 import { PlayerMappingStep } from './PlayerMappingStep';
-import type { WizardState } from '../wizard/types';
+import type { MatchFieldingEntry, WizardState } from '../wizard/types';
 
 export function CricHeroesImportModal({
   academyId,
@@ -50,8 +52,8 @@ export function CricHeroesImportModal({
   const existingMatches = academyMatchesQuery.data ?? [];
   const savedMappings = mappingsQuery.data ?? [];
 
-  function handleFileLoaded(text: string) {
-    const parsed = parseCricHeroesText(text);
+  function handleFileLoaded(content: string, _filename: string, fileType: 'pdf' | 'csv' | 'text') {
+    const parsed = fileType === 'csv' ? parseCricHeroesCsv(content) : parseCricHeroesText(content);
     setExtracted(parsed);
 
     // Extract all player names from innings
@@ -59,6 +61,7 @@ export function CricHeroesImportModal({
     parsed.innings.forEach((inn) => {
       inn.batting.forEach((b) => allNames.push(b.name));
       inn.bowling.forEach((b) => allNames.push(b.name));
+      inn.fielding?.forEach((f) => allNames.push(f.name));
     });
 
     const candidates = members.map((m) => ({
@@ -112,21 +115,37 @@ export function CricHeroesImportModal({
       // Non-blocking: continue import even if mapping save encounters a network glitch
     }
 
-    // Filter relevant innings for academy team based on selected team A or B
-    // Assuming innings[0] corresponds to team A (first parsed team) and innings[1] to team B
-    const academyInnings =
-      selectedAcademyTeamId === 'A'
-        ? extracted.innings[0]
-        : extracted.innings[1] || extracted.innings[0];
+    // Determine batting & bowling innings based on selected academy team
+    const teamAInnings = extracted.innings[0];
+    const teamBInnings = extracted.innings[1];
+
+    const batInnings = selectedAcademyTeamId === 'A' ? teamAInnings : teamBInnings || teamAInnings;
+    const bowlInnings = selectedAcademyTeamId === 'A' ? teamBInnings || teamAInnings : teamAInnings;
 
     const playerLookup = new Map(mappedPlayers.map((p) => [p.cricheroesName.toLowerCase(), p]));
 
+    // Deterministic ID generator so lineup, batting, bowling, and awards always match
+    const getMemberId = (cricheroesName: string): UUID => {
+      const p = playerLookup.get(cricheroesName.toLowerCase());
+      if (p && !p.isGuest && p.academyMemberId) return p.academyMemberId;
+      return `guest_${cricheroesName
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '_')}` as UUID;
+    };
+
+    // Extract player names specific to the selected Academy team
+    const academyPlayerNamesSet = new Set<string>();
+    batInnings?.batting?.forEach((b) => academyPlayerNamesSet.add(b.name.toLowerCase()));
+    bowlInnings?.bowling?.forEach((bw) => academyPlayerNamesSet.add(bw.name.toLowerCase()));
+    bowlInnings?.fielding?.forEach((f) => academyPlayerNamesSet.add(f.name.toLowerCase()));
+
     // Construct WizardState compatible with existing MatchWizard
     const lineup = mappedPlayers
-      .filter((p) => !p.isIgnored)
+      .filter((p) => !p.isIgnored && academyPlayerNamesSet.has(p.cricheroesName.toLowerCase()))
       .map((p, idx) => ({
-        memberId: (p.isGuest ? `guest_${idx}` : p.academyMemberId) as UUID,
-        fullName: p.isGuest ? p.cricheroesName : p.academyMemberName,
+        memberId: getMemberId(p.cricheroesName),
+        fullName: p.isGuest ? p.cricheroesName : p.academyMemberName || p.cricheroesName,
         email: '',
         avatarUrl: null,
         battingOrder: idx === 0 || idx === 1 ? 0 : idx + 1,
@@ -137,16 +156,16 @@ export function CricHeroesImportModal({
         guestName: p.isGuest ? p.cricheroesName : null,
       }));
 
-    const batting = (academyInnings?.batting || [])
+    const batting = (batInnings?.batting || [])
       .filter((b) => {
         const mapped = playerLookup.get(b.name.toLowerCase());
-        return mapped && !mapped.isIgnored;
+        return !mapped || !mapped.isIgnored;
       })
       .map((b) => {
         const mapped = playerLookup.get(b.name.toLowerCase());
         const isGuest = mapped?.isGuest ?? true;
         return {
-          memberId: (isGuest ? `guest_${b.name}` : mapped?.academyMemberId) as UUID,
+          memberId: getMemberId(b.name),
           runs: b.runs,
           balls: b.balls,
           fours: b.fours,
@@ -158,16 +177,16 @@ export function CricHeroesImportModal({
         };
       });
 
-    const bowling = (academyInnings?.bowling || [])
+    const bowling = (bowlInnings?.bowling || [])
       .filter((b) => {
         const mapped = playerLookup.get(b.name.toLowerCase());
-        return mapped && !mapped.isIgnored;
+        return !mapped || !mapped.isIgnored;
       })
       .map((b) => {
         const mapped = playerLookup.get(b.name.toLowerCase());
         const isGuest = mapped?.isGuest ?? true;
         return {
-          memberId: (isGuest ? `guest_${b.name}` : mapped?.academyMemberId) as UUID,
+          memberId: getMemberId(b.name),
           overs: b.overs,
           maidens: b.maidens,
           runsConceded: b.runsConceded,
@@ -179,10 +198,55 @@ export function CricHeroesImportModal({
         };
       });
 
+    // Extract Fielding contributions from bowling innings (opponent's batting)
+    const fielding: MatchFieldingEntry[] = (bowlInnings?.fielding || batInnings?.fielding || [])
+      .filter((f) => {
+        const mapped = playerLookup.get(f.name.toLowerCase());
+        return !mapped || !mapped.isIgnored;
+      })
+      .map((f) => {
+        const mapped = playerLookup.get(f.name.toLowerCase());
+        const isGuest = mapped?.isGuest ?? true;
+        return {
+          memberId: getMemberId(f.name),
+          catches: f.catches || 0,
+          stumpings: f.stumpings || 0,
+          runOuts: f.runOuts || 0,
+          runOutsDirect: f.runOuts || 0,
+          runOutsAssisted: 0,
+          isGuest,
+          guestName: isGuest ? f.name : null,
+        };
+      });
+
+    // Compute automatic MVP recommendations
+    const mvpResult = calculateMatchMvp(lineup, batting, bowling, fielding);
+
+    // Pre-fill awards using calculated MVP or text-parsed awards if matched
+    let pomId = mvpResult.playerOfMatch?.memberId as UUID | null;
+    let bestBatId = mvpResult.bestBatter?.memberId as UUID | null;
+    let bestBowlId = mvpResult.bestBowler?.memberId as UUID | null;
+    let bestFieldId = mvpResult.bestFielder?.memberId as UUID | null;
+
+    if (extracted.playerOfMatchName) {
+      pomId = getMemberId(extracted.playerOfMatchName);
+    }
+    if (extracted.bestBatterName) {
+      bestBatId = getMemberId(extracted.bestBatterName);
+    }
+    if (extracted.bestBowlerName) {
+      bestBowlId = getMemberId(extracted.bestBowlerName);
+    }
+    if (extracted.bestFielderName) {
+      bestFieldId = getMemberId(extracted.bestFielderName);
+    }
+
     const wizardState: WizardState = {
       matchName: extracted.matchName,
       matchDate: extracted.matchDate,
-      opponentName: opponentName || extracted.teamB.name,
+      opponentName:
+        opponentName ||
+        (selectedAcademyTeamId === 'A' ? extracted.teamB.name : extracted.teamA.name),
       venue: extracted.venue,
       matchType: extracted.matchType,
       format: extracted.format,
@@ -194,12 +258,12 @@ export function CricHeroesImportModal({
       lineup,
       batting,
       bowling,
-      fielding: [],
+      fielding,
       awards: {
-        playerOfMatchId: null,
-        bestBatterId: null,
-        bestBowlerId: null,
-        bestFielderId: null,
+        playerOfMatchId: pomId || null,
+        bestBatterId: bestBatId || null,
+        bestBowlerId: bestBowlId || null,
+        bestFielderId: bestFieldId || null,
       },
     };
 
@@ -209,7 +273,9 @@ export function CricHeroesImportModal({
   return (
     <Card className="mx-auto max-w-3xl shadow-xl">
       <CardBody className="p-6">
-        {step === 'upload' && <PdfUploadStep onFileLoaded={handleFileLoaded} onCancel={onCancel} />}
+        {step === 'upload' && (
+          <FileUploadStep onFileLoaded={handleFileLoaded} onCancel={onCancel} />
+        )}
 
         {step === 'teams' && extracted && (
           <TeamSelectStep

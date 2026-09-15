@@ -157,10 +157,10 @@ export function CricketCard({ profile, stats }: CricketCardProps) {
 
         {/* STATISTICS */}
         <div className="bg-surface-muted/30 border-border-subtle grid grid-cols-2 gap-px border-t sm:grid-cols-4">
-          <StatBox label="Matches" value={stats?.matchesPlayed.toString() ?? '--'} />
-          <StatBox label="Runs" value={stats?.battingRuns.toString() ?? '--'} />
-          <StatBox label="Wickets" value={stats?.bowlingWickets.toString() ?? '--'} />
-          <StatBox label="Catches" value={stats?.fieldingCatches.toString() ?? '--'} />
+          <StatBox label="Matches" value={stats?.matchesPlayed?.toString() ?? '--'} />
+          <StatBox label="Runs" value={stats?.battingRuns?.toString() ?? '--'} />
+          <StatBox label="Wickets" value={stats?.bowlingWickets?.toString() ?? '--'} />
+          <StatBox label="Catches" value={stats?.fieldingCatches?.toString() ?? '--'} />
           <StatBox label="Batting Avg" value={stats ? battingAverage : '--'} />
           <StatBox label="Strike Rate" value={stats ? strikeRate : '--'} />
           <StatBox

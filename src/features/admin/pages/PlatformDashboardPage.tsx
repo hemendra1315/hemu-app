@@ -12,11 +12,29 @@ import {
   Trash2,
   Trophy,
   Users,
+  Receipt,
+  QrCode,
+  Image,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardBody, CardHeader, Button, Input, Modal, Select, Avatar } from '@/components/ui';
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Button,
+  Input,
+  Modal,
+  Select,
+  Avatar,
+  Badge,
+} from '@/components/ui';
 import { ConfirmDialog, EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
+import {
+  useAllPlatformFeePayments,
+  updateStudentFeePaymentStatus,
+  type StudentFeePayment,
+} from '@/features/billing';
 import { formatDate } from '@/lib/utils/date';
 import { useUiStore } from '@/stores';
 import {
@@ -36,10 +54,17 @@ export default function PlatformDashboardPage() {
   const navigate = useNavigate();
   const { switchAcademy } = useActiveAcademy();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'academies' | 'users'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'academies' | 'users' | 'payments'>(
+    'overview',
+  );
   const [academySearch, setAcademySearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [paymentSearch, setPaymentSearch] = useState('');
+  const [viewingScreenshotPayment, setViewingScreenshotPayment] =
+    useState<StudentFeePayment | null>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<UUID | null>(null);
+
+  const { payments: allFeePayments } = useAllPlatformFeePayments();
 
   // Create Academy Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -100,8 +125,10 @@ export default function PlatformDashboardPage() {
     navigate('/dashboard');
   };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateSubmit = async (e?: React.FormEvent | React.SyntheticEvent) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (!createName.trim()) {
       pushToast({ title: 'Academy name is required', variant: 'error' });
       return;
@@ -132,9 +159,10 @@ export default function PlatformDashboardPage() {
         expiresAt: created.invitationExpiresAt,
       });
     } catch (err) {
+      console.error('[PlatformDashboardPage] Failed to create academy:', err);
       pushToast({
         title: 'Failed to create academy',
-        description: err instanceof Error ? err.message : 'Unknown error',
+        description: err instanceof Error ? err.message : 'Unknown error occurred',
         variant: 'error',
       });
     }
@@ -235,6 +263,18 @@ export default function PlatformDashboardPage() {
           onClick={() => setActiveTab('users')}
         >
           Users ({users.length})
+        </button>
+        <button
+          type="button"
+          className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition ${
+            activeTab === 'payments'
+              ? 'border-emerald-500 text-emerald-500'
+              : 'text-fg-muted hover:text-fg border-transparent'
+          }`}
+          onClick={() => setActiveTab('payments')}
+        >
+          <Receipt className="h-4 w-4" />
+          <span>Student Payments ({allFeePayments.length})</span>
         </button>
       </div>
 
@@ -755,6 +795,315 @@ export default function PlatformDashboardPage() {
         </Card>
       )}
 
+      {/* STUDENT PAYMENTS TAB */}
+      {activeTab === 'payments' && (
+        <div className="space-y-6">
+          {/* Summary KPIs */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+            <Card>
+              <CardBody className="flex items-center gap-4 p-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                  <Receipt className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                    Total Revenue Collected
+                  </p>
+                  <p className="text-fg text-2xl font-bold">
+                    ₹
+                    {allFeePayments
+                      .filter((p) => p.status === 'verified')
+                      .reduce((acc, p) => acc + p.amount, 0)}
+                  </p>
+                  <p className="text-fg-muted text-xs">
+                    {allFeePayments.filter((p) => p.status === 'verified').length} verified payments
+                  </p>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardBody className="flex items-center gap-4 p-4">
+                <div className="bg-primary/10 text-primary flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+                  <QrCode className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                    Payment Gateway
+                  </p>
+                  <p className="text-fg truncate text-sm font-bold">7358875632@fam</p>
+                  <p className="text-fg-muted text-xs">FamPay QR / UPI Direct</p>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardBody className="flex items-center gap-4 p-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                  <Users className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                    Pricing Model
+                  </p>
+                  <p className="text-fg text-2xl font-bold">₹200 / Month</p>
+                  <p className="text-fg-muted text-xs">Student-only subscription</p>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+
+          {/* Payments Table Card */}
+          <Card>
+            <CardHeader
+              title="Student ₹200 Monthly Payments"
+              description="Real-time ledger of student monthly app fee transactions with UPI reference (UTR) numbers."
+              action={
+                <div className="w-64">
+                  <Input
+                    placeholder="Search student, academy, UTR..."
+                    value={paymentSearch}
+                    onChange={(e) => setPaymentSearch(e.target.value)}
+                  />
+                </div>
+              }
+            />
+            <CardBody>
+              {allFeePayments.length === 0 ? (
+                <EmptyState
+                  title="No student payments recorded yet"
+                  description="When students submit their ₹200 FamPay/UPI payment with their 12-digit UTR number, it will appear here in real time."
+                />
+              ) : (
+                (() => {
+                  const filteredPayments = allFeePayments.filter(
+                    (p) =>
+                      p.studentName.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                      p.studentEmail.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                      p.academyName.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                      p.utr.includes(paymentSearch) ||
+                      p.monthLabel.toLowerCase().includes(paymentSearch.toLowerCase()),
+                  );
+
+                  if (filteredPayments.length === 0) {
+                    return <p className="text-fg-muted text-sm">No payments match your search.</p>;
+                  }
+
+                  return (
+                    <>
+                      {/* Mobile Cards */}
+                      <div className="space-y-3 md:hidden">
+                        {filteredPayments.map((p) => (
+                          <div
+                            key={p.id}
+                            className="border-border-subtle bg-surface space-y-2.5 rounded-xl border p-4 shadow-2xs"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <h4 className="text-fg font-bold">{p.studentName}</h4>
+                                <p className="text-fg-muted text-xs">{p.studentEmail}</p>
+                                <p className="text-primary mt-0.5 text-xs font-medium">
+                                  {p.academyName}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-mono text-sm font-black text-emerald-500">
+                                  ₹{p.amount}
+                                </span>
+                                <span className="text-fg-muted block text-[11px]">
+                                  {p.monthLabel}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="border-border-subtle text-fg-muted flex items-center justify-between border-t pt-2 text-xs">
+                              <div>
+                                <span className="block text-[11px] font-semibold uppercase">
+                                  UPI UTR Ref
+                                </span>
+                                <code className="text-fg font-mono font-bold">{p.utr}</code>
+                              </div>
+                              {p.screenshotUrl && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setViewingScreenshotPayment(p)}
+                                  className="h-7 gap-1 text-xs"
+                                >
+                                  <Image className="h-3.5 w-3.5" /> Proof
+                                </Button>
+                              )}
+                            </div>
+
+                            <div className="border-border-subtle flex items-center justify-between border-t pt-2 text-xs">
+                              <span className="text-fg-muted">
+                                {new Date(p.paidAt).toLocaleDateString()}
+                              </span>
+                              <Badge
+                                tone={
+                                  p.status === 'verified'
+                                    ? 'success'
+                                    : p.status === 'rejected'
+                                      ? 'danger'
+                                      : 'warning'
+                                }
+                              >
+                                {p.status.toUpperCase()}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop Table */}
+                      <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full text-left text-sm">
+                          <thead className="border-border-subtle text-fg-muted border-b text-xs tracking-wider uppercase">
+                            <tr>
+                              <th className="px-2 py-3">Student</th>
+                              <th className="px-2 py-3">Academy</th>
+                              <th className="px-2 py-3">Month</th>
+                              <th className="px-2 py-3">Amount</th>
+                              <th className="px-2 py-3">12-Digit UTR Ref</th>
+                              <th className="px-2 py-3">Proof</th>
+                              <th className="px-2 py-3">Submitted At</th>
+                              <th className="px-2 py-3 text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-border-subtle divide-y">
+                            {filteredPayments.map((p) => (
+                              <tr key={p.id} className="hover:bg-surface-subtle/50">
+                                <td className="px-2 py-3">
+                                  <div className="text-fg font-bold">{p.studentName}</div>
+                                  <div className="text-fg-muted text-xs">{p.studentEmail}</div>
+                                </td>
+                                <td className="text-fg px-2 py-3 font-medium">{p.academyName}</td>
+                                <td className="px-2 py-3">
+                                  <span className="bg-primary/10 text-primary rounded-md px-2 py-0.5 text-xs font-semibold">
+                                    {p.monthLabel}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-3 font-mono font-bold text-emerald-500">
+                                  ₹{p.amount}
+                                </td>
+                                <td className="px-2 py-3">
+                                  <div className="flex items-center gap-1.5">
+                                    <code className="bg-surface-muted text-fg rounded px-2 py-1 font-mono text-xs font-bold">
+                                      {p.utr}
+                                    </code>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        copyToClipboard(p.utr, 'UTR copied to clipboard')
+                                      }
+                                      className="text-fg-muted hover:text-fg p-1"
+                                      title="Copy UTR"
+                                    >
+                                      <Copy className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-3">
+                                  {p.screenshotUrl ? (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => setViewingScreenshotPayment(p)}
+                                      className="h-7 gap-1 text-xs font-semibold"
+                                    >
+                                      <Image className="text-primary h-3.5 w-3.5" /> View Proof
+                                    </Button>
+                                  ) : (
+                                    <span className="text-fg-muted text-xs">—</span>
+                                  )}
+                                </td>
+                                <td className="text-fg-muted px-2 py-3 text-xs">
+                                  {new Date(p.paidAt).toLocaleString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </td>
+                                <td className="px-2 py-3 text-right">
+                                  <select
+                                    value={p.status}
+                                    onChange={(e) =>
+                                      updateStudentFeePaymentStatus(
+                                        p.id,
+                                        e.target.value as 'verified' | 'pending' | 'rejected',
+                                      )
+                                    }
+                                    className={`rounded-lg border px-2 py-1 text-xs font-bold transition ${
+                                      p.status === 'verified'
+                                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                        : p.status === 'rejected'
+                                          ? 'border-danger/30 bg-danger/10 text-danger'
+                                          : 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                    }`}
+                                  >
+                                    <option value="verified">Verified ✅</option>
+                                    <option value="pending">Pending ⏳</option>
+                                    <option value="rejected">Rejected ❌</option>
+                                  </select>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()
+              )}
+            </CardBody>
+          </Card>
+        </div>
+      )}
+
+      {/* SCREENSHOT PROOF MODAL */}
+      {viewingScreenshotPayment && (
+        <Modal
+          open={Boolean(viewingScreenshotPayment)}
+          onClose={() => setViewingScreenshotPayment(null)}
+          title={`Payment Proof — ${viewingScreenshotPayment.studentName}`}
+          size="md"
+        >
+          <div className="space-y-4 py-2 text-center">
+            <div className="bg-surface-muted flex items-center justify-between rounded-xl p-3 text-left text-xs">
+              <div>
+                <p className="text-fg font-bold">{viewingScreenshotPayment.studentName}</p>
+                <p className="text-fg-muted">{viewingScreenshotPayment.academyName}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono font-bold text-emerald-500">
+                  ₹{viewingScreenshotPayment.amount}
+                </p>
+                <p className="text-fg-muted font-mono">{viewingScreenshotPayment.utr}</p>
+              </div>
+            </div>
+
+            {viewingScreenshotPayment.screenshotUrl ? (
+              <div className="border-border-subtle overflow-hidden rounded-xl border bg-black">
+                <img
+                  src={viewingScreenshotPayment.screenshotUrl}
+                  alt="Payment Proof Screenshot"
+                  className="mx-auto max-h-[450px] w-full object-contain"
+                />
+              </div>
+            ) : (
+              <p className="text-fg-muted py-8 text-sm">No screenshot attached for this payment.</p>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button variant="secondary" onClick={() => setViewingScreenshotPayment(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {/* ACADEMY DETAILS MODAL */}
       <Modal
         open={Boolean(selectedAcademyId)}
@@ -965,7 +1314,12 @@ export default function PlatformDashboardPage() {
             <Button type="button" variant="secondary" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" isLoading={createAcademyMutation.isPending}>
+            <Button
+              type="submit"
+              isLoading={createAcademyMutation.isPending}
+              disabled={createAcademyMutation.isPending}
+              onClick={handleCreateSubmit}
+            >
               Create Academy & Generate Invite
             </Button>
           </div>

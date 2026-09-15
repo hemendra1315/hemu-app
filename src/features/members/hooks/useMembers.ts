@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/keys';
 import { isUUID } from '@/lib/validators';
 import type { AcademyMember, PendingJoinRequest, UUID } from '@/types';
-import type { AppRole, JoinableRole, MemberStatus } from '@/types/enums';
+import type { AppRole, AssignableMemberRole, MemberStatus } from '@/types/enums';
 
 import {
   approveJoinRequest,
@@ -54,7 +54,7 @@ export function useUpdateMember(academyId: UUID) {
     queryClient.invalidateQueries({ queryKey: queryKeys.academy.pendingRequests(academyId) });
 
   const changeRole = useMutation({
-    mutationFn: ({ membershipId, role }: { membershipId: UUID; role: JoinableRole }) =>
+    mutationFn: ({ membershipId, role }: { membershipId: UUID; role: AssignableMemberRole }) =>
       updateMemberRole(membershipId, role),
     onSuccess: invalidate,
   });

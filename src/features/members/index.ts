@@ -10,3 +10,4 @@ export {
   usePendingJoinRequests,
   useUpdateMember,
 } from './hooks/useMembers';
+export { ChangeRoleModal } from './components/ChangeRoleModal';

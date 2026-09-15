@@ -1,7 +1,7 @@
 import { rpc, unwrap } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import type { AcademyMember, PendingJoinRequest, UUID } from '@/types';
-import type { AppRole, JoinableRole, JoinStatus, MemberStatus } from '@/types/enums';
+import type { AppRole, AssignableMemberRole, JoinStatus, MemberStatus } from '@/types/enums';
 
 type MemberRow = {
   id: string;
@@ -54,7 +54,9 @@ function toMember(row: MemberRow): AcademyMember {
     avatarUrl: row.profiles?.avatar_url ?? null,
     phone: row.profiles?.phone ?? null,
     batches: row.batch_members
-      ? row.batch_members.map(bm => bm.batches).filter((b): b is { id: string; name: string } => b !== null)
+      ? row.batch_members
+          .map((bm) => bm.batches)
+          .filter((b): b is { id: string; name: string } => b !== null)
       : [],
   };
 }
@@ -122,7 +124,10 @@ export async function rejectJoinRequest(requestId: UUID): Promise<void> {
   await rpc<void>('reject_join_request', { p_request_id: requestId, p_reason: null });
 }
 
-export async function updateMemberRole(membershipId: UUID, role: JoinableRole): Promise<void> {
+export async function updateMemberRole(
+  membershipId: UUID,
+  role: AssignableMemberRole,
+): Promise<void> {
   await unwrap(
     supabase.from('academy_members').update({ role }).eq('id', membershipId).select('id').single(),
   );
