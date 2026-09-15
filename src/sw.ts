@@ -7,6 +7,14 @@ declare const self: ServiceWorkerGlobalScope;
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
+self.addEventListener('install', () => {
+  void self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 // ─── Push Notifications ───────────────────────────────────────────────────────
 
 self.addEventListener('push', (event: PushEvent) => {

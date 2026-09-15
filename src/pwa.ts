@@ -15,6 +15,7 @@ export function registerPwa(): void {
   if (import.meta.env.DEV) return;
 
   const updateSW = registerSW({
+    immediate: true,
     onNeedRefresh() {
       logger.info('pwa_update_available');
       void updateSW(true);
