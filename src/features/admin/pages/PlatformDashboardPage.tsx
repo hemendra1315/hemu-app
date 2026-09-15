@@ -230,10 +230,10 @@ export default function PlatformDashboardPage() {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="border-border-subtle flex gap-2 border-b">
+      <div className="border-border-subtle flex [scrollbar-width:none] items-center gap-2 overflow-x-auto border-b pb-0.5 whitespace-nowrap [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
-          className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+          className={`shrink-0 border-b-2 px-3.5 py-2 text-sm font-medium transition ${
             activeTab === 'overview'
               ? 'border-primary text-primary'
               : 'text-fg-muted hover:text-fg border-transparent'
@@ -244,7 +244,7 @@ export default function PlatformDashboardPage() {
         </button>
         <button
           type="button"
-          className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+          className={`shrink-0 border-b-2 px-3.5 py-2 text-sm font-medium transition ${
             activeTab === 'academies'
               ? 'border-primary text-primary'
               : 'text-fg-muted hover:text-fg border-transparent'
@@ -255,7 +255,7 @@ export default function PlatformDashboardPage() {
         </button>
         <button
           type="button"
-          className={`border-b-2 px-4 py-2 text-sm font-medium transition ${
+          className={`shrink-0 border-b-2 px-3.5 py-2 text-sm font-medium transition ${
             activeTab === 'users'
               ? 'border-primary text-primary'
               : 'text-fg-muted hover:text-fg border-transparent'
@@ -266,7 +266,7 @@ export default function PlatformDashboardPage() {
         </button>
         <button
           type="button"
-          className={`flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition ${
+          className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm font-medium transition ${
             activeTab === 'payments'
               ? 'border-emerald-500 text-emerald-500'
               : 'text-fg-muted hover:text-fg border-transparent'
@@ -291,33 +291,37 @@ export default function PlatformDashboardPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <Card>
-                <CardBody className="flex items-center gap-4 p-4">
-                  <div className="bg-primary/10 text-primary flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
-                    <Building2 className="h-6 w-6" />
+                <CardBody className="flex items-center gap-3 p-3.5 sm:gap-4 sm:p-4">
+                  <div className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-12 sm:w-12">
+                    <Building2 className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                  <div className="min-w-0">
+                    <p className="text-fg-muted text-[11px] font-medium tracking-wider uppercase sm:text-xs">
                       Total Academies
                     </p>
-                    <p className="text-fg text-2xl font-bold">{analytics?.totalAcademies ?? 0}</p>
-                    <p className="text-fg-muted text-xs">Registered platform academies</p>
+                    <p className="text-fg text-xl font-bold sm:text-2xl">
+                      {analytics?.totalAcademies ?? 0}
+                    </p>
+                    <p className="text-fg-muted truncate text-[11px] sm:text-xs">
+                      Registered academies
+                    </p>
                   </div>
                 </CardBody>
               </Card>
 
               <Card>
-                <CardBody className="flex items-center gap-4 p-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500">
-                    <Users className="h-6 w-6" />
+                <CardBody className="flex items-center gap-3 p-3.5 sm:gap-4 sm:p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 sm:h-12 sm:w-12">
+                    <Users className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                  <div className="min-w-0">
+                    <p className="text-fg-muted text-[11px] font-medium tracking-wider uppercase sm:text-xs">
                       Total Members
                     </p>
-                    <p className="text-fg text-2xl font-bold">
+                    <p className="text-fg text-xl font-bold sm:text-2xl">
                       {(analytics?.totalPlayers ?? 0) + (analytics?.totalCoaches ?? 0)}
                     </p>
-                    <p className="text-fg-muted text-xs">
+                    <p className="text-fg-muted truncate text-[11px] sm:text-xs">
                       {analytics?.totalPlayers ?? 0} Players · {analytics?.totalCoaches ?? 0}{' '}
                       Coaches
                     </p>
@@ -326,31 +330,39 @@ export default function PlatformDashboardPage() {
               </Card>
 
               <Card>
-                <CardBody className="flex items-center gap-4 p-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
-                    <Trophy className="h-6 w-6" />
+                <CardBody className="flex items-center gap-3 p-3.5 sm:gap-4 sm:p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 sm:h-12 sm:w-12">
+                    <Trophy className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                  <div className="min-w-0">
+                    <p className="text-fg-muted text-[11px] font-medium tracking-wider uppercase sm:text-xs">
                       Total Matches
                     </p>
-                    <p className="text-fg text-2xl font-bold">{analytics?.totalMatches ?? 0}</p>
-                    <p className="text-fg-muted text-xs">Recorded platform matches</p>
+                    <p className="text-fg text-xl font-bold sm:text-2xl">
+                      {analytics?.totalMatches ?? 0}
+                    </p>
+                    <p className="text-fg-muted truncate text-[11px] sm:text-xs">
+                      Recorded matches
+                    </p>
                   </div>
                 </CardBody>
               </Card>
 
               <Card>
-                <CardBody className="flex items-center gap-4 p-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-                    <Calendar className="h-6 w-6" />
+                <CardBody className="flex items-center gap-3 p-3.5 sm:gap-4 sm:p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 sm:h-12 sm:w-12">
+                    <Calendar className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <p className="text-fg-muted text-xs font-medium tracking-wider uppercase">
+                  <div className="min-w-0">
+                    <p className="text-fg-muted text-[11px] font-medium tracking-wider uppercase sm:text-xs">
                       Training Sessions
                     </p>
-                    <p className="text-fg text-2xl font-bold">{analytics?.totalSessions ?? 0}</p>
-                    <p className="text-fg-muted text-xs">Scheduled training sessions</p>
+                    <p className="text-fg text-xl font-bold sm:text-2xl">
+                      {analytics?.totalSessions ?? 0}
+                    </p>
+                    <p className="text-fg-muted truncate text-[11px] sm:text-xs">
+                      Scheduled sessions
+                    </p>
                   </div>
                 </CardBody>
               </Card>
@@ -377,76 +389,155 @@ export default function PlatformDashboardPage() {
                   }
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="border-border-subtle text-fg-muted border-b text-xs tracking-wider uppercase">
-                      <tr>
-                        <th className="py-2">Academy</th>
-                        <th className="py-2">Owner</th>
-                        <th className="py-2">Members</th>
-                        <th className="py-2">Matches</th>
-                        <th className="py-2">Created</th>
-                        <th className="py-2 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-border-subtle divide-y">
-                      {academies.slice(0, 5).map((acad) => (
-                        <tr key={acad.id} className="hover:bg-surface-subtle/50">
-                          <td className="text-fg py-3 font-medium">
-                            <div className="flex items-center gap-2.5">
-                              <Avatar
-                                name={acad.name}
-                                src={acad.logoUrl}
-                                size="sm"
-                                shape="rounded"
-                              />
-                              <div className="min-w-0">
-                                <span className="truncate">{acad.name}</span>
-                                {acad.city ? (
-                                  <span className="text-fg-muted block text-xs font-normal">
-                                    {acad.city}
-                                  </span>
-                                ) : null}
-                              </div>
+                <>
+                  {/* Mobile Cards Layout (< md) */}
+                  <div className="space-y-3 md:hidden">
+                    {academies.slice(0, 5).map((acad) => (
+                      <div
+                        key={acad.id}
+                        className="border-border-subtle bg-surface space-y-3 rounded-xl border p-3.5 shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <Avatar name={acad.name} src={acad.logoUrl} size="md" shape="rounded" />
+                            <div className="min-w-0">
+                              <h3 className="text-fg truncate text-sm font-bold">{acad.name}</h3>
+                              <p className="text-fg-muted text-xs">
+                                /{acad.slug} {acad.city ? `· ${acad.city}` : ''}
+                              </p>
                             </div>
-                          </td>
-                          <td className="text-fg-muted py-3">{acad.ownerName}</td>
-                          <td className="text-fg py-3">{acad.memberCount}</td>
-                          <td className="text-fg py-3">{acad.matchCount}</td>
-                          <td className="text-fg-muted py-3">{formatDate(acad.createdAt)}</td>
-                          <td className="flex items-center justify-end gap-2 py-3 text-right">
+                          </div>
+                          <span className="bg-surface-muted text-fg-muted shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium">
+                            {formatDate(acad.createdAt)}
+                          </span>
+                        </div>
+
+                        <div className="border-border-subtle text-fg-muted grid grid-cols-2 gap-2 border-t pt-2 text-xs">
+                          <div>
+                            <span className="text-fg-muted block text-[11px] font-medium uppercase">
+                              Owner
+                            </span>
+                            <span className="text-fg block truncate font-semibold">
+                              {acad.ownerName || 'Unassigned'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-fg-muted block text-[11px] font-medium uppercase">
+                              Activity
+                            </span>
+                            <span className="text-fg font-semibold">
+                              {acad.memberCount} Members · {acad.matchCount} Matches
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="border-border-subtle flex flex-wrap items-center justify-between gap-2 border-t pt-2">
+                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="primary"
                               onClick={() => handleEnterAcademy(acad)}
-                              className="min-h-[36px] gap-1"
+                              className="h-8 min-h-[32px] gap-1 px-3 text-xs"
                             >
-                              <LogIn className="h-3.5 w-3.5" /> Enter Academy
+                              <LogIn className="h-3.5 w-3.5" /> Enter
                             </Button>
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() => {
-                                setSelectedAcademyId(acad.id);
-                              }}
+                              onClick={() => setSelectedAcademyId(acad.id)}
+                              className="h-8 min-h-[32px] px-3 text-xs"
                             >
                               Details
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-600"
-                              onClick={() => setAcademyToDelete(acad)}
-                              aria-label={`Delete ${acad.name}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
+                            onClick={() => setAcademyToDelete(acad)}
+                            aria-label={`Delete ${acad.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table Layout (>= md) */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[650px] text-left text-sm">
+                      <thead className="border-border-subtle text-fg-muted border-b text-xs tracking-wider uppercase">
+                        <tr>
+                          <th className="px-3 py-3">Academy</th>
+                          <th className="px-3 py-3">Owner</th>
+                          <th className="px-3 py-3">Members</th>
+                          <th className="px-3 py-3">Matches</th>
+                          <th className="px-3 py-3">Created</th>
+                          <th className="px-3 py-3 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-border-subtle divide-y">
+                        {academies.slice(0, 5).map((acad) => (
+                          <tr key={acad.id} className="hover:bg-surface-subtle/50">
+                            <td className="text-fg px-3 py-3 font-medium">
+                              <div className="flex items-center gap-2.5">
+                                <Avatar
+                                  name={acad.name}
+                                  src={acad.logoUrl}
+                                  size="sm"
+                                  shape="rounded"
+                                />
+                                <div className="min-w-0">
+                                  <span className="block truncate font-semibold">{acad.name}</span>
+                                  {acad.city ? (
+                                    <span className="text-fg-muted block text-xs font-normal">
+                                      {acad.city}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="text-fg-muted px-3 py-3">{acad.ownerName}</td>
+                            <td className="text-fg px-3 py-3">{acad.memberCount}</td>
+                            <td className="text-fg px-3 py-3">{acad.matchCount}</td>
+                            <td className="text-fg-muted px-3 py-3 whitespace-nowrap">
+                              {formatDate(acad.createdAt)}
+                            </td>
+                            <td className="flex items-center justify-end gap-2 px-3 py-3 text-right">
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleEnterAcademy(acad)}
+                                className="min-h-[36px] gap-1"
+                              >
+                                <LogIn className="h-3.5 w-3.5" /> Enter Academy
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => {
+                                  setSelectedAcademyId(acad.id);
+                                }}
+                              >
+                                Details
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-red-500 hover:text-red-600"
+                                onClick={() => setAcademyToDelete(acad)}
+                                aria-label={`Delete ${acad.name}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </CardBody>
           </Card>
