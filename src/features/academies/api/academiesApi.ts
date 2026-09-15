@@ -120,13 +120,57 @@ export type CreateAcademyInput = {
  * failure can never leave an academy without an owner.
  */
 export async function createAcademy(input: CreateAcademyInput): Promise<Academy> {
-  const row = await rpc<AcademyRow>('create_academy', {
-    p_name: input.name,
-    p_city: input.city ?? null,
-    p_timezone: input.timezone ?? 'Asia/Kolkata',
-    p_fee_mode: input.feeMode ?? 'player_pays',
-  });
-  return toAcademy(row);
+  try {
+    const row = await rpc<AcademyRow>('create_academy', {
+      p_name: input.name,
+      p_city: input.city ?? null,
+      p_timezone: input.timezone ?? 'Asia/Kolkata',
+      p_fee_mode: input.feeMode ?? 'player_pays',
+    });
+    return toAcademy(row);
+  } catch (rpcErr) {
+    const msg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
+    if (msg.includes('E_VALIDATION')) throw rpcErr;
+
+    // Fallback: direct table insert
+    try {
+      const authUser = (await supabase.auth.getUser()).data.user;
+      if (authUser) {
+        const slugBase =
+          input.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '') || 'academy';
+        const slug = `${slugBase}-${Date.now().toString(36)}`;
+        const { data: acadData, error: acadError } = await supabase
+          .from('academies')
+          .insert({
+            name: input.name.trim(),
+            slug,
+            city: input.city?.trim() || null,
+            timezone: input.timezone || 'Asia/Kolkata',
+            fee_mode: input.feeMode || 'player_pays',
+            owner_user_id: authUser.id,
+          })
+          .select(ACADEMY_COLUMNS)
+          .single();
+
+        if (!acadError && acadData) {
+          await supabase.from('academy_members').insert({
+            academy_id: (acadData as AcademyRow).id,
+            user_id: authUser.id,
+            role: 'academy_owner',
+            status: 'active',
+          });
+          return toAcademy(acadData as AcademyRow);
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    throw rpcErr;
+  }
 }
 
 /** Redeems a join code, creating a pending request for the owner to approve. */

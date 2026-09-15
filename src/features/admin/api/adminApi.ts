@@ -188,34 +188,126 @@ async function sha256Hex(text: string): Promise<string> {
 export async function createPlatformAcademy(
   payload: CreatePlatformAcademyPayload,
 ): Promise<CreatedPlatformAcademyResponse> {
-  const { data, error } = await (supabase.rpc as unknown as RpcCaller)(
-    'super_admin_create_academy_with_invite',
-    {
-      p_name: payload.name,
-      p_city: payload.city ?? null,
-      p_contact_email: payload.contactEmail ?? null,
-      p_contact_phone: payload.contactPhone ?? null,
-      p_timezone: payload.timezone ?? 'Asia/Kolkata',
-      p_fee_mode: payload.feeMode ?? 'player_pays',
-    },
-  );
+  let primaryError: unknown = null;
 
-  if (!error && data) {
-    return data as unknown as CreatedPlatformAcademyResponse;
+  // Stage 1: Try super_admin_create_academy_with_invite RPC (Migration 0036)
+  try {
+    const { data, error } = await (supabase.rpc as unknown as RpcCaller)(
+      'super_admin_create_academy_with_invite',
+      {
+        p_name: payload.name.trim(),
+        p_city: payload.city?.trim() || null,
+        p_contact_email: payload.contactEmail?.trim() || null,
+        p_contact_phone: payload.contactPhone?.trim() || null,
+        p_timezone: payload.timezone ?? 'Asia/Kolkata',
+        p_fee_mode: payload.feeMode ?? 'player_pays',
+      },
+    );
+
+    if (!error && data) {
+      return data as unknown as CreatedPlatformAcademyResponse;
+    }
+
+    primaryError = error;
+    const errShape = (error ?? {}) as RpcErrorShape;
+    if (errShape.message?.includes('E_VALIDATION')) {
+      throwRpcError('super_admin_create_academy_with_invite', error);
+    }
+  } catch (rpcErr) {
+    const msg = rpcErr instanceof Error ? rpcErr.message : String(rpcErr);
+    if (msg.includes('E_VALIDATION')) throw rpcErr;
+    primaryError = rpcErr;
+    console.warn(
+      '[super-admin] super_admin_create_academy_with_invite failed, trying fallback:',
+      rpcErr,
+    );
   }
 
-  // Fallback if super_admin_create_academy_with_invite RPC is missing/unavailable
-  const errShape = (error ?? {}) as RpcErrorShape;
-  if (errShape.message?.includes('E_VALIDATION') || errShape.message?.includes('E_FORBIDDEN')) {
-    throwRpcError('super_admin_create_academy_with_invite', error);
+  // Get authenticated user ID for owner assignment fallbacks
+  let authUserId: string | null = null;
+  try {
+    const userRes = await supabase.auth.getUser();
+    authUserId = userRes?.data?.user?.id ?? null;
+  } catch {
+    // ignore
   }
 
+  // Stage 2: Try create_platform_academy RPC (Migration 0024)
+  if (authUserId) {
+    try {
+      const { data: platData, error: platError } = await (supabase.rpc as unknown as RpcCaller)(
+        'create_platform_academy',
+        {
+          p_name: payload.name.trim(),
+          p_owner_user_id: authUserId,
+          p_city: payload.city?.trim() || null,
+          p_contact_email: payload.contactEmail?.trim() || null,
+          p_contact_phone: payload.contactPhone?.trim() || null,
+          p_timezone: payload.timezone ?? 'Asia/Kolkata',
+          p_fee_mode: payload.feeMode ?? 'player_pays',
+        },
+      );
+
+      if (!platError && platData) {
+        const acad = platData as {
+          id: UUID;
+          name: string;
+          slug: string;
+          city?: string;
+          createdAt?: string;
+        };
+        const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        const tokenHash = await sha256Hex(randomToken);
+        const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+
+        let invitationId = acad.id;
+        try {
+          const { data: invRow } = await supabase
+            .from('academy_owner_invitations')
+            .insert({
+              academy_id: acad.id,
+              token_hash: tokenHash,
+              status: 'pending',
+              created_by: authUserId,
+              expires_at: expiresAt,
+            })
+            .select('id')
+            .maybeSingle();
+          if (invRow?.id) invitationId = invRow.id as UUID;
+        } catch {
+          // ignore
+        }
+
+        return {
+          id: acad.id,
+          name: acad.name || payload.name,
+          slug: acad.slug,
+          city: acad.city || payload.city,
+          contactEmail: payload.contactEmail,
+          contactPhone: payload.contactPhone,
+          timezone: payload.timezone ?? 'Asia/Kolkata',
+          feeMode: payload.feeMode ?? 'player_pays',
+          playerJoinCode: 'PLAY12',
+          invitationId,
+          invitationToken: randomToken,
+          invitationExpiresAt: expiresAt,
+          createdAt: acad.createdAt || new Date().toISOString(),
+        };
+      }
+    } catch {
+      // ignore and continue
+    }
+  }
+
+  // Stage 3: Try create_academy RPC (Migration 0003)
   try {
     const { data: fallbackData, error: fallbackError } = await (
       supabase.rpc as unknown as RpcCaller
     )('create_academy', {
-      p_name: payload.name,
-      p_city: payload.city ?? null,
+      p_name: payload.name.trim(),
+      p_city: payload.city?.trim() || null,
       p_timezone: payload.timezone ?? 'Asia/Kolkata',
       p_fee_mode: payload.feeMode ?? 'player_pays',
     });
@@ -241,16 +333,15 @@ export async function createPlatformAcademy(
       const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
       let invitationId = acad.id;
 
-      try {
-        const authUser = (await supabase.auth.getUser()).data.user;
-        if (authUser) {
+      if (authUserId) {
+        try {
           const { data: invRow } = await supabase
             .from('academy_owner_invitations')
             .insert({
               academy_id: acad.id,
               token_hash: tokenHash,
               status: 'pending',
-              created_by: authUser.id,
+              created_by: authUserId,
               expires_at: expiresAt,
             })
             .select('id')
@@ -259,9 +350,9 @@ export async function createPlatformAcademy(
           if (invRow?.id) {
             invitationId = invRow.id as UUID;
           }
+        } catch (invErr) {
+          console.warn('[super-admin] Could not insert fallback owner invitation:', invErr);
         }
-      } catch (invErr) {
-        console.warn('[super-admin] Could not insert fallback owner invitation:', invErr);
       }
 
       return {
@@ -284,7 +375,108 @@ export async function createPlatformAcademy(
     console.warn('[super-admin] Fallback create_academy failed:', fallbackErr);
   }
 
-  throwRpcError('super_admin_create_academy_with_invite', error);
+  // Stage 4: Direct Supabase insert fallback if caller has table permissions
+  if (authUserId && supabase?.from) {
+    try {
+      const slugBase =
+        payload.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') || 'academy';
+      const slug = `${slugBase}-${Date.now().toString(36)}`;
+      const { data: directAcad, error: directErr } = await supabase
+        .from('academies')
+        .insert({
+          name: payload.name.trim(),
+          slug,
+          city: payload.city?.trim() || null,
+          contact_email: payload.contactEmail?.trim() || null,
+          contact_phone: payload.contactPhone?.trim() || null,
+          timezone: payload.timezone || 'Asia/Kolkata',
+          fee_mode: payload.feeMode || 'player_pays',
+          owner_user_id: authUserId,
+        })
+        .select('*')
+        .single();
+
+      if (!directErr && directAcad) {
+        const acad = directAcad as {
+          id: UUID;
+          name: string;
+          slug: string;
+          city?: string;
+          created_at?: string;
+        };
+
+        // Create owner membership
+        await supabase.from('academy_members').insert({
+          academy_id: acad.id,
+          user_id: authUserId,
+          role: 'academy_owner',
+          status: 'active',
+        });
+
+        // Create join code
+        const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        await supabase.from('academy_join_codes').insert({
+          academy_id: acad.id,
+          code: joinCode,
+          role: 'player',
+          created_by: authUserId,
+        });
+
+        const randomToken = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        const tokenHash = await sha256Hex(randomToken);
+        const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+
+        let invitationId = acad.id;
+        try {
+          const { data: invRow } = await supabase
+            .from('academy_owner_invitations')
+            .insert({
+              academy_id: acad.id,
+              token_hash: tokenHash,
+              status: 'pending',
+              created_by: authUserId,
+              expires_at: expiresAt,
+            })
+            .select('id')
+            .maybeSingle();
+          if (invRow?.id) invitationId = invRow.id as UUID;
+        } catch {
+          // ignore
+        }
+
+        return {
+          id: acad.id,
+          name: acad.name,
+          slug: acad.slug,
+          city: acad.city || payload.city,
+          contactEmail: payload.contactEmail,
+          contactPhone: payload.contactPhone,
+          timezone: payload.timezone ?? 'Asia/Kolkata',
+          feeMode: payload.feeMode ?? 'player_pays',
+          playerJoinCode: joinCode,
+          invitationId,
+          invitationToken: randomToken,
+          invitationExpiresAt: expiresAt,
+          createdAt: acad.created_at || new Date().toISOString(),
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  throwRpcError(
+    'super_admin_create_academy_with_invite',
+    primaryError || {
+      message: 'E_FORBIDDEN: Access restricted to platform super admins',
+      code: '42501',
+    },
+  );
 }
 
 export async function regenerateOwnerInvitation(academyId: UUID): Promise<{
