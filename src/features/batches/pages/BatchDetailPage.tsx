@@ -255,13 +255,15 @@ export default function BatchDetailPage() {
               ) : (
                 <div className="divide-border-subtle/50 divide-y">
                   {batchPlayersQuery.data.map((player) => {
-                    const name = player.fullName ?? player.email;
-                    const initials = name
-                      .split(' ')
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase();
+                    const name = player.fullName || player.email || 'Player';
+                    const initials =
+                      (name || 'P')
+                        .split(' ')
+                        .filter(Boolean)
+                        .map((n) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase() || 'P';
 
                     return (
                       <div

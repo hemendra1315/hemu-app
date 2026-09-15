@@ -32,16 +32,21 @@ function toBatch(row: any): Batch {
 }
 
 function toBatchPlayer(row: any): BatchPlayer {
+  const member = Array.isArray(row.academy_members)
+    ? row.academy_members[0]
+    : (row.academy_members ?? {});
+  const profile = Array.isArray(member?.profiles) ? member.profiles[0] : (member?.profiles ?? {});
+
   return {
     id: row.id,
     batchId: row.batch_id,
     academyMemberId: row.academy_member_id,
     joinedAt: row.joined_at,
-    fullName: row.academy_members?.profiles?.full_name ?? null,
-    email: row.academy_members?.profiles?.email ?? '',
-    avatarUrl: row.academy_members?.profiles?.avatar_url ?? null,
-    role: row.academy_members?.role,
-    status: row.academy_members?.status,
+    fullName: profile?.full_name || null,
+    email: profile?.email || '',
+    avatarUrl: profile?.avatar_url || null,
+    role: member?.role ?? null,
+    status: member?.status ?? null,
   };
 }
 
@@ -58,17 +63,99 @@ export async function fetchAcademyBatches(academyId: UUID): Promise<Batch[]> {
 }
 
 export async function fetchBatchPlayers(batchId: UUID): Promise<BatchPlayer[]> {
-  const rows = await unwrap<any[]>(
-    (supabase as any)
+  // 1. Try direct join first
+  try {
+    const { data, error } = await (supabase as any)
       .from('batch_members')
       .select(
-        'id, batch_id, academy_member_id, joined_at, academy_members!batch_members_academy_member_id_fkey(id, role, status, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url))',
+        `
+        id,
+        batch_id,
+        academy_member_id,
+        joined_at,
+        academy_members (
+          id,
+          role,
+          status,
+          profiles!academy_members_user_id_fkey (full_name, email, avatar_url)
+        )
+      `,
       )
+      .eq('batch_id', batchId)
+      .order('joined_at', { ascending: true });
+
+    if (!error && Array.isArray(data)) {
+      return data.map(toBatchPlayer);
+    }
+  } catch {
+    // Fall back to resilient two-step fetch below
+  }
+
+  // 2. Fallback: 2-step fetch to avoid any PostgREST nested embed schema cache failure
+  const batchMemberRows = await unwrap<any[]>(
+    (supabase as any)
+      .from('batch_members')
+      .select('id, batch_id, academy_member_id, joined_at')
       .eq('batch_id', batchId)
       .order('joined_at', { ascending: true }),
   );
 
-  return rows.map(toBatchPlayer);
+  if (!batchMemberRows || batchMemberRows.length === 0) {
+    return [];
+  }
+
+  const memberIds = batchMemberRows.map((r) => r.academy_member_id).filter(Boolean);
+  if (memberIds.length === 0) {
+    return [];
+  }
+
+  const memberMap = new Map<string, any>();
+  try {
+    const members = await unwrap<any[]>(
+      (supabase as any)
+        .from('academy_members')
+        .select(
+          'id, role, status, profiles!academy_members_user_id_fkey(full_name, email, avatar_url)',
+        )
+        .in('id', memberIds),
+    );
+    for (const m of members) {
+      memberMap.set(m.id, m);
+    }
+  } catch {
+    try {
+      const members = await unwrap<any[]>(
+        (supabase as any)
+          .from('academy_members')
+          .select('id, user_id, role, status')
+          .in('id', memberIds),
+      );
+      for (const m of members) {
+        memberMap.set(m.id, m);
+      }
+    } catch {
+      // Return bare batch members
+    }
+  }
+
+  return batchMemberRows.map((row) => {
+    const member = memberMap.get(row.academy_member_id);
+    const profile = Array.isArray(member?.profiles)
+      ? member.profiles[0]
+      : (member?.profiles ?? null);
+
+    return {
+      id: row.id,
+      batchId: row.batch_id,
+      academyMemberId: row.academy_member_id,
+      joinedAt: row.joined_at,
+      fullName: profile?.full_name || null,
+      email: profile?.email || '',
+      avatarUrl: profile?.avatar_url || null,
+      role: member?.role || null,
+      status: member?.status || null,
+    };
+  });
 }
 
 function formatDaysForDb(days: string | null | undefined, asArray: boolean): any {
@@ -359,28 +446,53 @@ export async function deleteBatch(batchId: UUID): Promise<void> {
 }
 
 export async function fetchBatchAvailablePlayers(academyId: UUID): Promise<AcademyMember[]> {
-  const rows = await unwrap<any[]>(
-    supabase
-      .from('academy_members')
-      .select(
-        'id, academy_id, user_id, role, status, joined_at, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url)',
-      )
-      .eq('academy_id', academyId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false }),
-  );
-  return rows.map((row) => ({
-    id: row.id,
-    academyId: row.academy_id,
-    userId: row.user_id,
-    role: row.role,
-    status: row.status,
-    joinedAt: row.joined_at,
-    fullName: row.profiles?.full_name ?? null,
-    email: row.profiles?.email ?? '',
-    avatarUrl: row.profiles?.avatar_url ?? null,
-    phone: null,
-  }));
+  try {
+    const rows = await unwrap<any[]>(
+      (supabase as any)
+        .from('academy_members')
+        .select(
+          'id, academy_id, user_id, role, status, joined_at, profiles!academy_members_user_id_fkey(full_name, email, avatar_url, phone)',
+        )
+        .eq('academy_id', academyId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false }),
+    );
+    return rows.map((row) => {
+      const profile = Array.isArray(row.profiles) ? row.profiles[0] : (row.profiles ?? {});
+      return {
+        id: row.id,
+        academyId: row.academy_id,
+        userId: row.user_id,
+        role: row.role,
+        status: row.status,
+        joinedAt: row.joined_at,
+        fullName: profile?.full_name || null,
+        email: profile?.email || '',
+        avatarUrl: profile?.avatar_url || null,
+        phone: profile?.phone || null,
+      };
+    });
+  } catch {
+    const rows = await unwrap<any[]>(
+      (supabase as any)
+        .from('academy_members')
+        .select('id, academy_id, user_id, role, status, joined_at')
+        .eq('academy_id', academyId)
+        .eq('status', 'active'),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      academyId: row.academy_id,
+      userId: row.user_id,
+      role: row.role,
+      status: row.status,
+      joinedAt: row.joined_at,
+      fullName: null,
+      email: '',
+      avatarUrl: null,
+      phone: null,
+    }));
+  }
 }
 
 export async function addPlayerToBatch(batchId: UUID, academyMemberId: UUID): Promise<void> {
