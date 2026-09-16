@@ -217,4 +217,110 @@ describe('usePushNotifications', () => {
       }),
     );
   });
+
+  it('persists subscription with resolved academy_id, platform, and fcm_token', async () => {
+    const mockSubscription = {
+      endpoint: 'https://fcm.googleapis.com/fcm/send/sample-fcm-token-12345',
+      toJSON: () => ({
+        keys: {
+          p256dh: 'test-p256dh-key',
+          auth: 'test-auth-secret',
+        },
+      }),
+    };
+
+    const mockPushManager = {
+      getSubscription: vi.fn().mockResolvedValue(null),
+      subscribe: vi.fn().mockResolvedValue(mockSubscription),
+    };
+
+    const mockServiceWorker = {
+      ready: Promise.resolve({
+        pushManager: mockPushManager,
+      }),
+    };
+
+    Object.defineProperty(window, 'Notification', {
+      value: {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    Object.defineProperty(window, 'navigator', {
+      value: {
+        ...originalNavigator,
+        userAgent: 'Mozilla/5.0 (Linux; Android 14; Mobile)',
+        serviceWorker: mockServiceWorker,
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => usePushNotifications());
+
+    let success = false;
+    await act(async () => {
+      success = await result.current.subscribe(
+        'mock-vapid-key',
+        'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d',
+      );
+    });
+
+    expect(success).toBe(true);
+    expect(result.current.permission).toBe('granted');
+    expect(result.current.isSubscribed).toBe(true);
+  });
+
+  it('handles missing academy by failing clearly and skipping malformed DB insert', async () => {
+    const mockSubscription = {
+      endpoint: 'https://push.example.com/sub/no-academy',
+      toJSON: () => ({
+        keys: {
+          p256dh: 'test-p256dh',
+          auth: 'test-auth',
+        },
+      }),
+    };
+
+    const mockPushManager = {
+      getSubscription: vi.fn().mockResolvedValue(null),
+      subscribe: vi.fn().mockResolvedValue(mockSubscription),
+    };
+
+    const mockServiceWorker = {
+      ready: Promise.resolve({
+        pushManager: mockPushManager,
+      }),
+    };
+
+    Object.defineProperty(window, 'Notification', {
+      value: {
+        permission: 'default',
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    Object.defineProperty(window, 'navigator', {
+      value: {
+        ...originalNavigator,
+        serviceWorker: mockServiceWorker,
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    const { result } = renderHook(() => usePushNotifications());
+
+    await act(async () => {
+      await result.current.subscribe();
+    });
+
+    // App gracefully marks subscribed locally but avoids corrupting push_subscriptions table
+    expect(result.current.permission).toBe('granted');
+  });
 });

@@ -7,20 +7,14 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
   },
-  server: {
-    url: process.env.CAP_LIVE_RELOAD
-      ? `http://${process.env.CAP_LIVE_RELOAD}:5173`
-      : 'https://hemu-app-main.vercel.app',
-    cleartext: true,
-    androidScheme: 'https',
-    allowNavigation: [
-      'hemu-app-main.vercel.app',
-      '*.vercel.app',
-      '*.supabase.co',
-      '*.google.com',
-      '*.googleapis.com',
-    ],
-  },
+  server: process.env.CAP_LIVE_RELOAD
+    ? {
+        url: `http://${process.env.CAP_LIVE_RELOAD}:5173`,
+        cleartext: true,
+      }
+    : {
+        androidScheme: 'https',
+      },
 };
 
 export default config;

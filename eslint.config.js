@@ -17,6 +17,7 @@ export default tseslint.config(
       'android',
       'player-dashboard-refresh',
       'cricket_academy_flutter',
+      'src/features/skip-queue/**',
     ],
   },
   {

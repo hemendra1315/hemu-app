@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 
+import { ensurePushSubscribed } from '@/lib/push/pushSubscription';
 import { logger } from '@/lib/logger';
 import { requestPersistentStorage } from '@/lib/offline/indexedDb';
 import { supabase } from '@/lib/supabase/client';
@@ -146,5 +147,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 /** Runs the identity query for as long as a session exists. */
 function IdentityLoader({ children }: { children: ReactNode }) {
   useIdentity();
+
+  const identityStatus = useAuthStore((state) => state.identityStatus);
+  const activeAcademyId = useAcademyStore((state) => state.activeAcademyId);
+
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return;
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (identityStatus !== 'ready') return;
+
+    const activeId =
+      activeAcademyId ||
+      useAuthStore.getState().memberships.find((m) => m.status === 'active')?.academyId;
+
+    if (activeId) {
+      void ensurePushSubscribed(activeId);
+    }
+  }, [identityStatus, activeAcademyId]);
+
   return <>{children}</>;
 }

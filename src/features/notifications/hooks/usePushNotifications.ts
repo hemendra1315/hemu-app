@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { fetchMyMemberships } from '@/features/academies/api/academiesApi';
 import { logger } from '@/lib/logger';
-import { useUiStore } from '@/stores';
+import { useAcademyStore, useAuthStore, useUiStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
 
 export type PushPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
@@ -14,6 +16,70 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
     outputArray[i] = rawData.charCodeAt(i);
   }
   return outputArray;
+}
+
+export function detectPushPlatform(): string {
+  if (Capacitor.isNativePlatform()) {
+    return Capacitor.getPlatform();
+  }
+  if (typeof navigator !== 'undefined') {
+    if (/android/i.test(navigator.userAgent)) return 'android';
+    if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return 'ios';
+  }
+  return 'web';
+}
+
+export function extractFcmToken(endpoint: string): string | null {
+  if (endpoint.includes('fcm.googleapis.com')) {
+    const parts = endpoint.split('/');
+    return parts[parts.length - 1] || null;
+  }
+  return null;
+}
+
+export async function resolveUserAcademyId(userId?: string): Promise<string | null> {
+  // 1. Primary: activeAcademyId from useAcademyStore
+  const activeAcademyId = useAcademyStore.getState().activeAcademyId;
+  if (activeAcademyId) return activeAcademyId;
+
+  // 2. Secondary: active memberships stored in useAuthStore
+  const storeMemberships = useAuthStore.getState().memberships;
+  const activeStoreMembership = storeMemberships.find((m) => m.status === 'active');
+  if (activeStoreMembership?.academyId) {
+    return activeStoreMembership.academyId;
+  }
+
+  // 3. Fallback: Query live memberships directly from Supabase
+  try {
+    const liveMemberships = await fetchMyMemberships();
+    const activeLiveMembership = liveMemberships.find((m) => m.status === 'active');
+    if (activeLiveMembership?.academyId) {
+      return activeLiveMembership.academyId;
+    }
+  } catch (err) {
+    logger.warn('resolve_user_academy_error', { userId, error: String(err) });
+  }
+
+  // 4. Fallback: Check if user owns an active academy
+  if (userId) {
+    try {
+      const { data: ownerAcademy } = await supabase
+        .from('academies')
+        .select('id')
+        .eq('owner_user_id', userId)
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (ownerAcademy?.id) {
+        return ownerAcademy.id;
+      }
+    } catch (err) {
+      logger.warn('resolve_owner_academy_error', { userId, error: String(err) });
+    }
+  }
+
+  return null;
 }
 
 export function usePushNotifications() {
@@ -72,7 +138,7 @@ export function usePushNotifications() {
   }, []);
 
   const subscribe = useCallback(
-    async (vapidKey?: string): Promise<boolean> => {
+    async (vapidKey?: string, explicitAcademyId?: string): Promise<boolean> => {
       if (typeof window === 'undefined' || !('Notification' in window)) {
         pushToast({
           title: 'Notifications not supported',
@@ -111,28 +177,52 @@ export function usePushNotifications() {
         setIsSubscribed(true);
         logger.info('push_subscription_success', { endpoint: subscription.endpoint });
 
-        // Persist subscription in push_subscriptions table if authenticated
-        try {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          if (user) {
-            const keys = subscription.toJSON().keys as { p256dh: string; auth: string } | undefined;
-            if (keys?.p256dh && keys?.auth) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              await (supabase as any).from('push_subscriptions').upsert(
-                {
-                  user_id: user.id,
-                  endpoint: subscription.endpoint,
-                  p256dh: keys.p256dh,
-                  auth: keys.auth,
-                },
-                { onConflict: 'user_id,endpoint' },
+        // Persist subscription in push_subscriptions table with verified academy_id
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const resolvedAcademyId = explicitAcademyId || (await resolveUserAcademyId(user.id));
+
+          if (!resolvedAcademyId) {
+            const err = new Error('No valid active academy membership found for push subscription');
+            logger.error('push_subscription_missing_academy', {
+              error: err.message,
+              userId: user.id,
+            });
+            throw err;
+          }
+
+          const keys = subscription.toJSON().keys as { p256dh: string; auth: string } | undefined;
+          if (keys?.p256dh && keys?.auth) {
+            const platform = detectPushPlatform();
+            const fcmToken = extractFcmToken(subscription.endpoint);
+
+            const { error: dbError } = await supabase.from('push_subscriptions').upsert(
+              {
+                user_id: user.id,
+                academy_id: resolvedAcademyId,
+                endpoint: subscription.endpoint,
+                p256dh: keys.p256dh,
+                auth: keys.auth,
+                platform,
+                fcm_token: fcmToken,
+              },
+              { onConflict: 'user_id,endpoint' },
+            );
+
+            if (dbError) {
+              logger.error('push_db_persist_failed', {
+                error: dbError.message,
+                academyId: resolvedAcademyId,
+                userId: user.id,
+              });
+              throw new Error(
+                `Failed to persist push subscription in database: ${dbError.message}`,
               );
             }
           }
-        } catch (dbErr) {
-          logger.warn('push_db_persist_skipped', { error: String(dbErr) });
         }
 
         pushToast({
