@@ -2,7 +2,25 @@ import { registerSW } from 'virtual:pwa-register';
 
 import { logger } from './lib/logger';
 import { ensurePushSubscribed } from './lib/push/pushSubscription';
+import { isNativePush, initNativePush } from './lib/push/nativePush';
 import { supabase } from './lib/supabase/client';
+
+async function findActiveAcademyId(): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: membership } = await supabase
+    .from('academy_members')
+    .select('academy_id')
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .limit(1)
+    .single();
+
+  return membership?.academy_id ?? null;
+}
 
 /**
  * Registers the generated service worker. `registerType: 'prompt'` means a new
@@ -12,6 +30,13 @@ import { supabase } from './lib/supabase/client';
  * that the stored endpoint in Supabase is always current.
  */
 export function registerPwa(): void {
+  if (isNativePush()) {
+    void findActiveAcademyId()
+      .then((academyId) => initNativePush(academyId))
+      .catch((err) => logger.debug('native_push_init_skipped', { reason: String(err) }));
+    return;
+  }
+
   if (import.meta.env.DEV) return;
 
   const updateSW = registerSW({
