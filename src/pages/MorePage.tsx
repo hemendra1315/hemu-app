@@ -42,6 +42,7 @@ export function MorePage() {
   const testModeRole = useTestModeStore((s) => s.activeRole);
 
   const canReadAttendance = useCan('attendance:read');
+  const canMarkAttendance = useCan('attendance:mark');
   const canReadMatches = useCan('matches:read');
   const canReadDrills = useCan('drills:read');
   const canManageMembers = useCan('members:manage');
@@ -91,7 +92,7 @@ export function MorePage() {
   ];
 
   const activityItems: (MenuItem | false)[] = [
-    canReadAttendance && {
+    canMarkAttendance && {
       to: '/attendance',
       label: 'Attendance & Analytics',
       desc: 'Attendance registers, records & monthly trends',

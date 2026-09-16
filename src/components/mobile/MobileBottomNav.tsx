@@ -95,7 +95,7 @@ export function MobileBottomNav() {
     testModeRole === 'student' ||
     (!testModeRole && !canUpdateAcademy && role === 'player')
   ) {
-    // Student / Player: Home | Attendance | Sessions | Matches | More
+    // Student / Player: Home | Sessions | Matches | Profile | More
     items = [
       {
         key: 'home',
@@ -103,13 +103,6 @@ export function MobileBottomNav() {
         label: 'Home',
         icon: Home,
         matchPrefixes: ['/player', '/dashboard', '/me'],
-      },
-      {
-        key: 'attendance',
-        to: '/attendance',
-        label: 'Attendance',
-        icon: UserCheck,
-        matchPrefixes: ['/attendance'],
       },
       {
         key: 'sessions',
@@ -126,18 +119,25 @@ export function MobileBottomNav() {
         matchPrefixes: ['/matches'],
       },
       {
+        key: 'profile',
+        to: '/profile',
+        label: 'Profile',
+        icon: User,
+        matchPrefixes: ['/profile'],
+      },
+      {
         key: 'more',
         to: '/more',
         label: 'More',
         icon: MoreHorizontal,
-        matchPrefixes: ['/more', '/profile', '/stats', '/drills'],
+        matchPrefixes: ['/more', '/stats', '/drills'],
       },
     ];
   } else if (
     testModeRole === 'parent' ||
     (!testModeRole && !canUpdateAcademy && role === 'parent')
   ) {
-    // Parent: Home | Attendance | Profile | More
+    // Parent: Home | Profile | More
     items = [
       {
         key: 'home',
@@ -145,13 +145,6 @@ export function MobileBottomNav() {
         label: 'Home',
         icon: Home,
         matchPrefixes: ['/parent/dashboard', '/dashboard'],
-      },
-      {
-        key: 'attendance',
-        to: '/attendance',
-        label: 'Attendance',
-        icon: UserCheck,
-        matchPrefixes: ['/attendance'],
       },
       {
         key: 'profile',

@@ -95,7 +95,7 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     to: '/attendance',
     label: 'Attendance',
     icon: <UserCheck className="h-4 w-4" aria-hidden />,
-    requiresCapability: 'attendance:read',
+    requiresCapability: 'attendance:mark',
     group: 'Training',
   },
   {
