@@ -18,6 +18,10 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === 'true'),
+  VITE_ENABLE_E2E_HOOKS: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
 });
 
 const parsed = envSchema.safeParse(import.meta.env);
@@ -38,6 +42,7 @@ export const env = {
   sentryDsn: parsed.data.VITE_SENTRY_DSN,
   logLevel: parsed.data.VITE_LOG_LEVEL,
   enableDevtools: parsed.data.VITE_ENABLE_DEVTOOLS,
+  enableE2EHooks: parsed.data.VITE_ENABLE_E2E_HOOKS ?? false,
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
 } as const;

@@ -45,8 +45,14 @@ const signedOutState = {
   signingOut: false,
 } satisfies Partial<AuthState>;
 
+const isE2EAllowed = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') return true;
+  return import.meta.env.VITE_ENABLE_E2E_HOOKS === 'true';
+};
+
 const getInitialState = (): Partial<AuthState> => {
-  if (typeof window !== 'undefined') {
+  if (isE2EAllowed()) {
     const storedAuth = sessionStorage.getItem('cam.e2e_auth');
     if (storedAuth) {
       try {

@@ -26,6 +26,12 @@ declare global {
   }
 }
 
+const isE2EAllowed = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') return true;
+  return import.meta.env.VITE_ENABLE_E2E_HOOKS === 'true';
+};
+
 /**
  * Bridges Supabase auth events into the auth store, then loads the identity
  * (profile, memberships, pending join requests) that routing depends on.
@@ -35,8 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    const e2eAllowed = isE2EAllowed();
 
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && e2eAllowed) {
       window.__E2E_SET_AUTH__ = (data) => {
         if (data.user) {
           sessionStorage.setItem('cam.e2e_auth', JSON.stringify(data));
@@ -92,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data }) => {
         const isE2E = Boolean(
-          typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
+          e2eAllowed && typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
         );
         if (
           active &&
@@ -109,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch((error: unknown) => {
         logger.error('session_bootstrap_failed', { error: String(error) });
         const isE2E = Boolean(
-          typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
+          e2eAllowed && typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
         );
         if (
           active &&
@@ -124,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
       logger.debug('auth_state_change', { event });
       const isE2E = Boolean(
-        typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
+        e2eAllowed && typeof window !== 'undefined' && sessionStorage.getItem('cam.e2e_auth'),
       );
       if (
         !isE2E &&
