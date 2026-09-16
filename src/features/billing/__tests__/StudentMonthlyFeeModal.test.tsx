@@ -118,4 +118,33 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     expect(screen.getByText(/Pass Active/i)).toBeInTheDocument();
     expect(screen.getByText(/Rohan Patel/i)).toBeInTheDocument();
   });
+
+  it('renders 1-tap WhatsApp share button on active receipt with pre-filled message', async () => {
+    render(
+      <StudentMonthlyFeeModal
+        open={true}
+        onClose={vi.fn()}
+        studentId="student_whatsapp"
+        studentName="Virat Kohli"
+        studentEmail="virat@gmail.com"
+        academyId="acad_1"
+        academyName="Royal Cricket Academy"
+      />,
+    );
+
+    const submitBtn = screen.getByRole('button', { name: /Confirm & Activate Pass/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Share Receipt on WhatsApp/i)).toBeInTheDocument();
+    });
+
+    const whatsappLink = screen.getByRole('link', { name: /Share Receipt on WhatsApp/i });
+    expect(whatsappLink).toHaveAttribute(
+      'href',
+      expect.stringContaining('api.whatsapp.com/send?text='),
+    );
+    expect(whatsappLink.getAttribute('href')).toContain('Virat%20Kohli');
+    expect(whatsappLink.getAttribute('href')).toContain('Royal%20Cricket%20Academy');
+  });
 });

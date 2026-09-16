@@ -9,6 +9,7 @@ import {
   FileCheck,
   CheckCircle2,
   UserCheck,
+  MessageCircle,
 } from 'lucide-react';
 import { Modal, Button, Input } from '@/components/ui';
 import {
@@ -16,6 +17,7 @@ import {
   STUDENT_MONTHLY_FEE_AMOUNT,
   getCurrentMonthKey,
   getCurrentMonthLabel,
+  getStudentPaymentForMonth,
   recordStudentFeePayment,
   type StudentFeePayment,
 } from '../api/studentFeeStore';
@@ -46,16 +48,21 @@ export function StudentMonthlyFeeModal({
   const currentMonthLabel = getCurrentMonthLabel();
   const fileInputId = useId();
 
+  const existingPayment = getStudentPaymentForMonth(studentId, currentMonthKey);
+
   const [registeredName, setRegisteredName] = useState(studentName || '');
   const [payerName, setPayerName] = useState('');
   const [screenshotData, setScreenshotData] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [submittedPayment, setSubmittedPayment] = useState<StudentFeePayment | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const pushToast = useUiStore((s) => s.pushToast);
+
+  const activeReceipt =
+    submittedPayment ||
+    (existingPayment && existingPayment.status === 'verified' ? existingPayment : null);
 
   const copyUpiId = async () => {
     try {
@@ -118,7 +125,6 @@ export function StudentMonthlyFeeModal({
       });
 
       setSubmittedPayment(payment);
-      setIsSuccess(true);
       pushToast({
         title: 'Monthly Pass Activated! 🎉',
         description: `₹${STUDENT_MONTHLY_FEE_AMOUNT} pass activated for ${cleanName} (${currentMonthLabel}).`,
@@ -140,21 +146,42 @@ export function StudentMonthlyFeeModal({
     setRegisteredName(studentName || '');
     setPayerName('');
     setScreenshotData(undefined);
-    setIsSuccess(false);
+    setSubmittedPayment(null);
     setErrorMessage(null);
     onClose();
   };
 
   const upiIntentUrl = `upi://pay?pa=${FAMPAY_UPI_ID}&pn=CAM%20App&am=${STUDENT_MONTHLY_FEE_AMOUNT}&cu=INR&tn=CAM%20Student%20Pass%20${encodeURIComponent(currentMonthLabel)}`;
 
+  const generateWhatsAppUrl = (p: StudentFeePayment) => {
+    const formattedDate = new Date(p.paidAt).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+
+    const text =
+      `🏏 *CRICKET ACADEMY MANAGER — OFFICIAL RECEIPT* 🏏\n\n` +
+      `✅ *Payment Status:* Verified & Paid\n` +
+      `👤 *Player Name:* ${p.studentName}\n` +
+      `🏢 *Academy:* ${p.academyName}\n` +
+      `📅 *Month:* ${p.monthLabel} Pass\n` +
+      `💰 *Amount:* ₹${p.amount}.00\n` +
+      (p.payerName ? `💳 *UPI Sender / Note:* ${p.payerName}\n` : '') +
+      `🕒 *Date:* ${formattedDate}\n\n` +
+      `🎉 *Monthly training drills, match stats & attendance pass are now active!*`;
+
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  };
+
   return (
     <Modal
       open={open}
       onClose={handleResetAndClose}
-      title={isSuccess ? 'Payment Confirmed' : `Monthly Pass · ₹${STUDENT_MONTHLY_FEE_AMOUNT}`}
+      title={activeReceipt ? 'Payment Receipt' : `Monthly Pass · ₹${STUDENT_MONTHLY_FEE_AMOUNT}`}
       size="md"
     >
-      {isSuccess && submittedPayment ? (
+      {activeReceipt ? (
         <div className="space-y-5 py-3 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500 ring-4 ring-emerald-500/20">
             <CheckCircle2 className="h-8 w-8" />
@@ -163,31 +190,31 @@ export function StudentMonthlyFeeModal({
           <div>
             <h3 className="text-fg text-xl font-bold tracking-tight">Pass Active!</h3>
             <p className="text-fg-muted mt-1 text-sm">
-              All features unlocked for <strong>{submittedPayment.monthLabel}</strong>.
+              All features unlocked for <strong>{activeReceipt.monthLabel}</strong>.
             </p>
           </div>
 
           <div className="bg-surface-muted/60 border-border-subtle divide-border-subtle divide-y rounded-2xl border text-left text-xs">
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-fg-muted font-medium">Player Name</span>
-              <span className="text-fg font-semibold">{submittedPayment.studentName}</span>
+              <span className="text-fg font-semibold">{activeReceipt.studentName}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-fg-muted font-medium">Academy</span>
-              <span className="text-fg font-semibold">{submittedPayment.academyName}</span>
+              <span className="text-fg font-semibold">{activeReceipt.academyName}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-fg-muted font-medium">Billing Period</span>
-              <span className="text-fg font-semibold">{submittedPayment.monthLabel}</span>
+              <span className="text-fg font-semibold">{activeReceipt.monthLabel}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-fg-muted font-medium">Amount</span>
-              <span className="font-bold text-emerald-500">₹{submittedPayment.amount}</span>
+              <span className="font-bold text-emerald-500">₹{activeReceipt.amount}</span>
             </div>
-            {submittedPayment.payerName && (
+            {activeReceipt.payerName && (
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-fg-muted font-medium">UPI Sender</span>
-                <span className="text-fg font-medium">{submittedPayment.payerName}</span>
+                <span className="text-fg font-medium">{activeReceipt.payerName}</span>
               </div>
             )}
             <div className="flex items-center justify-between px-4 py-2.5">
@@ -198,7 +225,23 @@ export function StudentMonthlyFeeModal({
             </div>
           </div>
 
-          <Button className="w-full font-bold" size="lg" onClick={handleResetAndClose}>
+          {/* 1-Tap WhatsApp Share Button */}
+          <a
+            href={generateWhatsAppUrl(activeReceipt)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#20bd5a] active:scale-[0.98]"
+          >
+            <MessageCircle className="h-4 w-4 fill-white" />
+            <span>Share Receipt on WhatsApp</span>
+          </a>
+
+          <Button
+            className="w-full font-bold"
+            variant="secondary"
+            size="lg"
+            onClick={handleResetAndClose}
+          >
             Done
           </Button>
         </div>
