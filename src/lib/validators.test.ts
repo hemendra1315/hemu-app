@@ -26,20 +26,17 @@ describe('joinAcademyFormSchema', () => {
 });
 
 describe('createAcademyFormSchema', () => {
-  it('requires a usable name and a known fee mode', () => {
+  it('requires a usable name', () => {
     expect(
       createAcademyFormSchema.safeParse({
         name: 'A',
         timezone: 'Asia/Kolkata',
-        feeMode: 'player_pays',
       }).success,
     ).toBe(false);
 
     expect(
       createAcademyFormSchema.safeParse({
-        name: 'Chennai Academy',
         timezone: 'Asia/Kolkata',
-        feeMode: 'someone_else_pays',
       }).success,
     ).toBe(false);
 
@@ -48,7 +45,6 @@ describe('createAcademyFormSchema', () => {
         name: '  Chennai Academy ',
         city: 'Chennai',
         timezone: 'Asia/Kolkata',
-        feeMode: 'academy_pays',
       }).name,
     ).toBe('Chennai Academy');
   });

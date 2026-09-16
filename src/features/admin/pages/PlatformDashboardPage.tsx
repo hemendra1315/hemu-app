@@ -32,11 +32,13 @@ import { ConfirmDialog, EmptyState, ErrorState } from '@/components/feedback';
 import { useActiveAcademy } from '@/features/academies';
 import {
   useAllPlatformFeePayments,
-  updateStudentFeePaymentStatus,
+  useResolveStudentFeeClaim,
   type StudentFeePayment,
 } from '@/features/billing';
+import { errorMessage } from '@/lib/api';
 import { formatDate } from '@/lib/utils/date';
 import { useUiStore } from '@/stores';
+import { useCan } from '@/lib/rbac';
 import {
   usePlatformAnalytics,
   usePlatformAcademies,
@@ -64,7 +66,9 @@ export default function PlatformDashboardPage() {
     useState<StudentFeePayment | null>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<UUID | null>(null);
 
+  const canManageBilling = useCan('billing:manage');
   const { payments: allFeePayments } = useAllPlatformFeePayments();
+  const resolveClaim = useResolveStudentFeeClaim();
 
   // Create Academy Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -73,7 +77,6 @@ export default function PlatformDashboardPage() {
   const [createEmail, setCreateEmail] = useState('');
   const [createPhone, setCreatePhone] = useState('');
   const [createTimezone, setCreateTimezone] = useState('Asia/Kolkata');
-  const [createFeeMode, setCreateFeeMode] = useState<'player_pays' | 'academy_pays'>('player_pays');
 
   // Created Invite Modal state
   const [createdInviteInfo, setCreatedInviteInfo] = useState<{
@@ -143,7 +146,6 @@ export default function PlatformDashboardPage() {
         contactEmail: createEmail.trim() || undefined,
         contactPhone: createPhone.trim() || undefined,
         timezone: createTimezone,
-        feeMode: createFeeMode,
       });
 
       pushToast({ title: 'Academy created successfully', variant: 'success' });
@@ -266,18 +268,20 @@ export default function PlatformDashboardPage() {
         >
           Users ({users.length})
         </button>
-        <button
-          type="button"
-          className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm font-medium transition ${
-            activeTab === 'payments'
-              ? 'border-emerald-500 text-emerald-500'
-              : 'text-fg-muted hover:text-fg border-transparent'
-          }`}
-          onClick={() => setActiveTab('payments')}
-        >
-          <Receipt className="h-4 w-4" />
-          <span>Student Payments ({allFeePayments.length})</span>
-        </button>
+        {canManageBilling && (
+          <button
+            type="button"
+            className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3.5 py-2 text-sm font-medium transition ${
+              activeTab === 'payments'
+                ? 'border-emerald-500 text-emerald-500'
+                : 'text-fg-muted hover:text-fg border-transparent'
+            }`}
+            onClick={() => setActiveTab('payments')}
+          >
+            <Receipt className="h-4 w-4" />
+            <span>Student Payments ({allFeePayments.length})</span>
+          </button>
+        )}
       </div>
 
       {/* OVERVIEW TAB */}
@@ -889,7 +893,7 @@ export default function PlatformDashboardPage() {
       )}
 
       {/* STUDENT PAYMENTS TAB */}
-      {activeTab === 'payments' && (
+      {activeTab === 'payments' && canManageBilling && (
         <div className="space-y-6">
           {/* Summary KPIs */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
@@ -1132,12 +1136,23 @@ export default function PlatformDashboardPage() {
                                 <td className="px-2 py-3 text-right">
                                   <select
                                     value={p.status}
-                                    onChange={(e) =>
-                                      updateStudentFeePaymentStatus(
-                                        p.id,
-                                        e.target.value as 'verified' | 'pending' | 'rejected',
-                                      )
-                                    }
+                                    disabled={resolveClaim.isPending}
+                                    onChange={(e) => {
+                                      const nextStatus = e.target.value as
+                                        'verified' | 'pending' | 'rejected';
+                                      resolveClaim.mutate(
+                                        { payment: p, status: nextStatus },
+                                        {
+                                          onError: (err) => {
+                                            pushToast({
+                                              title: 'Could not update payment status',
+                                              description: errorMessage(err),
+                                              variant: 'error',
+                                            });
+                                          },
+                                        },
+                                      );
+                                    }}
                                     className={`rounded-lg border px-2 py-1 text-xs font-bold transition ${
                                       p.status === 'verified'
                                         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
@@ -1382,36 +1397,20 @@ export default function PlatformDashboardPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-fg mb-1 block text-sm font-medium" htmlFor="create-timezone">
-                Timezone
-              </label>
-              <Select
-                id="create-timezone"
-                value={createTimezone}
-                onChange={(e) => setCreateTimezone(e.target.value)}
-              >
-                <option value="Asia/Kolkata">Asia/Kolkata</option>
-                <option value="Asia/Dubai">Asia/Dubai</option>
-                <option value="Asia/Colombo">Asia/Colombo</option>
-                <option value="UTC">UTC</option>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-fg mb-1 block text-sm font-medium" htmlFor="create-feemode">
-                Fee Mode
-              </label>
-              <Select
-                id="create-feemode"
-                value={createFeeMode}
-                onChange={(e) => setCreateFeeMode(e.target.value as 'player_pays' | 'academy_pays')}
-              >
-                <option value="player_pays">Player Pays</option>
-                <option value="academy_pays">Academy Pays</option>
-              </Select>
-            </div>
+          <div>
+            <label className="text-fg mb-1 block text-sm font-medium" htmlFor="create-timezone">
+              Timezone
+            </label>
+            <Select
+              id="create-timezone"
+              value={createTimezone}
+              onChange={(e) => setCreateTimezone(e.target.value)}
+            >
+              <option value="Asia/Kolkata">Asia/Kolkata</option>
+              <option value="Asia/Dubai">Asia/Dubai</option>
+              <option value="Asia/Colombo">Asia/Colombo</option>
+              <option value="UTC">UTC</option>
+            </Select>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

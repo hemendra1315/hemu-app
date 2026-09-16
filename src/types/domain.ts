@@ -1,4 +1,4 @@
-import type { AppRole, FeeMode, JoinStatus, MemberStatus } from './enums';
+import type { AppRole, JoinStatus, MemberStatus } from './enums';
 
 /**
  * Camel-cased domain types. Row → domain mapping lives in the feature api
@@ -44,7 +44,6 @@ export type Academy = AcademySummary & {
   state: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
-  feeMode: FeeMode;
   defaultMonthlyFeePaise: number;
   gracePeriodDays: number;
   ownerUserId: UUID;

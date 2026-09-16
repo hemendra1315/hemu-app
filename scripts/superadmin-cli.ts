@@ -123,7 +123,6 @@ async function createAcademyCommand(options: {
   contactEmail?: string;
   contactPhone?: string;
   timezone?: string;
-  feeMode?: string;
 }) {
   const supabase = getSupabaseClient();
   const { data: owner, error } = await supabase
@@ -143,7 +142,6 @@ async function createAcademyCommand(options: {
     p_contact_email: options.contactEmail ?? null,
     p_contact_phone: options.contactPhone ?? null,
     p_timezone: options.timezone ?? 'Asia/Kolkata',
-    p_fee_mode: options.feeMode ?? 'player_pays',
   });
 
   if (rpcError) {
@@ -303,7 +301,6 @@ authCommand
   .option('--contact-email <email>', 'Contact email')
   .option('--contact-phone <phone>', 'Contact phone')
   .option('--timezone <timezone>', 'Timezone', 'Asia/Kolkata')
-  .option('--fee-mode <mode>', 'Fee mode (player_pays, academy_pays, hybrid)', 'player_pays')
   .action(async (options) => {
     try {
       await authenticateSuperAdmin(program.opts().email, program.opts().password);

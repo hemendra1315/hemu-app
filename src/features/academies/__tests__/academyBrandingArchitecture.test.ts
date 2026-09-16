@@ -20,7 +20,6 @@ vi.mock('@/lib/supabase/client', () => {
       timezone: 'Europe/London',
       contact_email: 'info@lords.cricket',
       contact_phone: '+44 1234567890',
-      fee_mode: 'player_pays',
       default_monthly_fee_paise: 20000,
       grace_period_days: 7,
       owner_user_id: 'user-owner-123',

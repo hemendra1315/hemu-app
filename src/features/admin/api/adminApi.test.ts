@@ -190,7 +190,6 @@ describe('adminApi', () => {
         p_contact_email: payload.contactEmail,
         p_contact_phone: payload.contactPhone,
         p_timezone: 'Asia/Kolkata',
-        p_fee_mode: 'player_pays',
       });
       expect(result).toEqual({
         id: 'acad-new',
@@ -222,7 +221,6 @@ describe('adminApi', () => {
         p_contact_email: null,
         p_contact_phone: null,
         p_timezone: 'Asia/Kolkata',
-        p_fee_mode: 'player_pays',
       });
     });
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import {
   Copy,
@@ -24,6 +25,7 @@ import {
 import { FormField } from '@/components/form';
 import { MobilePageHeader } from '@/components/mobile';
 import { errorMessage } from '@/lib/api';
+import { academySettingsFormSchema, type AcademySettingsFormValues } from '@/lib/validators';
 import { useUiStore } from '@/stores';
 import type { UUID } from '@/types';
 import {
@@ -35,13 +37,7 @@ import {
 } from '../hooks/useAcademies';
 import { uploadAcademyLogo, removeAcademyLogo } from '../api/academiesApi';
 
-interface FormValues {
-  name: string;
-  city: string;
-  contactEmail: string;
-  contactPhone: string;
-  timezone: string;
-}
+type FormValues = AcademySettingsFormValues;
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -70,6 +66,7 @@ export default function AcademySettingsPage() {
     control,
     formState: { errors, isDirty },
   } = useForm<FormValues>({
+    resolver: zodResolver(academySettingsFormSchema),
     defaultValues: {
       name: '',
       city: '',
@@ -98,9 +95,9 @@ export default function AcademySettingsPage() {
     try {
       await updateAcademy.mutateAsync({
         name: values.name.trim(),
-        city: values.city.trim() || null,
-        contactEmail: values.contactEmail.trim() || null,
-        contactPhone: values.contactPhone.trim() || null,
+        city: values.city || null,
+        contactEmail: values.contactEmail || null,
+        contactPhone: values.contactPhone || null,
         timezone: values.timezone,
       });
       pushToast({ title: 'Academy settings saved', variant: 'success' });
@@ -319,11 +316,7 @@ export default function AcademySettingsPage() {
           <CardBody className="space-y-4 p-5 sm:p-6">
             <FormField label="Academy Name" required error={errors.name?.message}>
               {(field) => (
-                <Input
-                  {...field}
-                  {...register('name', { required: 'Academy name is required' })}
-                  hasError={Boolean(errors.name)}
-                />
+                <Input {...field} {...register('name')} hasError={Boolean(errors.name)} />
               )}
             </FormField>
 
@@ -355,6 +348,7 @@ export default function AcademySettingsPage() {
                     {...register('contactEmail')}
                     type="email"
                     placeholder="info@academy.com"
+                    hasError={Boolean(errors.contactEmail)}
                   />
                 )}
               </FormField>
@@ -366,6 +360,7 @@ export default function AcademySettingsPage() {
                     {...register('contactPhone')}
                     type="tel"
                     placeholder="+91 9876543210"
+                    hasError={Boolean(errors.contactPhone)}
                   />
                 )}
               </FormField>

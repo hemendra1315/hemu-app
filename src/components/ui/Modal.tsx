@@ -1,8 +1,9 @@
 import { X } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/utils/cn';
+import { useOverlayStackStore } from '@/stores';
 
 import { Button } from './Button';
 
@@ -19,6 +20,10 @@ const SIZES = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' } as const;
 
 /** Portal dialog with Escape-to-close and scroll locking. */
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+  const overlayId = useId();
+  const pushOverlay = useOverlayStackStore((state) => state.pushOverlay);
+  const popOverlay = useOverlayStackStore((state) => state.popOverlay);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -31,6 +36,15 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
       document.body.style.overflow = '';
     };
   }, [open, onClose]);
+
+  // Registers this modal on the shared overlay stack while it is open, so a
+  // single top-level Android back-button listener (see App.tsx) can close
+  // whichever modal is topmost without every modal owning its own listener.
+  useEffect(() => {
+    if (!open) return;
+    pushOverlay(overlayId, onClose);
+    return () => popOverlay(overlayId);
+  }, [open, onClose, overlayId, pushOverlay, popOverlay]);
 
   if (!open) return null;
 

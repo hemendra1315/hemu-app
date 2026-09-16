@@ -1,7 +1,6 @@
 import type {
   MonthlyAttendanceReportData,
   PlayerPerformanceReportData,
-  FeeDuesReportData,
   BatchScheduleReportData,
 } from '../types';
 import { generateCsvString } from './csvExporter';
@@ -154,54 +153,6 @@ export function generatePlayerPerformanceCsv(data: PlayerPerformanceReportData):
     for (const note of data.coachNotes) {
       rows.push([note]);
     }
-  }
-
-  return generateCsvString(rows);
-}
-
-/**
- * Builds CSV string for Fee Collection & Outstanding Dues Summary.
- */
-export function generateFeeDuesCsv(data: FeeDuesReportData): string {
-  const rows: (string | number | boolean | null | undefined)[][] = [];
-
-  rows.push(['FEE COLLECTION & DUES SUMMARY']);
-  rows.push(['Academy:', data.academyName]);
-  rows.push(['Generated At:', data.generatedAt]);
-  rows.push(['Total Receivable:', formatPaiseForExport(data.totalReceivablePaise)]);
-  rows.push(['Total Collected:', formatPaiseForExport(data.totalCollectedPaise)]);
-  rows.push(['Total Overdue:', formatPaiseForExport(data.totalOverduePaise)]);
-  rows.push(['Collection Rate:', `${data.collectionRatePercent.toFixed(1)}%`]);
-  rows.push([]);
-
-  rows.push([
-    'Player Name',
-    'Batch',
-    'Plan',
-    'Total Due',
-    'Paid',
-    'Balance Due',
-    'Status',
-    'Due Date',
-    'Parent Name',
-    'Parent Phone',
-    'Last Payment Date',
-  ]);
-
-  for (const r of data.records) {
-    rows.push([
-      r.playerName,
-      r.batchName,
-      r.planName,
-      formatPaiseForExport(r.amountDuePaise),
-      formatPaiseForExport(r.amountPaidPaise),
-      formatPaiseForExport(r.balanceDuePaise),
-      r.status.toUpperCase(),
-      r.dueDate,
-      r.parentName || '-',
-      r.parentPhone || '-',
-      r.lastPaymentDate || '-',
-    ]);
   }
 
   return generateCsvString(rows);

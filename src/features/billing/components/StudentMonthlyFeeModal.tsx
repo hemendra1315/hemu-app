@@ -12,16 +12,17 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import { Modal, Button, Input } from '@/components/ui';
+import { errorMessage } from '@/lib/api';
 import {
   FAMPAY_UPI_ID,
   STUDENT_MONTHLY_FEE_AMOUNT,
-  getCurrentMonthKey,
-  getCurrentMonthLabel,
-  getStudentPaymentForMonth,
-  recordStudentFeePayment,
+  useStudentFeePayment,
+  useSubmitStudentFeeClaim,
   type StudentFeePayment,
 } from '../api/studentFeeStore';
 import { useUiStore } from '@/stores';
+
+const MAX_RECEIPT_SIZE_BYTES = 5 * 1024 * 1024;
 
 interface StudentMonthlyFeeModalProps {
   open: boolean;
@@ -44,20 +45,24 @@ export function StudentMonthlyFeeModal({
   academyName,
   onPaymentSuccess,
 }: StudentMonthlyFeeModalProps) {
-  const currentMonthKey = getCurrentMonthKey();
-  const currentMonthLabel = getCurrentMonthLabel();
   const fileInputId = useId();
 
-  const existingPayment = getStudentPaymentForMonth(studentId, currentMonthKey);
+  const {
+    payment: existingPayment,
+    currentMonthKey,
+    currentMonthLabel,
+    refreshPayment,
+  } = useStudentFeePayment(studentId);
+  const submitClaim = useSubmitStudentFeeClaim(studentId);
 
   const [registeredName, setRegisteredName] = useState(studentName || '');
   const [payerName, setPayerName] = useState('');
-  const [screenshotData, setScreenshotData] = useState<string | undefined>(undefined);
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedPayment, setSubmittedPayment] = useState<StudentFeePayment | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
+  const isSubmitting = submitClaim.isPending;
   const pushToast = useUiStore((s) => s.pushToast);
 
   const activeReceipt =
@@ -80,7 +85,7 @@ export function StudentMonthlyFeeModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_RECEIPT_SIZE_BYTES) {
       pushToast({
         title: 'File too large',
         description: 'Please upload a screenshot under 5MB.',
@@ -89,50 +94,50 @@ export function StudentMonthlyFeeModal({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setScreenshotData(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      pushToast({
+        title: 'Unsupported file type',
+        description: 'Please upload an image (PNG, JPG, WEBP, or HEIC).',
+        variant: 'error',
+      });
+      return;
+    }
+
+    setScreenshotFile(file);
   };
 
   const cleanName = registeredName.trim();
   const isValidName = cleanName.length >= 2;
-  const hasScreenshot = Boolean(screenshotData);
+  const hasScreenshot = Boolean(screenshotFile);
   const isValidSubmission = isValidName && hasScreenshot;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
+    setFormError(null);
 
     if (!isValidName) {
-      setErrorMessage('Please enter your full name as registered in the app.');
+      setFormError('Please enter your full name as registered in the app.');
       return;
     }
 
-    if (!hasScreenshot) {
-      setErrorMessage('Please attach a screenshot of your UPI payment receipt.');
+    if (!screenshotFile) {
+      setFormError('Please attach a screenshot of your UPI payment receipt.');
       return;
     }
 
-    setIsSubmitting(true);
     try {
-      const payment = recordStudentFeePayment(
-        {
-          studentId,
-          studentName: cleanName,
-          registeredName: cleanName,
-          payerName: payerName.trim() || undefined,
-          studentEmail,
-          academyId,
-          academyName,
-          monthKey: currentMonthKey,
-          monthLabel: currentMonthLabel,
-          amount: STUDENT_MONTHLY_FEE_AMOUNT,
-          screenshotUrl: screenshotData,
-        },
-        'pending',
-      );
+      const payment = await submitClaim.mutateAsync({
+        studentName: cleanName,
+        registeredName: cleanName,
+        payerName: payerName.trim() || undefined,
+        studentEmail,
+        academyId,
+        academyName,
+        monthKey: currentMonthKey,
+        monthLabel: currentMonthLabel,
+        amount: STUDENT_MONTHLY_FEE_AMOUNT,
+        receiptFile: screenshotFile,
+      });
 
       setSubmittedPayment(payment);
       pushToast({
@@ -144,20 +149,23 @@ export function StudentMonthlyFeeModal({
       if (onPaymentSuccess) {
         onPaymentSuccess(payment);
       }
-    } catch {
-      setErrorMessage('Unable to record payment. Please try again.');
-      pushToast({ title: 'Payment recording failed', variant: 'error' });
-    } finally {
-      setIsSubmitting(false);
+    } catch (err) {
+      const message = errorMessage(err);
+      setFormError(message);
+      pushToast({ title: 'Payment submission failed', description: message, variant: 'error' });
+      // Re-sync with Supabase in case the claim actually landed (e.g. a
+      // timeout after the insert succeeded) so the UI never disagrees with
+      // the database.
+      refreshPayment();
     }
   };
 
   const handleResetAndClose = () => {
     setRegisteredName(studentName || '');
     setPayerName('');
-    setScreenshotData(undefined);
+    setScreenshotFile(null);
     setSubmittedPayment(null);
-    setErrorMessage(null);
+    setFormError(null);
     onClose();
   };
 
@@ -401,7 +409,7 @@ export function StudentMonthlyFeeModal({
               <p className="text-fg-muted mt-0.5 mb-1.5 text-[11px]">
                 Upload your GPay / PhonePe / Paytm / FamPay transaction screenshot.
               </p>
-              {screenshotData ? (
+              {screenshotFile ? (
                 <div className="relative flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-600 dark:text-emerald-400">
                   <div className="flex items-center gap-2">
                     <FileCheck className="h-4 w-4 shrink-0" />
@@ -409,7 +417,7 @@ export function StudentMonthlyFeeModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setScreenshotData(undefined)}
+                    onClick={() => setScreenshotFile(null)}
                     className="text-fg-muted hover:text-fg p-1"
                     aria-label="Remove screenshot"
                   >
@@ -435,12 +443,12 @@ export function StudentMonthlyFeeModal({
             </div>
           </div>
 
-          {errorMessage && (
+          {formError && (
             <div
               role="alert"
               className="border-danger/30 bg-danger/10 text-danger rounded-xl border p-3 text-xs font-semibold"
             >
-              {errorMessage}
+              {formError}
             </div>
           )}
 

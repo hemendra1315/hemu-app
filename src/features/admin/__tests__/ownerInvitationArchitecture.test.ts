@@ -48,7 +48,6 @@ describe('Owner Invitation Architecture & Authorization', () => {
         name: 'Elite Super Academy',
         city: 'London',
         timezone: 'Asia/Kolkata',
-        feeMode: 'player_pays',
       });
 
       expect(mockedSupabase.rpc).toHaveBeenCalledWith('super_admin_create_academy_with_invite', {
@@ -57,7 +56,6 @@ describe('Owner Invitation Architecture & Authorization', () => {
         p_contact_email: null,
         p_contact_phone: null,
         p_timezone: 'Asia/Kolkata',
-        p_fee_mode: 'player_pays',
       });
       expect(result.id).toBe('acad-super-1');
       expect(result.invitationToken).toHaveLength(64);

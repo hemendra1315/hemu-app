@@ -2,14 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   generateMonthlyAttendanceCsv,
   generatePlayerPerformanceCsv,
-  generateFeeDuesCsv,
   generateBatchScheduleCsv,
   formatPaiseForExport,
 } from '../utils/reportGenerators';
 import type {
   MonthlyAttendanceReportData,
   PlayerPerformanceReportData,
-  FeeDuesReportData,
   BatchScheduleReportData,
 } from '../types';
 import type { UUID } from '@/types';
@@ -147,54 +145,6 @@ describe('Report CSV Generators', () => {
       expect(csv).toContain('Player of the Match');
       expect(csv).toContain('Cover Drive Masterclass');
       expect(csv).toContain('Superb fitness and match temperament.');
-    });
-  });
-
-  describe('generateFeeDuesCsv', () => {
-    it('builds fee summary and student dues ledger CSV', () => {
-      const mockData: FeeDuesReportData = {
-        academyName: 'Apex Cricket Academy',
-        generatedAt: '2026-08-20 10:00:00',
-        totalReceivablePaise: 1200000,
-        totalCollectedPaise: 800000,
-        totalOverduePaise: 400000,
-        collectionRatePercent: 66.7,
-        records: [
-          {
-            playerId: 'p1' as UUID,
-            playerName: 'Rahul Dravid',
-            batchName: 'Junior A',
-            planName: 'Quarterly',
-            amountDuePaise: 600000,
-            amountPaidPaise: 600000,
-            balanceDuePaise: 0,
-            status: 'paid',
-            dueDate: '2026-08-01',
-            lastPaymentDate: '2026-07-28',
-          },
-          {
-            playerId: 'p2' as UUID,
-            playerName: 'VVS Laxman',
-            batchName: 'Junior A',
-            planName: 'Quarterly',
-            amountDuePaise: 600000,
-            amountPaidPaise: 200000,
-            balanceDuePaise: 400000,
-            status: 'overdue',
-            dueDate: '2026-08-01',
-          },
-        ],
-      };
-
-      const csv = generateFeeDuesCsv(mockData);
-
-      expect(csv).toContain('FEE COLLECTION & DUES SUMMARY');
-      expect(csv).toContain('₹12000.00');
-      expect(csv).toContain('₹8000.00');
-      expect(csv).toContain('₹4000.00');
-      expect(csv).toContain('Rahul Dravid');
-      expect(csv).toContain('PAID');
-      expect(csv).toContain('OVERDUE');
     });
   });
 

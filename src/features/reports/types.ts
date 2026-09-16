@@ -81,29 +81,6 @@ export interface PlayerPerformanceReportData {
   coachNotes: string[];
 }
 
-export interface FeeDuesReportData {
-  academyName: string;
-  generatedAt: string;
-  totalReceivablePaise: number;
-  totalCollectedPaise: number;
-  totalOverduePaise: number;
-  collectionRatePercent: number;
-  records: Array<{
-    playerId: UUID;
-    playerName: string;
-    batchName: string;
-    parentName?: string;
-    parentPhone?: string;
-    planName: string;
-    amountDuePaise: number;
-    amountPaidPaise: number;
-    balanceDuePaise: number;
-    status: 'paid' | 'partial' | 'overdue' | 'due_soon';
-    dueDate: string;
-    lastPaymentDate?: string;
-  }>;
-}
-
 export interface BatchScheduleReportData {
   academyName: string;
   generatedAt: string;

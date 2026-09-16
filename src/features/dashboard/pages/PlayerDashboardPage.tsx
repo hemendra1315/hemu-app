@@ -23,6 +23,7 @@ import { StudentMonthlyFeeBanner } from '@/features/billing';
 import { useTestModeStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
 import { isUUID } from '@/lib/validators';
+import { useCan } from '@/lib/rbac';
 import type { UUID } from '@/types';
 
 export default function PlayerDashboardPage() {
@@ -30,6 +31,7 @@ export default function PlayerDashboardPage() {
   const { profile } = useAuth();
   const testModeRole = useTestModeStore((s) => s.activeRole);
   const queryClient = useQueryClient();
+  const canReadOwnBilling = useCan('billing:read_own');
 
   const isPlayer = membership?.role === 'player' || testModeRole === 'student';
 
@@ -165,13 +167,15 @@ export default function PlayerDashboardPage() {
       <SuperAdminAcademyActions />
 
       {/* Student Monthly App Fee (₹200 FamPay / UPI) Banner */}
-      <StudentMonthlyFeeBanner
-        studentId={studentEffectiveId}
-        studentName={studentName}
-        studentEmail={studentEmail}
-        academyId={(academyId || 'academy_1') as string}
-        academyName={academyName}
-      />
+      {canReadOwnBilling && (
+        <StudentMonthlyFeeBanner
+          studentId={studentEffectiveId}
+          studentName={studentName}
+          studentEmail={studentEmail}
+          academyId={(academyId || 'academy_1') as string}
+          academyName={academyName}
+        />
+      )}
 
       {/* 2. Stat Tiles (7 Core Cricket Metrics) */}
       {stats && (

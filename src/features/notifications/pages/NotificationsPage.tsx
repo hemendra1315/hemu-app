@@ -154,7 +154,7 @@ export function NotificationsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-fg-muted hover:text-danger h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-fg-muted hover:text-danger h-8 w-8 p-0 opacity-60 transition-opacity group-hover:opacity-100"
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteNotif.mutate(notif.id);

@@ -3,7 +3,6 @@ import type { UUID } from '@/types';
 import {
   fetchMonthlyAttendanceReportData,
   fetchPlayerPerformanceReportData,
-  fetchFeeSummaryReportData,
   fetchBatchScheduleReportData,
 } from '../api/reportsApi';
 
@@ -13,8 +12,6 @@ export const reportKeys = {
     [...reportKeys.all, 'attendance', academyId, batchId, year, month] as const,
   playerPerformance: (academyId: UUID, playerId: UUID, start?: string, end?: string) =>
     [...reportKeys.all, 'player-performance', academyId, playerId, start, end] as const,
-  feeSummary: (academyId: UUID, statusFilter?: string) =>
-    [...reportKeys.all, 'fees', academyId, statusFilter] as const,
   batchSchedule: (academyId: UUID) => [...reportKeys.all, 'batch-schedule', academyId] as const,
 };
 
@@ -52,15 +49,6 @@ export function usePlayerPerformanceReport(
     ),
     queryFn: () => fetchPlayerPerformanceReportData(academyId!, playerId!, startDate, endDate),
     enabled: Boolean(academyId && playerId),
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function useFeeSummaryReport(academyId: UUID | null | undefined, statusFilter?: string) {
-  return useQuery({
-    queryKey: reportKeys.feeSummary(academyId ?? ('' as UUID), statusFilter),
-    queryFn: () => fetchFeeSummaryReportData(academyId!, statusFilter),
-    enabled: Boolean(academyId),
     staleTime: 5 * 60 * 1000,
   });
 }

@@ -1949,6 +1949,7 @@ export type Database = {
           note: string | null
           payer_phone: string
           period_month: string
+          receipt_storage_path: string | null
           resolved_at: string | null
           resolved_by: string | null
           status: string
@@ -1960,6 +1961,7 @@ export type Database = {
           note?: string | null
           payer_phone: string
           period_month: string
+          receipt_storage_path?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
@@ -1971,6 +1973,7 @@ export type Database = {
           note?: string | null
           payer_phone?: string
           period_month?: string
+          receipt_storage_path?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string

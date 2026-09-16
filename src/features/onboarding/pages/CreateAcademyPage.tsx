@@ -10,7 +10,6 @@ import { useCreateAcademy } from '@/features/academies';
 import { errorMessage } from '@/lib/api';
 import { createAcademyFormSchema, type CreateAcademyFormValues } from '@/lib/validators';
 import { useUiStore } from '@/stores';
-import { FEE_MODES, FEE_MODE_LABELS } from '@/types/enums';
 
 const TIMEZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Colombo', 'UTC'];
 
@@ -34,7 +33,7 @@ export default function CreateAcademyPage() {
     formState: { errors },
   } = useForm<CreateAcademyFormValues>({
     resolver: zodResolver(createAcademyFormSchema),
-    defaultValues: { name: '', city: '', timezone: 'Asia/Kolkata', feeMode: 'player_pays' },
+    defaultValues: { name: '', city: '', timezone: 'Asia/Kolkata' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
@@ -42,7 +41,6 @@ export default function CreateAcademyPage() {
       name: values.name,
       city: values.city || undefined,
       timezone: values.timezone,
-      feeMode: values.feeMode,
     });
     pushToast({ title: `${academy.name} is ready`, variant: 'success' });
     void navigate('/dashboard', { replace: true });
@@ -89,22 +87,6 @@ export default function CreateAcademyPage() {
                 {TIMEZONES.map((zone) => (
                   <option key={zone} value={zone}>
                     {zone}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </FormField>
-
-          <FormField
-            label="Who pays the monthly fee?"
-            hint="You can change this later in academy settings."
-            error={errors.feeMode?.message}
-          >
-            {(field) => (
-              <Select {...field} {...register('feeMode')}>
-                {FEE_MODES.map((mode) => (
-                  <option key={mode} value={mode}>
-                    {FEE_MODE_LABELS[mode]}
                   </option>
                 ))}
               </Select>

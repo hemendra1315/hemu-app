@@ -6,6 +6,7 @@ import { Browser } from '@capacitor/browser';
 
 import { AppProviders } from '@/app/providers';
 import { router } from '@/app/router';
+import { useAndroidBackButton } from '@/app/useAndroidBackButton';
 
 /** App root: providers wrap the router. */
 export default function App() {
@@ -43,6 +44,10 @@ export default function App() {
       listenerPromise.then((listener) => listener.remove());
     };
   }, []);
+
+  // Android hardware/gesture back button — single top-level listener, see
+  // useAndroidBackButton for the native-only guard and cleanup.
+  useAndroidBackButton(router);
 
   return (
     <AppProviders>

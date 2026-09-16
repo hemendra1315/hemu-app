@@ -1,7 +1,7 @@
 import { rpc, toApiError, unwrap } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import type { Academy, JoinRequest, Membership, UUID } from '@/types';
-import type { FeeMode, JoinableRole } from '@/types/enums';
+import type { JoinableRole } from '@/types/enums';
 
 type MembershipRow = {
   membership_id: string;
@@ -83,7 +83,6 @@ function toAcademy(row: AcademyRow): Academy {
     timezone: row.timezone,
     contactEmail: row.contact_email,
     contactPhone: row.contact_phone,
-    feeMode: (settings.fee_mode as FeeMode) || 'player_pays',
     defaultMonthlyFeePaise:
       typeof settings.default_monthly_fee_paise === 'number'
         ? settings.default_monthly_fee_paise
@@ -118,7 +117,6 @@ export type CreateAcademyInput = {
   name: string;
   city?: string;
   timezone?: string;
-  feeMode?: FeeMode;
 };
 
 /**
@@ -131,7 +129,6 @@ export async function createAcademy(input: CreateAcademyInput): Promise<Academy>
       p_name: input.name,
       p_city: input.city ?? null,
       p_timezone: input.timezone ?? 'Asia/Kolkata',
-      p_fee_mode: input.feeMode ?? 'player_pays',
     });
     return toAcademy(row);
   } catch (rpcErr) {
@@ -155,7 +152,6 @@ export async function createAcademy(input: CreateAcademyInput): Promise<Academy>
             slug,
             city: input.city?.trim() || null,
             timezone: input.timezone || 'Asia/Kolkata',
-            settings: { fee_mode: input.feeMode || 'player_pays' },
             owner_user_id: authUser.id,
           })
           .select(ACADEMY_COLUMNS)
@@ -220,7 +216,6 @@ export type UpdateAcademyInput = Partial<{
   contactEmail: string | null;
   contactPhone: string | null;
   timezone: string;
-  feeMode: FeeMode;
 }>;
 
 export async function updateAcademy(academyId: UUID, input: UpdateAcademyInput): Promise<Academy> {
@@ -234,7 +229,6 @@ export async function updateAcademy(academyId: UUID, input: UpdateAcademyInput):
         ...(input.contactEmail === undefined ? null : { contact_email: input.contactEmail }),
         ...(input.contactPhone === undefined ? null : { contact_phone: input.contactPhone }),
         ...(input.timezone === undefined ? null : { timezone: input.timezone }),
-        ...(input.feeMode === undefined ? null : { settings: { fee_mode: input.feeMode } }),
       })
       .eq('id', academyId)
       .select(ACADEMY_COLUMNS)

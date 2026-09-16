@@ -38,6 +38,7 @@ export default function OwnerDashboardPage() {
   const canManagePlayers = useCan('players:manage');
   const canManageSessions = useCan('sessions:manage');
   const canManageMatches = useCan('matches:manage');
+  const canReadOwnBilling = useCan('billing:read_own');
 
   const analytics = analyticsQuery.data;
 
@@ -91,43 +92,47 @@ export default function OwnerDashboardPage() {
       <SuperAdminAcademyActions />
 
       {/* Student Monthly App Pass (₹200 FamPay QR) Notice */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 shadow-2xs">
-        <div className="text-fg flex min-w-0 items-center gap-2.5 text-xs">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 font-black text-white shadow-2xs">
-            <QrCode className="h-4 w-4" />
+      {canReadOwnBilling && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 shadow-2xs">
+            <div className="text-fg flex min-w-0 items-center gap-2.5 text-xs">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 font-black text-white shadow-2xs">
+                <QrCode className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-fg truncate font-bold">
+                  Student Monthly App Pass:{' '}
+                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                    ₹{STUDENT_MONTHLY_FEE_AMOUNT}/mo
+                  </span>
+                </p>
+                <p className="text-fg-muted truncate text-[11px]">
+                  Owners & Coaches free lifetime. Students pay ₹{STUDENT_MONTHLY_FEE_AMOUNT}{' '}
+                  directly to app via FamPay QR.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-8 shrink-0 gap-1.5 border-emerald-500/30 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
+              onClick={() => setIsFeeModalOpen(true)}
+            >
+              <QrCode className="h-3.5 w-3.5" /> Preview FamPay QR
+            </Button>
           </div>
-          <div className="min-w-0">
-            <p className="text-fg truncate font-bold">
-              Student Monthly App Pass:{' '}
-              <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
-                ₹{STUDENT_MONTHLY_FEE_AMOUNT}/mo
-              </span>
-            </p>
-            <p className="text-fg-muted truncate text-[11px]">
-              Owners & Coaches free lifetime. Students pay ₹{STUDENT_MONTHLY_FEE_AMOUNT} directly to
-              app via FamPay QR.
-            </p>
-          </div>
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="h-8 shrink-0 gap-1.5 border-emerald-500/30 text-xs font-bold text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400"
-          onClick={() => setIsFeeModalOpen(true)}
-        >
-          <QrCode className="h-3.5 w-3.5" /> Preview FamPay QR
-        </Button>
-      </div>
 
-      <StudentMonthlyFeeModal
-        open={isFeeModalOpen}
-        onClose={() => setIsFeeModalOpen(false)}
-        studentId={profile?.id || 'demo_student'}
-        studentName={profile?.fullName || 'Student Player'}
-        studentEmail={profile?.email || 'player@cam.app'}
-        academyId={(academyId || 'academy_1') as string}
-        academyName={membership?.academyName || 'Cricket Academy'}
-      />
+          <StudentMonthlyFeeModal
+            open={isFeeModalOpen}
+            onClose={() => setIsFeeModalOpen(false)}
+            studentId={profile?.id || 'demo_student'}
+            studentName={profile?.fullName || 'Student Player'}
+            studentEmail={profile?.email || 'player@cam.app'}
+            academyId={(academyId || 'academy_1') as string}
+            academyName={membership?.academyName || 'Cricket Academy'}
+          />
+        </>
+      )}
 
       {/* 2. Today's Overview (KPIs) */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">

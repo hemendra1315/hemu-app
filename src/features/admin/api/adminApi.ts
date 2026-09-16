@@ -19,7 +19,6 @@ export interface PlatformAcademy {
   logoUrl?: string | null;
   city: string | null;
   timezone: string;
-  feeMode: string;
   createdAt: string;
   ownerName: string;
   ownerEmail: string;
@@ -53,7 +52,6 @@ export interface PlatformAcademyDetails {
     slug: string;
     city: string | null;
     timezone: string;
-    feeMode: string;
     createdAt: string;
     ownerName: string;
     ownerEmail: string;
@@ -152,7 +150,6 @@ export interface CreatePlatformAcademyPayload {
   contactEmail?: string;
   contactPhone?: string;
   timezone?: string;
-  feeMode?: 'player_pays' | 'academy_pays';
 }
 
 export interface CreatedPlatformAcademyResponse {
@@ -163,7 +160,6 @@ export interface CreatedPlatformAcademyResponse {
   contactEmail?: string;
   contactPhone?: string;
   timezone: string;
-  feeMode: string;
   playerJoinCode: string;
   invitationId: UUID;
   invitationToken: string;
@@ -200,7 +196,6 @@ export async function createPlatformAcademy(
         p_contact_email: payload.contactEmail?.trim() || null,
         p_contact_phone: payload.contactPhone?.trim() || null,
         p_timezone: payload.timezone ?? 'Asia/Kolkata',
-        p_fee_mode: payload.feeMode ?? 'player_pays',
       },
     );
 
@@ -244,7 +239,6 @@ export async function createPlatformAcademy(
           p_contact_email: payload.contactEmail?.trim() || null,
           p_contact_phone: payload.contactPhone?.trim() || null,
           p_timezone: payload.timezone ?? 'Asia/Kolkata',
-          p_fee_mode: payload.feeMode ?? 'player_pays',
         },
       );
 
@@ -288,7 +282,6 @@ export async function createPlatformAcademy(
           contactEmail: payload.contactEmail,
           contactPhone: payload.contactPhone,
           timezone: payload.timezone ?? 'Asia/Kolkata',
-          feeMode: payload.feeMode ?? 'player_pays',
           playerJoinCode: 'PLAY12',
           invitationId,
           invitationToken: randomToken,
@@ -309,7 +302,6 @@ export async function createPlatformAcademy(
       p_name: payload.name.trim(),
       p_city: payload.city?.trim() || null,
       p_timezone: payload.timezone ?? 'Asia/Kolkata',
-      p_fee_mode: payload.feeMode ?? 'player_pays',
     });
 
     if (!fallbackError && fallbackData) {
@@ -363,7 +355,6 @@ export async function createPlatformAcademy(
         contactEmail: payload.contactEmail,
         contactPhone: payload.contactPhone,
         timezone: payload.timezone ?? 'Asia/Kolkata',
-        feeMode: payload.feeMode ?? 'player_pays',
         playerJoinCode: (codeData as string) || 'JOIN123',
         invitationId,
         invitationToken: randomToken,
@@ -393,7 +384,6 @@ export async function createPlatformAcademy(
           contact_email: payload.contactEmail?.trim() || null,
           contact_phone: payload.contactPhone?.trim() || null,
           timezone: payload.timezone || 'Asia/Kolkata',
-          settings: { fee_mode: payload.feeMode || 'player_pays' },
           owner_user_id: authUserId,
         })
         .select('*')
@@ -457,7 +447,6 @@ export async function createPlatformAcademy(
           contactEmail: payload.contactEmail,
           contactPhone: payload.contactPhone,
           timezone: payload.timezone ?? 'Asia/Kolkata',
-          feeMode: payload.feeMode ?? 'player_pays',
           playerJoinCode: joinCode,
           invitationId,
           invitationToken: randomToken,

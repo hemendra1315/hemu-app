@@ -38,10 +38,19 @@ export const createAcademyFormSchema = z.object({
   name: z.string().trim().min(2, 'Academy name must be at least 2 characters.').max(120),
   city: z.string().trim().max(80).optional().or(z.literal('')),
   timezone: z.string().min(1),
-  feeMode: z.enum(['player_pays', 'academy_pays']),
 });
 
 export type CreateAcademyFormValues = z.infer<typeof createAcademyFormSchema>;
+
+export const academySettingsFormSchema = z.object({
+  name: z.string().trim().min(2, 'Academy name must be at least 2 characters.').max(120),
+  city: z.string().trim().max(80).optional().or(z.literal('')),
+  contactEmail: emailSchema.optional().or(z.literal('')),
+  contactPhone: indianPhoneSchema.optional().or(z.literal('')),
+  timezone: z.string().min(1),
+});
+
+export type AcademySettingsFormValues = z.infer<typeof academySettingsFormSchema>;
 
 export const joinAcademyFormSchema = z.object({
   code: joinCodeSchema,
