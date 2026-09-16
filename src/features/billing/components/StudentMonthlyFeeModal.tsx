@@ -8,6 +8,7 @@ import {
   X,
   FileCheck,
   CheckCircle2,
+  UserCheck,
 } from 'lucide-react';
 import { Modal, Button, Input } from '@/components/ui';
 import {
@@ -45,7 +46,8 @@ export function StudentMonthlyFeeModal({
   const currentMonthLabel = getCurrentMonthLabel();
   const fileInputId = useId();
 
-  const [utr, setUtr] = useState('');
+  const [registeredName, setRegisteredName] = useState(studentName || '');
+  const [payerName, setPayerName] = useState('');
   const [screenshotData, setScreenshotData] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,15 +89,15 @@ export function StudentMonthlyFeeModal({
     reader.readAsDataURL(file);
   };
 
-  const cleanUtr = utr.trim().replace(/\D/g, '');
-  const isValidUtr = cleanUtr.length === 12;
+  const cleanName = registeredName.trim();
+  const isValidName = cleanName.length >= 2;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!isValidUtr) {
-      setErrorMessage('Please enter the valid 12-digit UPI Reference / UTR Number.');
+    if (!isValidName) {
+      setErrorMessage('Please enter your full name as registered in the app.');
       return;
     }
 
@@ -103,14 +105,15 @@ export function StudentMonthlyFeeModal({
     try {
       const payment = recordStudentFeePayment({
         studentId,
-        studentName,
+        studentName: cleanName,
+        registeredName: cleanName,
+        payerName: payerName.trim() || undefined,
         studentEmail,
         academyId,
         academyName,
         monthKey: currentMonthKey,
         monthLabel: currentMonthLabel,
         amount: STUDENT_MONTHLY_FEE_AMOUNT,
-        utr: cleanUtr,
         screenshotUrl: screenshotData,
       });
 
@@ -118,7 +121,7 @@ export function StudentMonthlyFeeModal({
       setIsSuccess(true);
       pushToast({
         title: 'Monthly Pass Activated! 🎉',
-        description: `₹200 received for ${currentMonthLabel}. Reference UTR: ${cleanUtr}`,
+        description: `₹${STUDENT_MONTHLY_FEE_AMOUNT} pass activated for ${cleanName} (${currentMonthLabel}).`,
         variant: 'success',
       });
 
@@ -134,7 +137,8 @@ export function StudentMonthlyFeeModal({
   };
 
   const handleResetAndClose = () => {
-    setUtr('');
+    setRegisteredName(studentName || '');
+    setPayerName('');
     setScreenshotData(undefined);
     setIsSuccess(false);
     setErrorMessage(null);
@@ -165,7 +169,7 @@ export function StudentMonthlyFeeModal({
 
           <div className="bg-surface-muted/60 border-border-subtle divide-border-subtle divide-y rounded-2xl border text-left text-xs">
             <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-fg-muted font-medium">Player</span>
+              <span className="text-fg-muted font-medium">Player Name</span>
               <span className="text-fg font-semibold">{submittedPayment.studentName}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
@@ -173,17 +177,23 @@ export function StudentMonthlyFeeModal({
               <span className="text-fg font-semibold">{submittedPayment.academyName}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-fg-muted font-medium">Period</span>
+              <span className="text-fg-muted font-medium">Billing Period</span>
               <span className="text-fg font-semibold">{submittedPayment.monthLabel}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-fg-muted font-medium">Amount</span>
               <span className="font-bold text-emerald-500">₹{submittedPayment.amount}</span>
             </div>
+            {submittedPayment.payerName && (
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-fg-muted font-medium">UPI Sender</span>
+                <span className="text-fg font-medium">{submittedPayment.payerName}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between px-4 py-2.5">
-              <span className="text-fg-muted font-medium">UPI UTR Ref</span>
-              <span className="text-fg font-mono font-bold tracking-wider">
-                {submittedPayment.utr}
+              <span className="text-fg-muted font-medium">Status</span>
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 uppercase dark:text-emerald-400">
+                Verified & Paid
               </span>
             </div>
           </div>
@@ -242,31 +252,48 @@ export function StudentMonthlyFeeModal({
             </a>
           </div>
 
-          {/* Step 2: Enter 12-Digit UTR */}
+          {/* Step 2: Confirm Registered Name */}
           <div className="space-y-3">
             <div>
-              <label htmlFor="utr-input" className="text-fg block text-xs font-bold">
-                UPI Reference / UTR Number <span className="text-danger">*</span>
+              <label htmlFor="registered-name-input" className="text-fg block text-xs font-bold">
+                Your Registered Name in App <span className="text-danger">*</span>
               </label>
               <p className="text-fg-muted mt-0.5 text-[11px]">
-                12-digit reference number in your UPI payment receipt.
+                Confirm your name exactly as registered in your academy.
               </p>
               <div className="relative mt-1.5">
                 <Input
-                  id="utr-input"
+                  id="registered-name-input"
                   type="text"
-                  maxLength={12}
-                  placeholder="e.g. 425891029384"
-                  value={utr}
-                  onChange={(e) => setUtr(e.target.value.replace(/\D/g, '').slice(0, 12))}
-                  className="font-mono text-sm font-bold tracking-widest uppercase"
+                  placeholder="e.g. Rahul Sharma"
+                  value={registeredName}
+                  onChange={(e) => setRegisteredName(e.target.value)}
+                  className="font-medium"
                   required
                 />
-                {isValidUtr && (
+                {isValidName && (
                   <div className="absolute top-1/2 right-3 -translate-y-1/2 text-emerald-500">
-                    <Check className="h-4 w-4" />
+                    <UserCheck className="h-4 w-4" />
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="payer-name-input" className="text-fg-muted block text-xs font-medium">
+                UPI Sender / Payer Name or Phone (Optional)
+              </label>
+              <p className="text-fg-muted mt-0.5 text-[11px]">
+                If paid using a parent&apos;s or different UPI account.
+              </p>
+              <div className="mt-1.5">
+                <Input
+                  id="payer-name-input"
+                  type="text"
+                  placeholder="e.g. Suresh Sharma (Father) or 9876543210"
+                  value={payerName}
+                  onChange={(e) => setPayerName(e.target.value)}
+                />
               </div>
             </div>
 
@@ -333,12 +360,12 @@ export function StudentMonthlyFeeModal({
             </Button>
             <Button
               type="submit"
-              disabled={!isValidUtr || isSubmitting}
+              disabled={!isValidName || isSubmitting}
               isLoading={isSubmitting}
               className="flex-1 font-bold"
               size="lg"
             >
-              Activate Pass (₹{STUDENT_MONTHLY_FEE_AMOUNT})
+              Confirm & Activate Pass (₹{STUDENT_MONTHLY_FEE_AMOUNT})
             </Button>
           </div>
         </form>

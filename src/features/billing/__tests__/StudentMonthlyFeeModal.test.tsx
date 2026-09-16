@@ -27,7 +27,7 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     expect(screen.getByText(/Pay via UPI App/i)).toBeInTheDocument();
   });
 
-  it('validates 12-digit UTR and activates student pass on submit', async () => {
+  it('validates registered player name and activates student pass on submit', async () => {
     const handleSuccess = vi.fn();
 
     render(
@@ -43,28 +43,33 @@ describe('StudentMonthlyFeeModal & Banner', () => {
       />,
     );
 
-    const utrInput = screen.getByPlaceholderText(/425891029384/i);
-    const submitBtn = screen.getByRole('button', { name: /Activate Pass/i });
+    const nameInput = screen.getByLabelText(/Your Registered Name in App/i);
+    const submitBtn = screen.getByRole('button', { name: /Confirm & Activate Pass/i });
 
-    // Invalid UTR (too short) -> button disabled
-    fireEvent.change(utrInput, { target: { value: '12345' } });
+    // Pre-filled with student name
+    expect(nameInput).toHaveValue('Aarav Sharma');
+    expect(submitBtn).not.toBeDisabled();
+
+    // Clear name (too short) -> button disabled
+    fireEvent.change(nameInput, { target: { value: ' ' } });
     expect(submitBtn).toBeDisabled();
 
-    // Valid 12-digit UTR
-    fireEvent.change(utrInput, { target: { value: '425891029384' } });
+    // Enter valid player name
+    fireEvent.change(nameInput, { target: { value: 'Aarav Sharma' } });
     expect(submitBtn).not.toBeDisabled();
 
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/Pass Active!/i)).toBeInTheDocument();
-      expect(screen.getByText('425891029384')).toBeInTheDocument();
+      expect(screen.getAllByText('Aarav Sharma').length).toBeGreaterThan(0);
     });
 
     expect(handleSuccess).toHaveBeenCalledWith(
       expect.objectContaining({
         studentId: 'student_1',
-        utr: '425891029384',
+        studentName: 'Aarav Sharma',
+        registeredName: 'Aarav Sharma',
         amount: 200,
       }),
     );
@@ -88,9 +93,9 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     // Trigger payment
     fireEvent.click(screen.getByRole('button', { name: /Pay ₹200/i }));
 
-    const utrInput = screen.getByPlaceholderText(/425891029384/i);
-    fireEvent.change(utrInput, { target: { value: '987654321098' } });
-    fireEvent.click(screen.getByRole('button', { name: /Activate Pass/i }));
+    const nameInput = screen.getByLabelText(/Your Registered Name in App/i);
+    fireEvent.change(nameInput, { target: { value: 'Rohan Patel' } });
+    fireEvent.click(screen.getByRole('button', { name: /Confirm & Activate Pass/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Pass Active!/i)).toBeInTheDocument();
@@ -111,6 +116,6 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     );
 
     expect(screen.getByText(/Pass Active/i)).toBeInTheDocument();
-    expect(screen.getByText('987654321098')).toBeInTheDocument();
+    expect(screen.getByText(/Rohan Patel/i)).toBeInTheDocument();
   });
 });

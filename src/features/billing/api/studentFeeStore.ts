@@ -8,14 +8,16 @@ export const STUDENT_MONTHLY_FEE_AMOUNT = 200;
 export interface StudentFeePayment {
   id: string;
   studentId: string;
-  studentName: string;
+  studentName: string; // Registered student name in academy
+  registeredName?: string; // Confirmed name matching app profile
+  payerName?: string; // Optional UPI payer name (e.g. parent name)
   studentEmail: string;
   academyId: string;
   academyName: string;
   monthKey: string; // e.g. "2026-09"
   monthLabel: string; // e.g. "September 2026"
   amount: number; // 200
-  utr: string; // 12-digit reference
+  utr?: string; // Optional reference
   screenshotUrl?: string;
   status: 'verified' | 'pending' | 'rejected';
   paidAt: string; // ISO string

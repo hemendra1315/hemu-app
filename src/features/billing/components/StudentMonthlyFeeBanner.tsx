@@ -38,8 +38,7 @@ export function StudentMonthlyFeeBanner({
             <div>
               <p className="text-fg font-bold">Pass Active · {payment.monthLabel}</p>
               <p className="text-fg-muted text-[11px]">
-                ₹{payment.amount} paid · Ref:{' '}
-                <span className="font-mono font-semibold">{payment.utr}</span>
+                ₹{payment.amount} paid · {payment.studentName}
               </p>
             </div>
           </div>

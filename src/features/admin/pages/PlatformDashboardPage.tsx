@@ -950,11 +950,11 @@ export default function PlatformDashboardPage() {
           <Card>
             <CardHeader
               title="Student ₹200 Monthly Payments"
-              description="Real-time ledger of student monthly app fee transactions with UPI reference (UTR) numbers."
+              description="Real-time ledger of student monthly app fee passes mapped to registered academy players."
               action={
                 <div className="w-64">
                   <Input
-                    placeholder="Search student, academy, UTR..."
+                    placeholder="Search student, academy, sender..."
                     value={paymentSearch}
                     onChange={(e) => setPaymentSearch(e.target.value)}
                   />
@@ -965,7 +965,7 @@ export default function PlatformDashboardPage() {
               {allFeePayments.length === 0 ? (
                 <EmptyState
                   title="No student payments recorded yet"
-                  description="When students submit their ₹200 FamPay/UPI payment with their 12-digit UTR number, it will appear here in real time."
+                  description="When students activate their ₹200 FamPay/UPI pass with their registered name, it will appear here in real time."
                 />
               ) : (
                 (() => {
@@ -974,7 +974,9 @@ export default function PlatformDashboardPage() {
                       p.studentName.toLowerCase().includes(paymentSearch.toLowerCase()) ||
                       p.studentEmail.toLowerCase().includes(paymentSearch.toLowerCase()) ||
                       p.academyName.toLowerCase().includes(paymentSearch.toLowerCase()) ||
-                      p.utr.includes(paymentSearch) ||
+                      (p.payerName &&
+                        p.payerName.toLowerCase().includes(paymentSearch.toLowerCase())) ||
+                      (p.utr && p.utr.includes(paymentSearch)) ||
                       p.monthLabel.toLowerCase().includes(paymentSearch.toLowerCase()),
                   );
 
@@ -1009,14 +1011,29 @@ export default function PlatformDashboardPage() {
                               </div>
                             </div>
 
-                            <div className="border-border-subtle text-fg-muted flex items-center justify-between border-t pt-2 text-xs">
-                              <div>
-                                <span className="block text-[11px] font-semibold uppercase">
-                                  UPI UTR Ref
-                                </span>
-                                <code className="text-fg font-mono font-bold">{p.utr}</code>
+                            {p.payerName && (
+                              <div className="border-border-subtle text-fg-muted flex items-center justify-between border-t pt-2 text-xs">
+                                <div>
+                                  <span className="block text-[10px] font-semibold uppercase">
+                                    UPI Sender
+                                  </span>
+                                  <span className="text-fg font-medium">{p.payerName}</span>
+                                </div>
+                                {p.screenshotUrl && (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setViewingScreenshotPayment(p)}
+                                    className="h-7 gap-1 text-xs"
+                                  >
+                                    <Image className="h-3.5 w-3.5" /> Proof
+                                  </Button>
+                                )}
                               </div>
-                              {p.screenshotUrl && (
+                            )}
+
+                            {!p.payerName && p.screenshotUrl && (
+                              <div className="border-border-subtle flex items-center justify-end border-t pt-2 text-xs">
                                 <Button
                                   size="sm"
                                   variant="secondary"
@@ -1025,8 +1042,8 @@ export default function PlatformDashboardPage() {
                                 >
                                   <Image className="h-3.5 w-3.5" /> Proof
                                 </Button>
-                              )}
-                            </div>
+                              </div>
+                            )}
 
                             <div className="border-border-subtle flex items-center justify-between border-t pt-2 text-xs">
                               <span className="text-fg-muted">
@@ -1057,7 +1074,7 @@ export default function PlatformDashboardPage() {
                               <th className="px-2 py-3">Academy</th>
                               <th className="px-2 py-3">Month</th>
                               <th className="px-2 py-3">Amount</th>
-                              <th className="px-2 py-3">12-Digit UTR Ref</th>
+                              <th className="px-2 py-3">UPI Sender / Note</th>
                               <th className="px-2 py-3">Proof</th>
                               <th className="px-2 py-3">Submitted At</th>
                               <th className="px-2 py-3 text-right">Status</th>
@@ -1080,21 +1097,15 @@ export default function PlatformDashboardPage() {
                                   ₹{p.amount}
                                 </td>
                                 <td className="px-2 py-3">
-                                  <div className="flex items-center gap-1.5">
+                                  {p.payerName ? (
+                                    <span className="text-fg font-medium">{p.payerName}</span>
+                                  ) : p.utr ? (
                                     <code className="bg-surface-muted text-fg rounded px-2 py-1 font-mono text-xs font-bold">
                                       {p.utr}
                                     </code>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        copyToClipboard(p.utr, 'UTR copied to clipboard')
-                                      }
-                                      className="text-fg-muted hover:text-fg p-1"
-                                      title="Copy UTR"
-                                    >
-                                      <Copy className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
+                                  ) : (
+                                    <span className="text-fg-muted text-xs">Direct Mapping</span>
+                                  )}
                                 </td>
                                 <td className="px-2 py-3">
                                   {p.screenshotUrl ? (
