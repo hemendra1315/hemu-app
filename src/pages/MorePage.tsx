@@ -16,6 +16,7 @@ import {
   Layers,
   FileSpreadsheet,
   QrCode,
+  UserCheck,
 } from 'lucide-react';
 import { MobilePageHeader } from '@/components/mobile';
 import { Card } from '@/components/ui';
@@ -91,9 +92,15 @@ export function MorePage() {
 
   const activityItems: (MenuItem | false)[] = [
     canReadAttendance && {
+      to: '/attendance',
+      label: 'Attendance & Analytics',
+      desc: 'Attendance registers, records & monthly trends',
+      icon: UserCheck,
+    },
+    canReadAttendance && {
       to: '/sessions',
-      label: 'Training & Attendance',
-      desc: 'Track attendance, drills & sessions',
+      label: 'Training Sessions & Drills',
+      desc: 'Schedule, training plans & batch sessions',
       icon: CalendarCheck,
     },
     canReadMatches && {

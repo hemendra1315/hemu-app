@@ -11,6 +11,7 @@ import {
   WifiOff,
   BarChart2,
   Settings,
+  UserCheck,
 } from 'lucide-react';
 import { Suspense, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -88,6 +89,13 @@ const SIDEBAR_ITEMS: NavItemDef[] = [
     label: 'Batches',
     icon: <Menu className="h-4 w-4" aria-hidden />,
     requiresCapability: 'batches:read',
+    group: 'Training',
+  },
+  {
+    to: '/attendance',
+    label: 'Attendance',
+    icon: <UserCheck className="h-4 w-4" aria-hidden />,
+    requiresCapability: 'attendance:read',
     group: 'Training',
   },
   {

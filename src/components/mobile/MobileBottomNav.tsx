@@ -8,6 +8,7 @@ import {
   User,
   Settings,
   ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMemberships } from '@/features/academies';
@@ -52,7 +53,7 @@ export function MobileBottomNav() {
   let items: NavItemDef[] = [];
 
   if (testModeRole === 'coach' || (!testModeRole && !canUpdateAcademy && role === 'coach')) {
-    // Coach: Home | Players | Batches | Sessions | More
+    // Coach: Home | Attendance | Players | Batches | More
     items = [
       {
         key: 'home',
@@ -60,6 +61,13 @@ export function MobileBottomNav() {
         label: 'Home',
         icon: Home,
         matchPrefixes: ['/dashboard', '/coach', '/me'],
+      },
+      {
+        key: 'attendance',
+        to: '/attendance',
+        label: 'Attendance',
+        icon: UserCheck,
+        matchPrefixes: ['/attendance'],
       },
       {
         key: 'players',
@@ -76,25 +84,18 @@ export function MobileBottomNav() {
         matchPrefixes: ['/batches'],
       },
       {
-        key: 'sessions',
-        to: '/sessions',
-        label: 'Sessions',
-        icon: CalendarDays,
-        matchPrefixes: ['/sessions'],
-      },
-      {
         key: 'more',
         to: '/more',
         label: 'More',
         icon: MoreHorizontal,
-        matchPrefixes: ['/more', '/drills', '/matches', '/stats', '/profile'],
+        matchPrefixes: ['/more', '/sessions', '/drills', '/matches', '/stats', '/profile'],
       },
     ];
   } else if (
     testModeRole === 'student' ||
     (!testModeRole && !canUpdateAcademy && role === 'player')
   ) {
-    // Student / Player: Home | Sessions | Matches | Profile | More
+    // Student / Player: Home | Attendance | Sessions | Matches | More
     items = [
       {
         key: 'home',
@@ -102,6 +103,13 @@ export function MobileBottomNav() {
         label: 'Home',
         icon: Home,
         matchPrefixes: ['/player', '/dashboard', '/me'],
+      },
+      {
+        key: 'attendance',
+        to: '/attendance',
+        label: 'Attendance',
+        icon: UserCheck,
+        matchPrefixes: ['/attendance'],
       },
       {
         key: 'sessions',
@@ -118,25 +126,18 @@ export function MobileBottomNav() {
         matchPrefixes: ['/matches'],
       },
       {
-        key: 'profile',
-        to: '/profile',
-        label: 'Profile',
-        icon: User,
-        matchPrefixes: ['/profile'],
-      },
-      {
         key: 'more',
         to: '/more',
         label: 'More',
         icon: MoreHorizontal,
-        matchPrefixes: ['/more', '/stats', '/drills'],
+        matchPrefixes: ['/more', '/profile', '/stats', '/drills'],
       },
     ];
   } else if (
     testModeRole === 'parent' ||
     (!testModeRole && !canUpdateAcademy && role === 'parent')
   ) {
-    // Parent: Home | Profile | More
+    // Parent: Home | Attendance | Profile | More
     items = [
       {
         key: 'home',
@@ -144,6 +145,13 @@ export function MobileBottomNav() {
         label: 'Home',
         icon: Home,
         matchPrefixes: ['/parent/dashboard', '/dashboard'],
+      },
+      {
+        key: 'attendance',
+        to: '/attendance',
+        label: 'Attendance',
+        icon: UserCheck,
+        matchPrefixes: ['/attendance'],
       },
       {
         key: 'profile',
@@ -161,7 +169,7 @@ export function MobileBottomNav() {
       },
     ];
   } else if (canUpdateAcademy) {
-    // Owner & Super Admin: Home | Players | Sessions | Settings | More
+    // Owner & Super Admin: Home | Attendance | Players | Settings | More
     items = [
       {
         key: 'home',
@@ -171,18 +179,18 @@ export function MobileBottomNav() {
         matchPrefixes: ['/dashboard', '/owner', '/admin', '/me'],
       },
       {
+        key: 'attendance',
+        to: '/attendance',
+        label: 'Attendance',
+        icon: UserCheck,
+        matchPrefixes: ['/attendance'],
+      },
+      {
         key: 'players',
         to: '/members',
         label: 'Players',
         icon: Users,
         matchPrefixes: ['/members'],
-      },
-      {
-        key: 'sessions',
-        to: '/sessions',
-        label: 'Sessions',
-        icon: CalendarDays,
-        matchPrefixes: ['/sessions'],
       },
       {
         key: 'settings',
@@ -196,7 +204,7 @@ export function MobileBottomNav() {
         to: '/more',
         label: 'More',
         icon: MoreHorizontal,
-        matchPrefixes: ['/more', '/drills', '/stats', '/batches', '/matches'],
+        matchPrefixes: ['/more', '/sessions', '/drills', '/stats', '/batches', '/matches'],
       },
     ];
   }
