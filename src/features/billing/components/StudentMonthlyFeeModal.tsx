@@ -98,6 +98,8 @@ export function StudentMonthlyFeeModal({
 
   const cleanName = registeredName.trim();
   const isValidName = cleanName.length >= 2;
+  const hasScreenshot = Boolean(screenshotData);
+  const isValidSubmission = isValidName && hasScreenshot;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,27 +110,35 @@ export function StudentMonthlyFeeModal({
       return;
     }
 
+    if (!hasScreenshot) {
+      setErrorMessage('Please attach a screenshot of your UPI payment receipt.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const payment = recordStudentFeePayment({
-        studentId,
-        studentName: cleanName,
-        registeredName: cleanName,
-        payerName: payerName.trim() || undefined,
-        studentEmail,
-        academyId,
-        academyName,
-        monthKey: currentMonthKey,
-        monthLabel: currentMonthLabel,
-        amount: STUDENT_MONTHLY_FEE_AMOUNT,
-        screenshotUrl: screenshotData,
-      });
+      const payment = recordStudentFeePayment(
+        {
+          studentId,
+          studentName: cleanName,
+          registeredName: cleanName,
+          payerName: payerName.trim() || undefined,
+          studentEmail,
+          academyId,
+          academyName,
+          monthKey: currentMonthKey,
+          monthLabel: currentMonthLabel,
+          amount: STUDENT_MONTHLY_FEE_AMOUNT,
+          screenshotUrl: screenshotData,
+        },
+        'pending',
+      );
 
       setSubmittedPayment(payment);
       pushToast({
-        title: 'Monthly Pass Activated! 🎉',
-        description: `₹${STUDENT_MONTHLY_FEE_AMOUNT} pass activated for ${cleanName} (${currentMonthLabel}).`,
-        variant: 'success',
+        title: 'Payment Submitted! ⏳',
+        description: `₹${STUDENT_MONTHLY_FEE_AMOUNT} payment submitted for ${cleanName} (${currentMonthLabel}). Pending coach/admin verification.`,
+        variant: 'info',
       });
 
       if (onPaymentSuccess) {
@@ -160,16 +170,25 @@ export function StudentMonthlyFeeModal({
       year: 'numeric',
     });
 
+    const statusText =
+      p.status === 'verified'
+        ? '✅ Verified & Paid'
+        : p.status === 'rejected'
+          ? '❌ Rejected'
+          : '⏳ Submitted (Pending Admin Verification)';
+
     const text =
       `🏏 *CRICKET ACADEMY MANAGER — OFFICIAL RECEIPT* 🏏\n\n` +
-      `✅ *Payment Status:* Verified & Paid\n` +
+      `*Status:* ${statusText}\n` +
       `👤 *Player Name:* ${p.studentName}\n` +
       `🏢 *Academy:* ${p.academyName}\n` +
       `📅 *Month:* ${p.monthLabel} Pass\n` +
       `💰 *Amount:* ₹${p.amount}.00\n` +
       (p.payerName ? `💳 *UPI Sender / Note:* ${p.payerName}\n` : '') +
       `🕒 *Date:* ${formattedDate}\n\n` +
-      `🎉 *Monthly training drills, match stats & attendance pass are now active!*`;
+      (p.status === 'verified'
+        ? `🎉 *Monthly training drills, match stats & attendance pass are active!*`
+        : `⏳ *Your payment receipt has been submitted to academy management for review.*`);
 
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   };
@@ -183,14 +202,36 @@ export function StudentMonthlyFeeModal({
     >
       {activeReceipt ? (
         <div className="space-y-5 py-3 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500 ring-4 ring-emerald-500/20">
-            <CheckCircle2 className="h-8 w-8" />
+          <div
+            className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl ${
+              activeReceipt.status === 'verified'
+                ? 'bg-emerald-500/10 text-emerald-500 ring-4 ring-emerald-500/20'
+                : activeReceipt.status === 'rejected'
+                  ? 'bg-danger/10 text-danger ring-danger/20 ring-4'
+                  : 'bg-amber-500/10 text-amber-500 ring-4 ring-amber-500/20'
+            }`}
+          >
+            {activeReceipt.status === 'verified' ? (
+              <CheckCircle2 className="h-8 w-8" />
+            ) : (
+              <ShieldCheck className="h-8 w-8" />
+            )}
           </div>
 
           <div>
-            <h3 className="text-fg text-xl font-bold tracking-tight">Pass Active!</h3>
+            <h3 className="text-fg text-xl font-bold tracking-tight">
+              {activeReceipt.status === 'verified'
+                ? 'Pass Active!'
+                : activeReceipt.status === 'rejected'
+                  ? 'Payment Rejected'
+                  : 'Payment Submitted!'}
+            </h3>
             <p className="text-fg-muted mt-1 text-sm">
-              All features unlocked for <strong>{activeReceipt.monthLabel}</strong>.
+              {activeReceipt.status === 'verified'
+                ? `All features unlocked for ${activeReceipt.monthLabel}.`
+                : activeReceipt.status === 'rejected'
+                  ? 'Your payment proof was not verified. Please contact academy admin.'
+                  : `Your ₹${activeReceipt.amount} payment for ${activeReceipt.monthLabel} is pending admin verification.`}
             </p>
           </div>
 
@@ -219,8 +260,20 @@ export function StudentMonthlyFeeModal({
             )}
             <div className="flex items-center justify-between px-4 py-2.5">
               <span className="text-fg-muted font-medium">Status</span>
-              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 uppercase dark:text-emerald-400">
-                Verified & Paid
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                  activeReceipt.status === 'verified'
+                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                    : activeReceipt.status === 'rejected'
+                      ? 'bg-danger/20 text-danger'
+                      : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {activeReceipt.status === 'verified'
+                  ? 'Verified & Active'
+                  : activeReceipt.status === 'rejected'
+                    ? 'Rejected'
+                    : 'Pending Verification ⏳'}
               </span>
             </div>
           </div>
@@ -340,19 +393,19 @@ export function StudentMonthlyFeeModal({
               </div>
             </div>
 
-            {/* Optional Screenshot upload */}
+            {/* Step 3: Required Screenshot upload */}
             <div>
-              <label
-                htmlFor={fileInputId}
-                className="text-fg-muted mb-1.5 block text-xs font-medium"
-              >
-                Receipt Screenshot (Optional)
+              <label htmlFor={fileInputId} className="text-fg block text-xs font-bold">
+                Payment Receipt Screenshot <span className="text-danger">*</span>
               </label>
+              <p className="text-fg-muted mt-0.5 mb-1.5 text-[11px]">
+                Upload your GPay / PhonePe / Paytm / FamPay transaction screenshot.
+              </p>
               {screenshotData ? (
                 <div className="relative flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-2 text-xs text-emerald-600 dark:text-emerald-400">
                   <div className="flex items-center gap-2">
                     <FileCheck className="h-4 w-4 shrink-0" />
-                    <span className="font-semibold">Screenshot Attached</span>
+                    <span className="font-semibold">Receipt Screenshot Attached</span>
                   </div>
                   <button
                     type="button"
@@ -366,10 +419,10 @@ export function StudentMonthlyFeeModal({
               ) : (
                 <label
                   htmlFor={fileInputId}
-                  className="border-border-subtle bg-surface-muted/30 text-fg-muted hover:bg-surface-muted/60 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-2 text-xs font-medium transition"
+                  className="border-border-subtle bg-surface-muted/30 text-fg-muted hover:bg-surface-muted/60 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-2.5 text-xs font-medium transition"
                 >
                   <UploadCloud className="h-4 w-4" />
-                  <span>Upload receipt image</span>
+                  <span>Upload receipt image (Required)</span>
                   <input
                     id={fileInputId}
                     type="file"
@@ -403,12 +456,12 @@ export function StudentMonthlyFeeModal({
             </Button>
             <Button
               type="submit"
-              disabled={!isValidName || isSubmitting}
+              disabled={!isValidSubmission || isSubmitting}
               isLoading={isSubmitting}
               className="flex-1 font-bold"
               size="lg"
             >
-              Confirm & Activate Pass (₹{STUDENT_MONTHLY_FEE_AMOUNT})
+              Submit for Verification (₹{STUDENT_MONTHLY_FEE_AMOUNT})
             </Button>
           </div>
         </form>

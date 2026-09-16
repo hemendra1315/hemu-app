@@ -21,7 +21,8 @@ export function StudentMonthlyFeeBanner({
   academyName,
   className = '',
 }: StudentMonthlyFeeBannerProps) {
-  const { payment, isPaidThisMonth, currentMonthLabel } = useStudentFeePayment(studentId);
+  const { payment, isPaidThisMonth, isPendingThisMonth, currentMonthLabel } =
+    useStudentFeePayment(studentId);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   if (isPaidThisMonth && payment) {
@@ -38,7 +39,7 @@ export function StudentMonthlyFeeBanner({
             <div>
               <p className="text-fg font-bold">Pass Active · {payment.monthLabel}</p>
               <p className="text-fg-muted text-[11px]">
-                ₹{payment.amount} paid · {payment.studentName}
+                ₹{payment.amount} verified · {payment.studentName}
               </p>
             </div>
           </div>
@@ -51,6 +52,54 @@ export function StudentMonthlyFeeBanner({
           >
             <Receipt className="h-3.5 w-3.5" />
             <span>Receipt</span>
+          </Button>
+        </aside>
+
+        <StudentMonthlyFeeModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          studentId={studentId}
+          studentName={studentName}
+          studentEmail={studentEmail}
+          academyId={academyId}
+          academyName={academyName}
+        />
+      </>
+    );
+  }
+
+  if (isPendingThisMonth && payment) {
+    return (
+      <>
+        <aside
+          aria-label="Student Monthly Pass Pending Verification"
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/15 px-4 py-3 text-xs text-amber-800 shadow-xs dark:text-amber-200 ${className}`}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+              <ShieldAlert className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-fg font-bold">Pass Pending Verification</p>
+                <span className="py-0.2 rounded-md bg-amber-500/25 px-1.5 text-[10px] font-extrabold uppercase">
+                  {payment.monthLabel}
+                </span>
+              </div>
+              <p className="text-fg-muted text-[11px]">
+                ₹{payment.amount} submitted · Waiting for coach/admin verification
+              </p>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <Receipt className="h-3.5 w-3.5" />
+            <span>View Receipt</span>
           </Button>
         </aside>
 

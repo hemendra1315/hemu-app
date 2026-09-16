@@ -2,6 +2,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { StudentMonthlyFeeModal } from '../components/StudentMonthlyFeeModal';
 import { StudentMonthlyFeeBanner } from '../components/StudentMonthlyFeeBanner';
+import { recordStudentFeePayment, updateStudentFeePaymentStatus } from '../api/studentFeeStore';
+
+function createMockFile() {
+  return new File(['mock receipt content'], 'receipt.png', { type: 'image/png' });
+}
 
 describe('StudentMonthlyFeeModal & Banner', () => {
   beforeEach(() => {
@@ -27,7 +32,7 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     expect(screen.getByText(/Pay via UPI App/i)).toBeInTheDocument();
   });
 
-  it('validates registered player name and activates student pass on submit', async () => {
+  it('validates registered player name + required screenshot and submits for verification', async () => {
     const handleSuccess = vi.fn();
 
     render(
@@ -44,10 +49,20 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     );
 
     const nameInput = screen.getByLabelText(/Your Registered Name in App/i);
-    const submitBtn = screen.getByRole('button', { name: /Confirm & Activate Pass/i });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const submitBtn = screen.getByRole('button', { name: /Submit for Verification/i });
 
-    // Pre-filled with student name
-    expect(nameInput).toHaveValue('Aarav Sharma');
+    // Without screenshot -> button disabled
+    expect(submitBtn).toBeDisabled();
+
+    // Attach receipt screenshot
+    const file = createMockFile();
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Receipt Screenshot Attached/i)).toBeInTheDocument();
+    });
+
     expect(submitBtn).not.toBeDisabled();
 
     // Clear name (too short) -> button disabled
@@ -61,7 +76,8 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Pass Active!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Payment Submitted!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Pending Verification ⏳/i)).toBeInTheDocument();
       expect(screen.getAllByText('Aarav Sharma').length).toBeGreaterThan(0);
     });
 
@@ -71,11 +87,12 @@ describe('StudentMonthlyFeeModal & Banner', () => {
         studentName: 'Aarav Sharma',
         registeredName: 'Aarav Sharma',
         amount: 200,
+        status: 'pending',
       }),
     );
   });
 
-  it('renders due banner when unpaid and active banner when paid', async () => {
+  it('renders due banner when unpaid, pending banner when submitted, and active banner when verified', async () => {
     const { rerender } = render(
       <StudentMonthlyFeeBanner
         studentId="student_2"
@@ -90,21 +107,55 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     expect(screen.getByText(/Monthly Pass · ₹200/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Pay ₹200/i })).toBeInTheDocument();
 
-    // Trigger payment
+    // Submit payment
     fireEvent.click(screen.getByRole('button', { name: /Pay ₹200/i }));
 
-    const nameInput = screen.getByLabelText(/Your Registered Name in App/i);
-    fireEvent.change(nameInput, { target: { value: 'Rohan Patel' } });
-    fireEvent.click(screen.getByRole('button', { name: /Confirm & Activate Pass/i }));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [createMockFile()] } });
 
     await waitFor(() => {
-      expect(screen.getByText(/Pass Active!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Receipt Screenshot Attached/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Submit for Verification/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Payment Submitted!/i)).toBeInTheDocument();
     });
 
     // Close modal
     fireEvent.click(screen.getByRole('button', { name: /Done/i }));
 
-    // Now banner shows Active
+    // Banner now shows Pending Verification
+    rerender(
+      <StudentMonthlyFeeBanner
+        studentId="student_2"
+        studentName="Rohan Patel"
+        studentEmail="rohan@gmail.com"
+        academyId="acad_1"
+        academyName="Apex Academy"
+      />,
+    );
+
+    expect(screen.getByText(/Pass Pending Verification/i)).toBeInTheDocument();
+
+    // Admin verifies payment
+    const payment = recordStudentFeePayment(
+      {
+        studentId: 'student_2',
+        studentName: 'Rohan Patel',
+        studentEmail: 'rohan@gmail.com',
+        academyId: 'acad_1',
+        academyName: 'Apex Academy',
+        monthKey: '2026-09',
+        monthLabel: 'September 2026',
+        amount: 200,
+      },
+      'verified',
+    );
+    updateStudentFeePaymentStatus(payment.id, 'verified');
+
+    // Banner now shows Active
     rerender(
       <StudentMonthlyFeeBanner
         studentId="student_2"
@@ -116,7 +167,6 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     );
 
     expect(screen.getByText(/Pass Active/i)).toBeInTheDocument();
-    expect(screen.getByText(/Rohan Patel/i)).toBeInTheDocument();
   });
 
   it('renders 1-tap WhatsApp share button on active receipt with pre-filled message', async () => {
@@ -132,7 +182,14 @@ describe('StudentMonthlyFeeModal & Banner', () => {
       />,
     );
 
-    const submitBtn = screen.getByRole('button', { name: /Confirm & Activate Pass/i });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [createMockFile()] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Receipt Screenshot Attached/i)).toBeInTheDocument();
+    });
+
+    const submitBtn = screen.getByRole('button', { name: /Submit for Verification/i });
     fireEvent.click(submitBtn);
 
     await waitFor(() => {

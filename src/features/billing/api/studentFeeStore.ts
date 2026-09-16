@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase/client';
 
 export const FAMPAY_UPI_ID = '7358875632@fam';
 export const FAMPAY_UPI_NUMBER = '7358875632';
@@ -41,10 +42,74 @@ function loadPaymentsFromStorage(): StudentFeePayment[] {
   }
 }
 
+interface StudentFeePaymentRow {
+  id: string;
+  student_id: string;
+  student_name: string;
+  registered_name: string;
+  payer_name: string;
+  student_email: string | null;
+  academy_id: string;
+  academy_name: string | null;
+  month_key: string;
+  month_label: string;
+  amount: number;
+  utr: string | null;
+  screenshot_url: string | null;
+  status: 'verified' | 'pending' | 'rejected';
+  paid_at: string;
+}
+
+async function syncPaymentsWithSupabase() {
+  if (typeof window === 'undefined' || !supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('student_fee_payments' as never)
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const serverPayments: StudentFeePayment[] = (data as unknown as StudentFeePaymentRow[]).map(
+        (row) => ({
+          id: row.id,
+          studentId: row.student_id,
+          studentName: row.student_name,
+          registeredName: row.registered_name,
+          payerName: row.payer_name,
+          studentEmail: row.student_email || '',
+          academyId: row.academy_id,
+          academyName: row.academy_name || '',
+          monthKey: row.month_key,
+          monthLabel: row.month_label,
+          amount: row.amount || STUDENT_MONTHLY_FEE_AMOUNT,
+          utr: row.utr || undefined,
+          screenshotUrl: row.screenshot_url || undefined,
+          status: row.status,
+          paidAt: row.paid_at,
+        }),
+      );
+
+      // Merge server payments with local payments
+      const local = loadPaymentsFromStorage();
+      const localMap = new Map(local.map((p) => [p.id, p]));
+      serverPayments.forEach((sp) => {
+        localMap.set(sp.id, sp);
+      });
+
+      const merged = Array.from(localMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      notifyListeners();
+    }
+  } catch {
+    // Graceful fallback to local storage
+  }
+}
+
 function getStoreSnapshot(): StudentFeePayment[] {
   if (!isInitialized) {
     cachedPayments = loadPaymentsFromStorage();
     isInitialized = true;
+    void syncPaymentsWithSupabase();
   }
   return cachedPayments;
 }
@@ -111,6 +176,7 @@ export function getStudentPaymentForMonth(
 
 export function recordStudentFeePayment(
   data: Omit<StudentFeePayment, 'id' | 'paidAt' | 'status'>,
+  status: 'pending' | 'verified' = 'pending',
 ): StudentFeePayment {
   const existing = getStoreSnapshot();
   const id = `pay_${data.monthKey}_${data.studentId}_${Date.now()}`;
@@ -118,7 +184,7 @@ export function recordStudentFeePayment(
     ...data,
     id,
     paidAt: new Date().toISOString(),
-    status: 'verified',
+    status,
   };
 
   // Filter out any previous draft for same month/student, then add new one
@@ -132,6 +198,33 @@ export function recordStudentFeePayment(
     notifyListeners();
   } catch (err) {
     logger.error('save_student_fee_payment_failed', { error: String(err) });
+  }
+
+  // Asynchronously persist to Supabase if available
+  if (supabase && typeof window !== 'undefined') {
+    void (async () => {
+      try {
+        await supabase.from('student_fee_payments' as never).upsert({
+          id: newPayment.id,
+          student_id: newPayment.studentId,
+          student_name: newPayment.studentName,
+          registered_name: newPayment.registeredName,
+          payer_name: newPayment.payerName,
+          student_email: newPayment.studentEmail,
+          academy_id: newPayment.academyId,
+          academy_name: newPayment.academyName,
+          month_key: newPayment.monthKey,
+          month_label: newPayment.monthLabel,
+          amount: newPayment.amount,
+          utr: newPayment.utr,
+          screenshot_url: newPayment.screenshotUrl,
+          status: newPayment.status,
+          paid_at: newPayment.paidAt,
+        } as never);
+      } catch {
+        // Silent fallback to local storage
+      }
+    })();
   }
 
   return newPayment;
@@ -148,6 +241,20 @@ export function updateStudentFeePaymentStatus(
     notifyListeners();
   } catch (err) {
     logger.error('update_student_payment_status_failed', { error: String(err) });
+  }
+
+  // Asynchronously update in Supabase
+  if (supabase && typeof window !== 'undefined') {
+    void (async () => {
+      try {
+        await supabase
+          .from('student_fee_payments' as never)
+          .update({ status } as never)
+          .eq('id' as never, paymentId);
+      } catch {
+        // Silent fallback
+      }
+    })();
   }
 }
 
@@ -167,10 +274,14 @@ export function useStudentFeePayment(studentId?: string) {
   return {
     payment,
     isPaidThisMonth: Boolean(payment && payment.status === 'verified'),
+    isPendingThisMonth: Boolean(payment && payment.status === 'pending'),
+    isRejectedThisMonth: Boolean(payment && payment.status === 'rejected'),
+    status: payment?.status,
     currentMonthKey,
     currentMonthLabel,
     refreshPayment: () => {
       notifyListeners();
+      void syncPaymentsWithSupabase();
     },
   };
 }
@@ -183,6 +294,7 @@ export function useAllPlatformFeePayments() {
     payments,
     refresh: () => {
       notifyListeners();
+      void syncPaymentsWithSupabase();
     },
   };
 }

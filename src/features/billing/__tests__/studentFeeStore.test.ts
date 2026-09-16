@@ -49,7 +49,7 @@ describe('studentFeeStore', () => {
     });
 
     expect(payment.id).toBeDefined();
-    expect(payment.status).toBe('verified');
+    expect(payment.status).toBe('pending');
     expect(payment.amount).toBe(200);
     expect(payment.utr).toBe('425891029384');
 
