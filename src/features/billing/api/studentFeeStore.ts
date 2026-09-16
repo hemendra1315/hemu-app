@@ -66,6 +66,24 @@ interface PlatformSubscriptionPaymentRow {
   created_at?: string;
 }
 
+function toDbStatus(
+  status: 'verified' | 'pending' | 'rejected',
+): 'confirmed' | 'pending' | 'dismissed' {
+  if (status === 'verified') return 'confirmed';
+  if (status === 'rejected') return 'dismissed';
+  return 'pending';
+}
+
+function fromDbStatus(status: string, hasPaidRecord = false): 'verified' | 'pending' | 'rejected' {
+  if (hasPaidRecord || status === 'confirmed' || status === 'approved' || status === 'verified') {
+    return 'verified';
+  }
+  if (status === 'dismissed' || status === 'rejected') {
+    return 'rejected';
+  }
+  return 'pending';
+}
+
 async function syncPaymentsWithSupabase() {
   if (typeof window === 'undefined' || !supabase) return;
   try {
@@ -112,14 +130,7 @@ async function syncPaymentsWithSupabase() {
       processedKeys.add(key);
 
       const hasPaidRecord = paymentMap.has(key);
-      const isApproved =
-        hasPaidRecord || claim.status === 'approved' || claim.status === 'verified';
-      const isRejected = claim.status === 'rejected';
-      const status: 'verified' | 'pending' | 'rejected' = isApproved
-        ? 'verified'
-        : isRejected
-          ? 'rejected'
-          : 'pending';
+      const status = fromDbStatus(claim.status, hasPaidRecord);
 
       serverPayments.push({
         id: claim.id,
@@ -293,14 +304,22 @@ export function recordStudentFeePayment(
           screenshotUrl: newPayment.screenshotUrl,
         });
 
+        const payerPhone =
+          (
+            newPayment.payerName ||
+            newPayment.registeredName ||
+            newPayment.studentName ||
+            FAMPAY_UPI_NUMBER
+          ).trim() || FAMPAY_UPI_NUMBER;
+
         const { data: claimData, error: claimError } = await supabase
           .from('platform_subscription_claims' as never)
           .insert({
             user_id: newPayment.studentId,
             period_month: newPayment.monthKey,
-            payer_phone: FAMPAY_UPI_NUMBER,
+            payer_phone: payerPhone,
             note: notePayload,
-            status: status === 'verified' ? 'approved' : 'pending',
+            status: toDbStatus(status),
           } as never)
           .select('id' as never)
           .single();
@@ -343,7 +362,7 @@ export function updateStudentFeePaymentStatus(
   if (supabase && typeof window !== 'undefined' && payment) {
     void (async () => {
       try {
-        const dbStatus = status === 'verified' ? 'approved' : status;
+        const dbStatus = toDbStatus(status);
         await supabase
           .from('platform_subscription_claims' as never)
           .update({
