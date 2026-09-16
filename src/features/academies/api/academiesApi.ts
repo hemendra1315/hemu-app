@@ -34,16 +34,14 @@ type AcademyRow = {
   timezone: string;
   contact_email: string | null;
   contact_phone: string | null;
-  fee_mode: FeeMode;
-  default_monthly_fee_paise: number;
-  grace_period_days: number;
+  settings: unknown;
   owner_user_id: string;
   is_active: boolean;
   created_at: string;
 };
 
 const ACADEMY_COLUMNS =
-  'id, name, slug, logo_url, city, state, timezone, contact_email, contact_phone, fee_mode, default_monthly_fee_paise, grace_period_days, owner_user_id, is_active, created_at';
+  'id, name, slug, logo_url, city, state, timezone, contact_email, contact_phone, settings, owner_user_id, is_active, created_at';
 
 function toMembership(row: MembershipRow): Membership {
   return {
@@ -71,6 +69,10 @@ function toJoinRequest(row: JoinRequestRow): JoinRequest {
 }
 
 function toAcademy(row: AcademyRow): Academy {
+  const settings =
+    row.settings && typeof row.settings === 'object'
+      ? (row.settings as Record<string, unknown>)
+      : {};
   return {
     id: row.id,
     name: row.name,
@@ -81,9 +83,13 @@ function toAcademy(row: AcademyRow): Academy {
     timezone: row.timezone,
     contactEmail: row.contact_email,
     contactPhone: row.contact_phone,
-    feeMode: row.fee_mode,
-    defaultMonthlyFeePaise: row.default_monthly_fee_paise,
-    gracePeriodDays: row.grace_period_days,
+    feeMode: (settings.fee_mode as FeeMode) || 'player_pays',
+    defaultMonthlyFeePaise:
+      typeof settings.default_monthly_fee_paise === 'number'
+        ? settings.default_monthly_fee_paise
+        : 20000,
+    gracePeriodDays:
+      typeof settings.grace_period_days === 'number' ? settings.grace_period_days : 7,
     ownerUserId: row.owner_user_id,
     isActive: row.is_active,
     createdAt: row.created_at,
@@ -149,7 +155,7 @@ export async function createAcademy(input: CreateAcademyInput): Promise<Academy>
             slug,
             city: input.city?.trim() || null,
             timezone: input.timezone || 'Asia/Kolkata',
-            fee_mode: input.feeMode || 'player_pays',
+            settings: { fee_mode: input.feeMode || 'player_pays' },
             owner_user_id: authUser.id,
           })
           .select(ACADEMY_COLUMNS)
@@ -228,7 +234,7 @@ export async function updateAcademy(academyId: UUID, input: UpdateAcademyInput):
         ...(input.contactEmail === undefined ? null : { contact_email: input.contactEmail }),
         ...(input.contactPhone === undefined ? null : { contact_phone: input.contactPhone }),
         ...(input.timezone === undefined ? null : { timezone: input.timezone }),
-        ...(input.feeMode === undefined ? null : { fee_mode: input.feeMode }),
+        ...(input.feeMode === undefined ? null : { settings: { fee_mode: input.feeMode } }),
       })
       .eq('id', academyId)
       .select(ACADEMY_COLUMNS)

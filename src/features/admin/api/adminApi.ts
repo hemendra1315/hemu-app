@@ -393,7 +393,7 @@ export async function createPlatformAcademy(
           contact_email: payload.contactEmail?.trim() || null,
           contact_phone: payload.contactPhone?.trim() || null,
           timezone: payload.timezone || 'Asia/Kolkata',
-          fee_mode: payload.feeMode || 'player_pays',
+          settings: { fee_mode: payload.feeMode || 'player_pays' },
           owner_user_id: authUserId,
         })
         .select('*')

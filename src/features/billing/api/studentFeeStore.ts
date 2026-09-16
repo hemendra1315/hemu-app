@@ -42,30 +42,6 @@ function loadPaymentsFromStorage(): StudentFeePayment[] {
   }
 }
 
-interface PlatformSubscriptionClaimRow {
-  id: string;
-  user_id: string;
-  period_month: string;
-  payer_phone?: string | null;
-  note?: string | null;
-  status: string;
-  resolved_at?: string | null;
-  resolved_by?: string | null;
-  created_at?: string;
-  updated_at?: string;
-}
-
-interface PlatformSubscriptionPaymentRow {
-  id: string;
-  user_id: string;
-  amount_paise: number;
-  period_month: string;
-  paid_on?: string | null;
-  method?: string | null;
-  recorded_by?: string | null;
-  created_at?: string;
-}
-
 function toDbStatus(
   status: 'verified' | 'pending' | 'rejected',
 ): 'confirmed' | 'pending' | 'dismissed' {
@@ -89,21 +65,17 @@ async function syncPaymentsWithSupabase() {
   try {
     const [claimsRes, paymentsRes] = await Promise.all([
       supabase
-        .from('platform_subscription_claims' as never)
+        .from('platform_subscription_claims')
         .select('*')
-        .order('created_at' as never, { ascending: false }),
+        .order('created_at', { ascending: false }),
       supabase
-        .from('platform_subscription_payments' as never)
+        .from('platform_subscription_payments')
         .select('*')
-        .order('created_at' as never, { ascending: false }),
+        .order('created_at', { ascending: false }),
     ]);
 
-    const claims = Array.isArray(claimsRes.data)
-      ? (claimsRes.data as unknown as PlatformSubscriptionClaimRow[])
-      : [];
-    const payments = Array.isArray(paymentsRes.data)
-      ? (paymentsRes.data as unknown as PlatformSubscriptionPaymentRow[])
-      : [];
+    const claims = claimsRes.data ?? [];
+    const payments = paymentsRes.data ?? [];
 
     if (claims.length === 0 && payments.length === 0) return;
 
@@ -313,27 +285,27 @@ export function recordStudentFeePayment(
           ).trim() || FAMPAY_UPI_NUMBER;
 
         const { data: claimData, error: claimError } = await supabase
-          .from('platform_subscription_claims' as never)
+          .from('platform_subscription_claims')
           .insert({
             user_id: newPayment.studentId,
             period_month: newPayment.monthKey,
             payer_phone: payerPhone,
             note: notePayload,
             status: toDbStatus(status),
-          } as never)
-          .select('id' as never)
+          })
+          .select('id')
           .single();
 
         if (claimError) {
           logger.warn('insert_platform_subscription_claim_failed', { error: claimError.message });
         } else if (claimData && status === 'verified') {
-          await supabase.from('platform_subscription_payments' as never).insert({
+          await supabase.from('platform_subscription_payments').insert({
             user_id: newPayment.studentId,
             amount_paise: (newPayment.amount || STUDENT_MONTHLY_FEE_AMOUNT) * 100,
             period_month: newPayment.monthKey,
             paid_on: newPayment.paidAt,
             method: 'upi',
-          } as never);
+          });
         }
       } catch (err) {
         logger.warn('persist_subscription_claim_error', { error: String(err) });
@@ -364,26 +336,26 @@ export function updateStudentFeePaymentStatus(
       try {
         const dbStatus = toDbStatus(status);
         await supabase
-          .from('platform_subscription_claims' as never)
+          .from('platform_subscription_claims')
           .update({
             status: dbStatus,
             resolved_at: status !== 'pending' ? new Date().toISOString() : null,
-          } as never)
-          .match({ user_id: payment.studentId, period_month: payment.monthKey } as never);
+          })
+          .match({ user_id: payment.studentId, period_month: payment.monthKey });
 
         if (status === 'verified') {
-          await supabase.from('platform_subscription_payments' as never).upsert({
+          await supabase.from('platform_subscription_payments').upsert({
             user_id: payment.studentId,
             amount_paise: (payment.amount || STUDENT_MONTHLY_FEE_AMOUNT) * 100,
             period_month: payment.monthKey,
             paid_on: payment.paidAt || new Date().toISOString(),
             method: 'upi',
-          } as never);
+          });
         } else if (status === 'rejected') {
           await supabase
-            .from('platform_subscription_payments' as never)
+            .from('platform_subscription_payments')
             .delete()
-            .match({ user_id: payment.studentId, period_month: payment.monthKey } as never);
+            .match({ user_id: payment.studentId, period_month: payment.monthKey });
         }
       } catch (err) {
         logger.warn('update_subscription_status_db_error', { error: String(err) });
