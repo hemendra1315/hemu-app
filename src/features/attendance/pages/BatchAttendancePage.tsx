@@ -66,10 +66,19 @@ export default function BatchAttendancePage() {
           {attendanceQuery.data.map((session) => (
             <div
               key={session.sessionId}
-              className="hover:bg-surface-muted/20 flex flex-col justify-between gap-3 p-4 transition-colors sm:flex-row sm:items-center"
+              onClick={() => navigate(`/sessions/${session.sessionId}/attendance`)}
+              className="hover:bg-surface-muted/30 group flex cursor-pointer flex-col justify-between gap-3 p-4 transition-colors sm:flex-row sm:items-center"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/sessions/${session.sessionId}/attendance`);
+                }
+              }}
             >
               <div className="min-w-0 flex-1">
-                <p className="font-heading text-fg text-sm font-bold tracking-tight uppercase">
+                <p className="font-heading text-fg group-hover:text-primary text-sm font-bold tracking-tight uppercase transition-colors">
                   {session.title}
                 </p>
                 <div className="text-fg-muted mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs">
@@ -88,6 +97,9 @@ export default function BatchAttendancePage() {
                 <span className="border-primary/20 bg-primary-pale text-primary inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-[11px] font-bold">
                   <Users className="h-3 w-3" />
                   {session.attendance.length} Records
+                </span>
+                <span className="text-fg-muted group-hover:text-primary text-xs font-semibold transition-all group-hover:translate-x-0.5">
+                  →
                 </span>
               </div>
             </div>
