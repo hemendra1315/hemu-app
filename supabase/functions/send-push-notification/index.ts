@@ -489,14 +489,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 4b. Native Android — FCM HTTP v1
+    // 4b. Native Android — FCM HTTP v1 (deduplicated by fcm_token)
     if (androidSubs.length > 0) {
+      // Group subscription row IDs by fcm_token so that identical tokens are sent at most once
+      const tokenToSubMap = new Map<string, PushSub[]>();
+      for (const sub of androidSubs) {
+        if (!sub.fcm_token) continue;
+        const existing = tokenToSubMap.get(sub.fcm_token) ?? [];
+        existing.push(sub);
+        tokenToSubMap.set(sub.fcm_token, existing);
+      }
+
       const serviceAccountJson = Deno.env.get('FCM_SERVICE_ACCOUNT_JSON');
       if (!serviceAccountJson) {
         console.warn(
           'FCM_SERVICE_ACCOUNT_JSON not set — skipping',
-          androidSubs.length,
-          'Android subscription(s)',
+          tokenToSubMap.size,
+          'distinct Android FCM token(s)',
         );
       } else {
         try {
@@ -504,12 +513,12 @@ Deno.serve(async (req: Request) => {
           const accessToken = await getFcmAccessToken(serviceAccount);
 
           await Promise.all(
-            androidSubs.map(async (sub) => {
+            Array.from(tokenToSubMap.entries()).map(async ([fcmToken, subsForToken]) => {
               try {
                 const res = await sendFcmMessage(
                   serviceAccount.project_id,
                   accessToken,
-                  sub.fcm_token!,
+                  fcmToken,
                   announcement.title,
                   announcement.message,
                 );
@@ -519,9 +528,10 @@ Deno.serve(async (req: Request) => {
                   console.warn('fcm_send_ok');
                 } else if (res.status === 404 || res.status === 400) {
                   console.warn('fcm_send_rejected', res.status, await res.text());
-                  // UNREGISTERED / INVALID_ARGUMENT — the token is dead
-                  // (uninstalled app, expired, malformed); stop sending to it.
-                  staleIds.push(sub.id);
+                  // UNREGISTERED / INVALID_ARGUMENT — all rows sharing this dead token are pruned
+                  for (const sub of subsForToken) {
+                    staleIds.push(sub.id);
+                  }
                 } else {
                   console.warn('fcm_send_failed', res.status, await res.text());
                 }

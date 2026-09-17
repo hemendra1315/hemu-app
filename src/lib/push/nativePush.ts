@@ -78,6 +78,8 @@ async function persistToken(token: Token): Promise<void> {
       return;
     }
 
+    const canonicalEndpoint = `fcm:${token.value}`;
+
     // Reuses the existing (user_id, endpoint) unique constraint with a
     // synthetic endpoint so this upsert works identically to the Web Push
     // path -- no separate conflict target needed per platform.
@@ -86,7 +88,7 @@ async function persistToken(token: Token): Promise<void> {
         user_id: user.id,
         academy_id: currentAcademyId,
         platform: 'android',
-        endpoint: `fcm:${token.value}`,
+        endpoint: canonicalEndpoint,
         fcm_token: token.value,
         p256dh: null,
         auth: null,
@@ -94,6 +96,17 @@ async function persistToken(token: Token): Promise<void> {
       { onConflict: 'user_id,endpoint' },
     );
     if (error) throw error;
+
+    // Defensively clean up any legacy Android subscription row belonging to the
+    // same user with the same FCM token but a different legacy endpoint format.
+    void supabase
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('platform', 'android')
+      .eq('fcm_token', token.value)
+      .neq('endpoint', canonicalEndpoint);
+
     pendingToken = null;
     logger.info('native_push_token_saved');
   } catch (err) {
