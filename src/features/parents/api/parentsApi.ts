@@ -19,9 +19,7 @@ export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[
   // with a 400 "Could not find a relationship" error. This does the join in two
   // plain queries instead, which the existing `academy_members_select_parents`
   // RLS policy already supports.
-  const links = await unwrap<
-    { id: string; relationship_type: ParentRelationshipType; player_user_id: string }[]
-  >(
+  const links = await unwrap<{ id: string; relationship_type: string; player_user_id: string }[]>(
     supabase
       .from('parent_player_links')
       .select('id, relationship_type, player_user_id')
@@ -50,7 +48,7 @@ export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[
       const profile = await fetchPlayerProfile(academyId, memberId);
       children.push({
         linkId: link.id,
-        relationshipType: link.relationship_type,
+        relationshipType: link.relationship_type as ParentRelationshipType,
         player: profile,
       });
     } catch (err) {
