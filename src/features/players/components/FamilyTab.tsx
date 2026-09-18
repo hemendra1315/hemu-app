@@ -12,6 +12,7 @@ import { QrCode, Trash2, Copy, Check } from 'lucide-react';
 import type { UUID } from '@/types';
 import type { ParentRelationshipType } from '@/features/parents/api/parentsTypes';
 import { useUiStore } from '@/stores';
+import { errorMessage } from '@/lib/api/errors';
 
 export function FamilyTab({
   academyId,
@@ -40,8 +41,8 @@ export function FamilyTab({
         relationshipType: selectedRel,
       });
       pushToast({ title: 'Linking code generated', variant: 'success' });
-    } catch {
-      pushToast({ title: 'Failed to generate code', variant: 'error' });
+    } catch (error: unknown) {
+      pushToast({ title: errorMessage(error), variant: 'error' });
     }
   };
 
