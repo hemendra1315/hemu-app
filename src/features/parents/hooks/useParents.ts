@@ -1,4 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query/keys';
+import { useAcademyStore, useAuthStore } from '@/stores';
 import type { UUID } from '@/types';
 import {
   fetchLinkedChildren,
@@ -67,10 +69,30 @@ export function useGenerateLinkingCode() {
 
 export function useRedeemLinkingCode() {
   const queryClient = useQueryClient();
+  const setActiveAcademy = useAcademyStore((state) => state.setActiveAcademy);
+  const setIdentityStatus = useAuthStore((state) => state.setIdentityStatus);
 
   return useMutation({
     mutationFn: (code: string) => redeemLinkingCode(code),
-    onSuccess: () => {
+    // redeemLinkingCode() resolves with the academy the code belongs to
+    // (redeem_parent_linking_code RPC RETURNS the academy id). When this is
+    // the parent's first membership in that academy, the RPC creates their
+    // academy_members row server-side, but the client's `memberships` (Zustand
+    // authStore) and `activeAcademyId` (persisted academyStore) have no idea
+    // it exists: `useIdentity()` is a one-shot query gated on
+    // `identityStatus !== 'ready'`, so it will not refetch on its own once the
+    // parent is already logged in - and `activeAcademyId` is persisted to
+    // localStorage, so it stays null/stale even across an app reinstall.
+    // Net effect: `useActiveAcademy().academyId` stays null or points at the
+    // wrong academy, `useLinkedChildren()` is disabled or queries the wrong
+    // tenant, and the dashboard shows "No children linked" even though the
+    // link was created correctly. Force both to catch up immediately.
+    onSuccess: (academyId) => {
+      setActiveAcademy(academyId);
+      setIdentityStatus('loading');
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.identity(useAuthStore.getState().user?.id ?? 'anonymous'),
+      });
       // Invalidate children for all academies since we don't know the academyId beforehand
       void queryClient.invalidateQueries({ queryKey: parentKeys.all });
     },
