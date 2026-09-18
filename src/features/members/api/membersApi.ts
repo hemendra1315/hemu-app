@@ -128,9 +128,12 @@ export async function updateMemberRole(
   membershipId: UUID,
   role: AssignableMemberRole,
 ): Promise<void> {
-  await unwrap(
-    supabase.from('academy_members').update({ role }).eq('id', membershipId).select('id').single(),
-  );
+  // A raw `.update({ role })` can collide with `academy_members_academy_id_user_id_role_key`
+  // when the member has a prior (left/rejected) row for the target role, so this goes
+  // through a dedicated RPC that reactivates that row instead of updating in place -
+  // matching the ON CONFLICT (academy_id, user_id, role) DO UPDATE pattern already used
+  // elsewhere in this schema (see 0024_super_admin_academy_management.sql).
+  await rpc<UUID>('change_member_role', { p_membership_id: membershipId, p_new_role: role });
 }
 
 export async function updateMemberStatus(

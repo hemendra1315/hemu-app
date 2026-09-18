@@ -82,6 +82,8 @@ const DOMAIN_MESSAGES: Record<string, string> = {
     'That join code has been used too many times. Ask your academy for a new one.',
   E_ALREADY_MEMBER: 'You are already part of this academy.',
   E_REQUEST_PENDING: 'Your request is already waiting for the academy owner to approve it.',
+  E_ROLE_ALREADY_ASSIGNED: 'This member already has that role in this academy.',
+  E_INVALID_ROLE: 'That is not a valid role to assign.',
 };
 
 function domainMessage(message: string): string | undefined {

@@ -5,6 +5,7 @@ import { useUpdateMember } from '../hooks/useMembers';
 import { useUiStore } from '@/stores';
 import { ROLE_LABELS, type AppRole, type AssignableMemberRole } from '@/types/enums';
 import type { UUID } from '@/types';
+import { errorMessage } from '@/lib/api/errors';
 
 export type ChangeRoleModalProps = {
   open: boolean;
@@ -127,10 +128,9 @@ function ChangeRoleForm({
           onClose();
         },
         onError: (err: unknown) => {
-          const message = err instanceof Error ? err.message : 'Failed to update member role';
           pushToast({
             title: 'Role change failed',
-            description: message,
+            description: errorMessage(err),
             variant: 'error',
           });
         },
