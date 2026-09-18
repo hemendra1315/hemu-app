@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { unwrap } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import { isUUID } from '@/lib/validators';
@@ -14,26 +13,44 @@ import { fetchPlayerProfile } from '@/features/players/api/playersApi';
 export async function fetchLinkedChildren(academyId: UUID): Promise<LinkedChild[]> {
   if (!isUUID(academyId)) return [];
 
-  const rows = await unwrap<any[]>(
-    (supabase as any)
+  // `parent_player_links` has no foreign key to `academy_members` (it links via
+  // profiles.id, not academy_members.id), so a PostgREST embed like
+  // `academy_members!inner(id)` cannot resolve a relationship and always fails
+  // with a 400 "Could not find a relationship" error. This does the join in two
+  // plain queries instead, which the existing `academy_members_select_parents`
+  // RLS policy already supports.
+  const links = await unwrap<
+    { id: string; relationship_type: ParentRelationshipType; player_user_id: string }[]
+  >(
+    supabase
       .from('parent_player_links')
-      .select('id, relationship_type, player_user_id, academy_members!inner(id)')
+      .select('id, relationship_type, player_user_id')
       .eq('academy_id', academyId)
-      .eq('status', 'active')
-      .eq('academy_members.academy_id', academyId),
+      .eq('status', 'active'),
   );
 
+  if (links.length === 0) return [];
+
+  const playerUserIds = [...new Set(links.map((link) => link.player_user_id))];
+
+  const members = await unwrap<{ id: string; user_id: string }[]>(
+    supabase
+      .from('academy_members')
+      .select('id, user_id')
+      .eq('academy_id', academyId)
+      .in('user_id', playerUserIds),
+  );
+  const memberIdByUserId = new Map(members.map((member) => [member.user_id, member.id]));
+
   const children: LinkedChild[] = [];
-  for (const row of rows) {
-    const memberId = Array.isArray(row.academy_members)
-      ? row.academy_members[0]?.id
-      : row.academy_members?.id;
+  for (const link of links) {
+    const memberId = memberIdByUserId.get(link.player_user_id);
     if (!memberId) continue;
     try {
       const profile = await fetchPlayerProfile(academyId, memberId);
       children.push({
-        linkId: row.id,
-        relationshipType: row.relationship_type,
+        linkId: link.id,
+        relationshipType: link.relationship_type,
         player: profile,
       });
     } catch (err) {
