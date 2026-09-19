@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { unwrap, unwrapVoid } from '@/lib/api';
+import { unwrap, unwrapVoid, unwrapMaybe } from '@/lib/api';
 import { supabase } from '@/lib/supabase/client';
 import type { UUID } from '@/types';
 import type {
@@ -529,12 +529,13 @@ export async function fetchMatchPartnerships(matchId: UUID): Promise<MatchPartne
 // ============================================================
 
 export async function fetchMatchAwards(matchId: UUID): Promise<MatchAwards | null> {
-  const row = await unwrap<any>(
+  const row = await unwrapMaybe<any>(
     (supabase as any)
       .from('match_awards')
       .select(
         `
         id, match_id, player_of_match_id, best_batter_id, best_bowler_id, best_fielder_id,
+        created_at, updated_at,
         player_of_match:player_of_match_id(
           id,
           profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url)
@@ -615,7 +616,7 @@ export async function fetchPlayerStatisticsById(
   academyId: UUID,
   playerId: UUID,
 ): Promise<PlayerStatistics | null> {
-  const row = await unwrap<any>(
+  const row = await unwrapMaybe<any>(
     (supabase as any)
       .from('player_statistics')
       .select(
