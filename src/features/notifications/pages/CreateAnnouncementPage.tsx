@@ -42,7 +42,7 @@ export function CreateAnnouncementPage() {
   const { data: batches = [] } = useBatches(academyId || null);
   const pushToast = useUiStore((s) => s.pushToast);
 
-  const isOwner = membership?.role === 'academy_owner';
+  const isOwner = membership?.role === 'academy_owner' || membership?.role === 'super_admin';
 
   const {
     register,
@@ -55,14 +55,14 @@ export function CreateAnnouncementPage() {
     defaultValues: {
       title: '',
       message: '',
-      audience: 'all',
+      audience: isOwner ? 'all' : 'batch',
       batch_id: null,
     },
   });
 
   // Set default audience to batch if the user is a coach
   useEffect(() => {
-    if (membership && membership.role !== 'academy_owner') {
+    if (membership && membership.role !== 'academy_owner' && membership.role !== 'super_admin') {
       setValue('audience', 'batch');
     }
   }, [membership, setValue]);

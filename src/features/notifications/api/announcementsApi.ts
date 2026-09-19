@@ -39,6 +39,10 @@ export const announcementsApi = {
   },
 
   async createAnnouncement(payload: CreateAnnouncementPayload): Promise<Announcement> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { data, error } = await supabase
       .from('announcements')
       .insert({
@@ -47,6 +51,7 @@ export const announcementsApi = {
         message: payload.message,
         audience: payload.audience,
         batch_id: payload.batch_id || null,
+        created_by: user?.id ?? null,
       })
       .select()
       .single();

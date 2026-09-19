@@ -62,12 +62,26 @@ function markAutoPrompted(): void {
   }
 }
 
-async function persistToken(token: Token): Promise<void> {
+export type NativePushSubscribeResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason:
+        | 'unsupported'
+        | 'permission_denied'
+        | 'registration_timeout'
+        | 'registration_error'
+        | `db_error:${string}`;
+    };
+
+export async function persistToken(
+  token: Token,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!currentAcademyId) {
     // Not an error: stash it and write once the academy is known.
     pendingToken = token;
     logger.debug('native_push_token_pending_academy');
-    return;
+    return { ok: false, error: 'pending_academy' };
   }
   try {
     const {
@@ -75,7 +89,7 @@ async function persistToken(token: Token): Promise<void> {
     } = await supabase.auth.getUser();
     if (!user) {
       pendingToken = token;
-      return;
+      return { ok: false, error: 'unauthenticated' };
     }
 
     const canonicalEndpoint = `fcm:${token.value}`;
@@ -109,8 +123,11 @@ async function persistToken(token: Token): Promise<void> {
 
     pendingToken = null;
     logger.info('native_push_token_saved');
+    return { ok: true };
   } catch (err) {
-    logger.warn('native_push_token_save_failed', { error: String(err) });
+    const errMsg = String(err);
+    logger.warn('native_push_token_save_failed', { error: errMsg });
+    return { ok: false, error: errMsg };
   }
 }
 
@@ -189,28 +206,90 @@ export async function initNativePush(academyId: string | null): Promise<void> {
   }
 }
 
+export async function getNativePushPermission(): Promise<
+  'default' | 'granted' | 'denied' | 'unsupported'
+> {
+  if (!isNativePush()) return 'unsupported';
+  try {
+    const status = await PushNotifications.checkPermissions();
+    if (status.receive === 'granted') return 'granted';
+    if (status.receive === 'denied') return 'denied';
+    return 'default';
+  } catch {
+    return 'unsupported';
+  }
+}
+
 export async function isNativePushSubscribed(): Promise<boolean> {
   if (!isNativePush()) return false;
-  const status = await PushNotifications.checkPermissions();
-  return status.receive === 'granted';
+  try {
+    const status = await PushNotifications.checkPermissions();
+    if (status.receive !== 'granted') return false;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await supabase
+      .from('push_subscriptions')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('platform', 'android')
+      .limit(1);
+    return Boolean(data && data.length > 0);
+  } catch {
+    return false;
+  }
 }
 
 /** UI entry point for the "Enable Notifications" button on native Android. */
-export async function subscribeToNativePush(
-  academyId: string,
-): Promise<'granted' | 'denied' | 'unsupported'> {
-  if (!isNativePush()) return 'unsupported';
+export async function subscribeToNativePush(academyId: string): Promise<NativePushSubscribeResult> {
+  if (!isNativePush()) return { ok: false, reason: 'unsupported' };
   currentAcademyId = academyId;
   ensureListeners();
 
   const status = await PushNotifications.requestPermissions();
   if (status.receive !== 'granted') {
     logger.info('native_push_permission_denied');
-    return 'denied';
+    return { ok: false, reason: 'permission_denied' };
   }
 
-  await PushNotifications.register();
-  return 'granted';
+  return new Promise((resolve) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      void regListener.then((l) => l.remove());
+      void errListener.then((l) => l.remove());
+      resolve({ ok: false, reason: 'registration_timeout' });
+    }, 15000);
+
+    const regListener = PushNotifications.addListener('registration', (token: Token) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      void regListener.then((l) => l.remove());
+      void errListener.then((l) => l.remove());
+      void persistToken(token).then((result) => {
+        if (result.ok) {
+          resolve({ ok: true });
+        } else {
+          resolve({ ok: false, reason: `db_error:${result.error}` });
+        }
+      });
+    });
+
+    const errListener = PushNotifications.addListener('registrationError', (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      void regListener.then((l) => l.remove());
+      void errListener.then((l) => l.remove());
+      logger.warn('native_push_registration_error', { error: String(err) });
+      resolve({ ok: false, reason: 'registration_error' });
+    });
+
+    void PushNotifications.register();
+  });
 }
 
 /**

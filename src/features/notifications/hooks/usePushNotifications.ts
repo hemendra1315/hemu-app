@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { fetchMyMemberships } from '@/features/academies/api/academiesApi';
 import { logger } from '@/lib/logger';
+import {
+  isNativePush,
+  getNativePushPermission,
+  isNativePushSubscribed,
+  subscribeToNativePush,
+} from '@/lib/push/nativePush';
 import { useAcademyStore, useAuthStore, useUiStore } from '@/stores';
 import { supabase } from '@/lib/supabase/client';
 
@@ -87,14 +93,29 @@ export function usePushNotifications() {
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const pushToast = useUiStore((s) => s.pushToast);
+  const isNative = isNativePush();
 
   const checkStatus = useCallback(async () => {
+    if (isNative) {
+      try {
+        const perm = await getNativePushPermission();
+        setPermission(perm);
+        const subscribed = await isNativePushSubscribed();
+        setIsSubscribed(subscribed);
+      } catch {
+        setPermission('unsupported');
+        setIsSubscribed(false);
+      }
+      return;
+    }
+
     if (
       typeof window === 'undefined' ||
       !('Notification' in window) ||
       !('serviceWorker' in navigator)
     ) {
       setPermission('unsupported');
+      setIsSubscribed(false);
       return;
     }
 
@@ -107,17 +128,35 @@ export function usePushNotifications() {
     } catch {
       setIsSubscribed(false);
     }
-  }, []);
+  }, [isNative]);
 
   useEffect(() => {
     let active = true;
     void (async () => {
+      if (isNative) {
+        try {
+          const perm = await getNativePushPermission();
+          if (active) setPermission(perm);
+          const subscribed = await isNativePushSubscribed();
+          if (active) setIsSubscribed(subscribed);
+        } catch {
+          if (active) {
+            setPermission('unsupported');
+            setIsSubscribed(false);
+          }
+        }
+        return;
+      }
+
       if (
         typeof window === 'undefined' ||
         !('Notification' in window) ||
         !('serviceWorker' in navigator)
       ) {
-        if (active) setPermission('unsupported');
+        if (active) {
+          setPermission('unsupported');
+          setIsSubscribed(false);
+        }
         return;
       }
 
@@ -135,14 +174,28 @@ export function usePushNotifications() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isNative]);
 
   const subscribe = useCallback(
     async (vapidKey?: string, explicitAcademyId?: string): Promise<boolean> => {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
         pushToast({
-          title: 'Notifications not supported',
-          description: 'This browser does not support Web Push notifications.',
+          title: 'Sign in required',
+          description: 'You need to be signed in to enable notifications.',
+          variant: 'error',
+        });
+        return false;
+      }
+
+      const resolvedAcademyId = explicitAcademyId || (await resolveUserAcademyId(user.id));
+      if (!resolvedAcademyId) {
+        pushToast({
+          title: 'Select an academy first',
+          description: 'Notifications are tied to an academy — pick one before enabling.',
           variant: 'error',
         });
         return false;
@@ -150,10 +203,68 @@ export function usePushNotifications() {
 
       setIsLoading(true);
       try {
+        if (isNative) {
+          const result = await subscribeToNativePush(resolvedAcademyId);
+          if (result.ok) {
+            setPermission('granted');
+            setIsSubscribed(true);
+            pushToast({
+              title: 'Push notifications enabled!',
+              description: 'You will receive session reminders, match call-ups, and dues alerts.',
+              variant: 'success',
+            });
+            return true;
+          }
+
+          setIsSubscribed(false);
+          if (result.reason === 'permission_denied') {
+            setPermission('denied');
+            pushToast({
+              title: 'Permission not granted',
+              description:
+                'Enable notifications for this app in Android Settings to receive alerts.',
+              variant: 'info',
+            });
+          } else if (result.reason === 'registration_timeout') {
+            pushToast({
+              title: "Couldn't enable notifications",
+              description:
+                'Registration with Google Play services timed out. Check your connection and try again.',
+              variant: 'error',
+            });
+          } else if (result.reason.startsWith('db_error:')) {
+            pushToast({
+              title: 'Registered, but not saved',
+              description: "Your device registered for push, but we couldn't save it. Try again.",
+              variant: 'error',
+            });
+          } else {
+            pushToast({
+              title: "Couldn't enable notifications",
+              description: 'Device registration failed. Try again in a moment.',
+              variant: 'error',
+            });
+          }
+          return false;
+        }
+
+        // ─── Web Push path ───────────────────────────────────────────────
+        if (typeof window === 'undefined' || !('Notification' in window)) {
+          setIsSubscribed(false);
+          setPermission('unsupported');
+          pushToast({
+            title: 'Notifications not supported',
+            description: 'This browser does not support Web Push notifications.',
+            variant: 'error',
+          });
+          return false;
+        }
+
         const permResult = await Notification.requestPermission();
         setPermission(permResult);
 
         if (permResult !== 'granted') {
+          setIsSubscribed(false);
           pushToast({
             title: 'Permission not granted',
             description: 'Enable notifications in browser settings to receive academy alerts.',
@@ -174,57 +285,51 @@ export function usePushNotifications() {
         };
 
         const subscription = await reg.pushManager.subscribe(options);
-        setIsSubscribed(true);
-        logger.info('push_subscription_success', { endpoint: subscription.endpoint });
-
-        // Persist subscription in push_subscriptions table with verified academy_id
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          const resolvedAcademyId = explicitAcademyId || (await resolveUserAcademyId(user.id));
-
-          if (!resolvedAcademyId) {
-            const err = new Error('No valid active academy membership found for push subscription');
-            logger.error('push_subscription_missing_academy', {
-              error: err.message,
-              userId: user.id,
-            });
-            throw err;
-          }
-
-          const keys = subscription.toJSON().keys as { p256dh: string; auth: string } | undefined;
-          if (keys?.p256dh && keys?.auth) {
-            const platform = detectPushPlatform();
-            const fcmToken = extractFcmToken(subscription.endpoint);
-
-            const { error: dbError } = await supabase.from('push_subscriptions').upsert(
-              {
-                user_id: user.id,
-                academy_id: resolvedAcademyId,
-                endpoint: subscription.endpoint,
-                p256dh: keys.p256dh,
-                auth: keys.auth,
-                platform,
-                fcm_token: fcmToken,
-              },
-              { onConflict: 'user_id,endpoint' },
-            );
-
-            if (dbError) {
-              logger.error('push_db_persist_failed', {
-                error: dbError.message,
-                academyId: resolvedAcademyId,
-                userId: user.id,
-              });
-              throw new Error(
-                `Failed to persist push subscription in database: ${dbError.message}`,
-              );
-            }
-          }
+        const keys = subscription.toJSON().keys as { p256dh: string; auth: string } | undefined;
+        if (!keys?.p256dh || !keys?.auth) {
+          setIsSubscribed(false);
+          pushToast({
+            title: "Couldn't enable notifications",
+            description: 'Failed to generate encryption keys for browser push.',
+            variant: 'error',
+          });
+          return false;
         }
 
+        const platform = detectPushPlatform();
+        const fcmToken = extractFcmToken(subscription.endpoint);
+
+        const { error: dbError } = await supabase.from('push_subscriptions').upsert(
+          {
+            user_id: user.id,
+            academy_id: resolvedAcademyId,
+            endpoint: subscription.endpoint,
+            p256dh: keys.p256dh,
+            auth: keys.auth,
+            platform,
+            fcm_token: fcmToken,
+          },
+          { onConflict: 'user_id,endpoint' },
+        );
+
+        if (dbError) {
+          logger.error('push_db_persist_failed', {
+            error: dbError.message,
+            academyId: resolvedAcademyId,
+            userId: user.id,
+          });
+          setIsSubscribed(false);
+          pushToast({
+            title: 'Registered, but not saved',
+            description:
+              "Your browser subscribed, but we couldn't save it to the server. Try again.",
+            variant: 'error',
+          });
+          return false;
+        }
+
+        setIsSubscribed(true);
+        logger.info('push_subscription_success', { endpoint: subscription.endpoint });
         pushToast({
           title: 'Push notifications enabled!',
           description: 'You will receive session reminders, match call-ups, and dues alerts.',
@@ -233,19 +338,18 @@ export function usePushNotifications() {
         return true;
       } catch (err) {
         logger.warn('push_subscription_failed', { error: String(err) });
-        // Fallback for permissions granted without active VAPID backend
-        setIsSubscribed(true);
+        setIsSubscribed(false);
         pushToast({
-          title: 'Notifications active',
-          description: 'Local and in-app alerts are now enabled.',
-          variant: 'success',
+          title: "Couldn't enable notifications",
+          description: 'Subscription failed. Please check permissions and try again.',
+          variant: 'error',
         });
-        return true;
+        return false;
       } finally {
         setIsLoading(false);
       }
     },
-    [pushToast],
+    [isNative, pushToast],
   );
 
   const sendTestNotification = useCallback(

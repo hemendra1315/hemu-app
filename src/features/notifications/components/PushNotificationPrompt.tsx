@@ -12,7 +12,7 @@ export function PushNotificationPrompt() {
     return null;
   }
 
-  const isGranted = permission === 'granted' || isSubscribed;
+  const isGranted = isSubscribed;
 
   return (
     <Card className="border-primary/30 bg-primary/5 relative overflow-hidden rounded-2xl border shadow-xs">

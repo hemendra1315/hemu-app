@@ -37,6 +37,9 @@ vi.mock('@/lib/supabase/client', () => {
 
   return {
     supabase: {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-owner-123' } } }),
+      },
       from: fromMock,
     },
   };
