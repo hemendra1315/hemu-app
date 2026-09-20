@@ -17,7 +17,10 @@ vi.mock('@/lib/supabase/client', () => ({
 import { supabase } from '@/lib/supabase/client';
 import {
   FAMPAY_UPI_ID,
+  FAMPAY_PAYEE_NAME,
   STUDENT_MONTHLY_FEE_AMOUNT,
+  buildStudentFeeUpiUri,
+  UPI_TEST_VARIANTS,
   getCurrentMonthKey,
   getCurrentMonthLabel,
   formatMonthLabelFromKey,
@@ -94,7 +97,30 @@ const claimsRow = (overrides: Row = {}): Row => ({
 describe('studentFeeStore date helpers', () => {
   it('exposes correct FamPay configuration constants', () => {
     expect(FAMPAY_UPI_ID).toBe('7358875632@fam');
+    expect(FAMPAY_PAYEE_NAME).toBe('Hemendra');
     expect(STUDENT_MONTHLY_FEE_AMOUNT).toBe(200);
+  });
+
+  it('builds canonical student fee UPI URI with exact matching parameters', () => {
+    const uri = buildStudentFeeUpiUri('September 2026');
+    expect(uri).toBe(
+      'upi://pay?pa=7358875632@fam&pn=Hemendra&am=200&cu=INR&tn=CAM%20Student%20Pass%20September%202026',
+    );
+    expect(uri).toContain('7358875632@fam');
+    expect(uri).not.toContain('%40');
+  });
+
+  it('provides all 4 diagnostic test variants for mobile intent debugging', () => {
+    expect(UPI_TEST_VARIANTS.variant1_rawBase).toBe('upi://pay?pa=7358875632@fam&pn=Hemendra');
+    expect(UPI_TEST_VARIANTS.variant2_withAmount).toBe(
+      'upi://pay?pa=7358875632@fam&pn=Hemendra&am=200&cu=INR',
+    );
+    expect(UPI_TEST_VARIANTS.variant3_withNoteLiteralAt('September 2026')).toBe(
+      'upi://pay?pa=7358875632@fam&pn=Hemendra&am=200&cu=INR&tn=CAM%20Student%20Pass%20September%202026',
+    );
+    expect(UPI_TEST_VARIANTS.variant4_withEncodedAt('September 2026')).toBe(
+      'upi://pay?pa=7358875632%40fam&pn=Hemendra&am=200&cu=INR&tn=CAM%20Student%20Pass%20September%202026',
+    );
   });
 
   it('computes month keys and labels accurately', () => {

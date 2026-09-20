@@ -1,4 +1,5 @@
-import { useState, useId } from 'react';
+import { useState, useId, useEffect } from 'react';
+import QRCode from 'qrcode';
 import {
   Copy,
   Check,
@@ -13,9 +14,12 @@ import {
 } from 'lucide-react';
 import { Modal, Button, Input } from '@/components/ui';
 import { errorMessage } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import {
   FAMPAY_UPI_ID,
   STUDENT_MONTHLY_FEE_AMOUNT,
+  buildStudentFeeUpiUri,
+  UPI_TEST_VARIANTS,
   useStudentFeePayment,
   useSubmitStudentFeeClaim,
   type StudentFeePayment,
@@ -61,6 +65,32 @@ export function StudentMonthlyFeeModal({
   const [copied, setCopied] = useState(false);
   const [submittedPayment, setSubmittedPayment] = useState<StudentFeePayment | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+
+  const upiIntentUrl = buildStudentFeeUpiUri(currentMonthLabel);
+
+  useEffect(() => {
+    let isMounted = true;
+    QRCode.toDataURL(upiIntentUrl, {
+      width: 240,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => {
+        if (isMounted) setQrDataUrl(url);
+      })
+      .catch((err) => {
+        logger.warn('qr_generation_failed', { error: String(err) });
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [upiIntentUrl]);
 
   const isSubmitting = submitClaim.isPending;
   const pushToast = useUiStore((s) => s.pushToast);
@@ -168,8 +198,6 @@ export function StudentMonthlyFeeModal({
     setFormError(null);
     onClose();
   };
-
-  const upiIntentUrl = `upi://pay?pa=${FAMPAY_UPI_ID}&pn=CAM%20App&am=${STUDENT_MONTHLY_FEE_AMOUNT}&cu=INR&tn=CAM%20Student%20Pass%20${encodeURIComponent(currentMonthLabel)}`;
 
   const generateWhatsAppUrl = (p: StudentFeePayment) => {
     const formattedDate = new Date(p.paidAt).toLocaleDateString('en-IN', {
@@ -321,8 +349,14 @@ export function StudentMonthlyFeeModal({
 
           {/* QR Code & Direct UPI section */}
           <div className="border-border-subtle bg-surface-muted/40 flex flex-col items-center justify-center rounded-2xl border p-4 text-center">
-            <div className="border-primary/30 relative mb-2.5 overflow-hidden rounded-2xl border-2 bg-white p-2 shadow-md">
-              <img src="/fampay_qr.jpg" alt="FamPay QR Code" className="h-40 w-40 object-contain" />
+            <div className="border-primary/30 relative mb-2.5 flex h-44 w-44 items-center justify-center overflow-hidden rounded-2xl border-2 bg-white p-2 shadow-md">
+              {qrDataUrl ? (
+                <img src={qrDataUrl} alt="FamPay QR Code" className="h-40 w-40 object-contain" />
+              ) : (
+                <div className="flex h-40 w-40 items-center justify-center">
+                  <span className="text-fg-muted text-xs">Generating QR...</span>
+                </div>
+              )}
             </div>
             <p className="text-fg text-xs font-semibold">
               Scan with GPay, PhonePe, Paytm, or FamPay
@@ -349,11 +383,76 @@ export function StudentMonthlyFeeModal({
             {/* Direct Mobile Pay Button */}
             <a
               href={upiIntentUrl}
+              onClick={() => {
+                // eslint-disable-next-line no-console
+                console.log('[UPI Intent Triggered]', upiIntentUrl);
+              }}
               className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98]"
             >
               <ExternalLink className="h-4 w-4" />
               <span>Pay via UPI App</span>
             </a>
+
+            {/* Diagnostic Test Variant Buttons */}
+            <div className="border-border-subtle mt-3 w-full space-y-1.5 rounded-xl border border-dashed p-2 text-left">
+              <span className="text-fg-muted block text-[10px] font-bold tracking-wider uppercase">
+                🔬 UPI Intent Diagnostics
+              </span>
+              <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                <a
+                  href={UPI_TEST_VARIANTS.variant1_rawBase}
+                  onClick={() => {
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      '[UPI Test Variant 1 - Raw QR Base]',
+                      UPI_TEST_VARIANTS.variant1_rawBase,
+                    );
+                  }}
+                  className="bg-surface border-border-subtle text-fg hover:bg-surface-muted inline-flex items-center justify-center rounded-lg border px-2 py-1 text-[11px] font-medium transition"
+                >
+                  Test 1: Base (pa+pn)
+                </a>
+                <a
+                  href={UPI_TEST_VARIANTS.variant2_withAmount}
+                  onClick={() => {
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      '[UPI Test Variant 2 - Amount+INR]',
+                      UPI_TEST_VARIANTS.variant2_withAmount,
+                    );
+                  }}
+                  className="bg-surface border-border-subtle text-fg hover:bg-surface-muted inline-flex items-center justify-center rounded-lg border px-2 py-1 text-[11px] font-medium transition"
+                >
+                  Test 2: + ₹200 (am+cu)
+                </a>
+                <a
+                  href={UPI_TEST_VARIANTS.variant3_withNoteLiteralAt(currentMonthLabel)}
+                  onClick={() => {
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      '[UPI Test Variant 3 - Literal @ + Note]',
+                      UPI_TEST_VARIANTS.variant3_withNoteLiteralAt(currentMonthLabel),
+                    );
+                  }}
+                  className="bg-surface border-border-subtle text-fg hover:bg-surface-muted inline-flex items-center justify-center rounded-lg border px-2 py-1 text-[11px] font-medium transition"
+                >
+                  Test 3: + Note (@fam)
+                </a>
+                <a
+                  href={UPI_TEST_VARIANTS.variant4_withEncodedAt(currentMonthLabel)}
+                  onClick={() => {
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      '[UPI Test Variant 4 - Encoded %40]',
+                      UPI_TEST_VARIANTS.variant4_withEncodedAt(currentMonthLabel),
+                    );
+                  }}
+                  className="bg-surface border-border-subtle text-fg hover:bg-surface-muted inline-flex items-center justify-center rounded-lg border px-2 py-1 text-[11px] font-medium transition"
+                >
+                  Test 4: Encoded (%40)
+                </a>
+              </div>
+            </div>
           </div>
 
           {/* Step 2: Confirm Registered Name */}

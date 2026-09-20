@@ -1,232 +1,188 @@
-import { rpc } from '@/lib/api';
 import { parseAppError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase/client';
-import type { PaymentMethod, PaymentStatus, InvoiceStatus } from '../providers/types';
+import { STUDENT_MONTHLY_FEE_AMOUNT } from './studentFeeStore';
 
-export interface Invoice {
-  id: string;
-  academyId: string;
-  membershipId: string;
-  feePlanId: string | null;
+export interface FeeRecoveryItem {
+  claimId: string;
+  invoiceId: string; // for backward compatibility with UI identifier expectations
   invoiceNumber: string;
-  title: string;
-  amount: number;
-  discountAmount: number;
-  taxAmount: number;
+  studentUserId: string;
+  membershipId: string;
+  studentName: string;
+  studentEmail: string;
+  phone?: string;
+  batchName?: string;
   totalAmount: number;
   paidAmount: number;
-  status: InvoiceStatus;
+  balanceAmount: number;
   dueDate: string;
-  issuedAt: string;
-  paidAt: string | null;
-  notes: string | null;
-}
-
-export interface Payment {
-  id: string;
-  academyId: string;
-  invoiceId: string;
-  membershipId: string;
-  amount: number;
-  currency: string;
-  paymentMethod: PaymentMethod;
-  status: PaymentStatus;
-  referenceNumber: string | null;
-  receiptUrl: string | null;
-  notes: string | null;
-  rejectionReason: string | null;
-  verifiedBy: string | null;
-  verifiedAt: string | null;
-  paidAt: string | null;
-  createdAt: string;
+  daysOverdue: number;
+  status: 'pending' | 'confirmed' | 'dismissed';
+  urgency: 'due_today' | 'overdue' | 'long_overdue';
 }
 
 export interface RecordManualPaymentInput {
   academyId: string;
-  invoiceId: string;
+  studentUserId?: string;
+  invoiceId?: string; // fallback if studentUserId passed as invoiceId
   amount: number;
-  paymentMethod: PaymentMethod;
-  referenceNumber: string;
+  paymentMethod?: string;
+  referenceNumber?: string;
   notes?: string;
-  receiptUrl?: string;
-  idempotencyKey?: string;
-}
-
-export interface SubmitPaymentProofInput {
-  invoiceId: string;
-  amount: number;
-  paymentMethod: PaymentMethod;
-  referenceNumber: string;
-  receiptUrl: string;
-  notes?: string;
-  idempotencyKey?: string;
-}
-
-export interface ReviewPaymentProofInput {
-  paymentId: string;
-  action: 'approve' | 'reject';
-  rejectionReason?: string;
-  idempotencyKey?: string;
 }
 
 /**
- * 1. Record Manual Payment (Staff Flow)
+ * 1. Record Manual Cash / Offline Payment (Staff & Owner Flow)
+ * Writes directly into production platform_subscription_payments and confirms pending claims.
  */
 export async function recordManualPayment(input: RecordManualPaymentInput) {
-  const idempotencyKey = input.idempotencyKey || crypto.randomUUID();
-  try {
-    return await rpc<Record<string, unknown>>('record_manual_payment', {
-      p_academy_id: input.academyId,
-      p_invoice_id: input.invoiceId,
-      p_amount: input.amount,
-      p_payment_method: input.paymentMethod,
-      p_reference_number: input.referenceNumber,
-      p_idempotency_key: idempotencyKey,
-      p_notes: input.notes ?? null,
-      p_receipt_url: input.receiptUrl ?? null,
-    });
-  } catch (err) {
-    throw parseAppError(err);
+  const userId = input.studentUserId || input.invoiceId;
+  if (!userId) {
+    throw new Error('Missing student user ID for recording payment');
   }
-}
 
-/**
- * 2. Submit Payment Proof (Player / Parent Flow)
- */
-export async function submitPaymentProof(input: SubmitPaymentProofInput) {
-  const idempotencyKey = input.idempotencyKey || crypto.randomUUID();
-  try {
-    return await rpc<Record<string, unknown>>('submit_payment_proof', {
-      p_invoice_id: input.invoiceId,
-      p_amount: input.amount,
-      p_payment_method: input.paymentMethod,
-      p_reference_number: input.referenceNumber,
-      p_receipt_url: input.receiptUrl,
-      p_notes: input.notes ?? null,
-      p_idempotency_key: idempotencyKey,
-    });
-  } catch (err) {
-    throw parseAppError(err);
-  }
-}
+  const periodMonth = `${new Date().toISOString().slice(0, 7)}-01`;
+  const paidOn = new Date().toISOString().slice(0, 10);
 
-/**
- * 3. Review Payment Proof (Staff Approval / Rejection Flow)
- */
-export async function reviewPaymentProof(input: ReviewPaymentProofInput) {
-  const idempotencyKey = input.idempotencyKey || crypto.randomUUID();
-  try {
-    return await rpc<Record<string, unknown>>('review_payment_proof', {
-      p_payment_id: input.paymentId,
-      p_action: input.action,
-      p_rejection_reason: input.rejectionReason ?? null,
-      p_idempotency_key: idempotencyKey,
-    });
-  } catch (err) {
-    throw parseAppError(err);
-  }
-}
-
-interface InvoiceDbRow {
-  id: string;
-  academy_id: string;
-  membership_id: string;
-  fee_plan_id: string | null;
-  invoice_number: string;
-  title?: string;
-  amount: number | string;
-  discount_amount?: number | string;
-  tax_amount?: number | string;
-  total_amount: number | string;
-  paid_amount?: number | string;
-  status: InvoiceStatus;
-  due_date: string;
-  issued_at: string;
-  paid_at?: string | null;
-  notes?: string | null;
-}
-
-interface PaymentDbRow {
-  id: string;
-  academy_id: string;
-  invoice_id: string;
-  membership_id: string;
-  amount: number | string;
-  currency: string;
-  payment_method: PaymentMethod;
-  status: PaymentStatus;
-  reference_number?: string | null;
-  receipt_url?: string | null;
-  notes?: string | null;
-  rejection_reason?: string | null;
-  verified_by?: string | null;
-  verified_at?: string | null;
-  paid_at?: string | null;
-  created_at: string;
-}
-
-/**
- * 4. Fetch Invoices for an Academy
- */
-export async function fetchAcademyInvoices(academyId: string): Promise<Invoice[]> {
+  // 1. Insert/upsert into platform_subscription_payments
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from('invoices')
-    .select('*')
-    .eq('academy_id', academyId)
-    .order('due_date', { ascending: false });
+  const { error: paymentError } = await (supabase as any)
+    .from('platform_subscription_payments')
+    .upsert(
+      {
+        user_id: userId,
+        amount_paise: Math.round(input.amount * 100),
+        period_month: periodMonth,
+        paid_on: paidOn,
+        method: input.paymentMethod || 'cash',
+        notes: input.notes || 'Cash collected on ground',
+      },
+      { onConflict: 'user_id,period_month' },
+    );
 
-  if (error) throw parseAppError(error);
+  if (paymentError) throw parseAppError(paymentError);
 
-  return ((data as InvoiceDbRow[]) || []).map((row) => ({
-    id: row.id,
-    academyId: row.academy_id,
-    membershipId: row.membership_id,
-    feePlanId: row.fee_plan_id,
-    invoiceNumber: row.invoice_number,
-    title: row.title || 'Academy Fee',
-    amount: Number(row.amount),
-    discountAmount: Number(row.discount_amount || 0),
-    taxAmount: Number(row.tax_amount || 0),
-    totalAmount: Number(row.total_amount),
-    paidAmount: Number(row.paid_amount || 0),
-    status: row.status,
-    dueDate: row.due_date,
-    issuedAt: row.issued_at,
-    paidAt: row.paid_at || null,
-    notes: row.notes || null,
-  }));
+  // 2. Resolve any pending claim
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase as any)
+    .from('platform_subscription_claims')
+    .update({
+      status: 'confirmed',
+      resolved_at: new Date().toISOString(),
+    })
+    .match({ user_id: userId, period_month: periodMonth });
 }
 
 /**
- * 5. Fetch Payments for an Invoice
+ * 2. Fetch Fee Recovery items aggregated from live platform_subscription_claims
+ * joined with academy members & profiles for the given academy.
  */
-export async function fetchInvoicePayments(invoiceId: string): Promise<Payment[]> {
+export async function fetchFeeRecoveryItems(academyId: string): Promise<FeeRecoveryItem[]> {
+  const memberMap = new Map<
+    string,
+    { id: string; userId: string; name: string; email: string; phone?: string; batchName?: string }
+  >();
+
+  // Fetch all active academy members and their profiles & batches
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
-    .from('payments')
-    .select('*')
-    .eq('invoice_id', invoiceId)
+  const { data: memberRows, error: memberError } = await (supabase as any)
+    .from('academy_members')
+    .select(
+      'id, user_id, profiles!academy_members_user_id_fkey!inner(full_name, email, avatar_url, phone), batch_members(batches(id, name))',
+    )
+    .eq('academy_id', academyId);
+
+  if (memberError) {
+    throw parseAppError(memberError);
+  }
+
+  for (const m of memberRows || []) {
+    const info = {
+      id: m.id,
+      userId: m.user_id,
+      name: m.profiles?.full_name || m.profiles?.email || 'Player',
+      email: m.profiles?.email || '',
+      phone: m.profiles?.phone || undefined,
+      batchName: m.batch_members?.[0]?.batches?.name,
+    };
+    memberMap.set(m.id, info);
+    if (m.user_id) {
+      memberMap.set(m.user_id, info);
+    }
+  }
+
+  // Fetch pending platform subscription claims
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: claims, error: claimsError } = await (supabase as any)
+    .from('platform_subscription_claims')
+    .select('id, user_id, period_month, payer_phone, note, status, created_at')
+    .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
-  if (error) throw parseAppError(error);
+  if (claimsError) {
+    throw parseAppError(claimsError);
+  }
 
-  return ((data as PaymentDbRow[]) || []).map((row) => ({
-    id: row.id,
-    academyId: row.academy_id,
-    invoiceId: row.invoice_id,
-    membershipId: row.membership_id,
-    amount: Number(row.amount),
-    currency: row.currency,
-    paymentMethod: row.payment_method,
-    status: row.status,
-    referenceNumber: row.reference_number || null,
-    receiptUrl: row.receipt_url || null,
-    notes: row.notes || null,
-    rejectionReason: row.rejection_reason || null,
-    verifiedBy: row.verified_by || null,
-    verifiedAt: row.verified_at || null,
-    paidAt: row.paid_at || null,
-    createdAt: row.created_at,
-  }));
+  const todayStr = new Date().toISOString().split('T')[0] ?? '';
+  const nowMs = Date.now();
+  const recoveryItems: FeeRecoveryItem[] = [];
+
+  for (const claim of claims || []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let noteData: Record<string, any> = {};
+    if (claim.note) {
+      try {
+        noteData = JSON.parse(claim.note);
+      } catch {
+        noteData = {};
+      }
+    }
+
+    // Filter by academy association
+    if (noteData.academyId && noteData.academyId !== academyId) {
+      continue;
+    }
+    if (!noteData.academyId && memberMap.size > 0 && !memberMap.has(claim.user_id)) {
+      continue;
+    }
+
+    const member =
+      memberMap.get(claim.user_id) ||
+      Array.from(memberMap.values()).find((m) => m.email === noteData.studentEmail);
+
+    const amount =
+      typeof noteData.amount === 'number' && noteData.amount > 0
+        ? noteData.amount
+        : STUDENT_MONTHLY_FEE_AMOUNT;
+
+    const dueDate = claim.period_month || claim.created_at?.slice(0, 10) || todayStr;
+    const dueTime = new Date(dueDate).getTime();
+    const daysOverdue = Math.max(0, Math.floor((nowMs - dueTime) / 86400000));
+    const isDueToday = dueDate.startsWith(todayStr.slice(0, 7)) || dueDate === todayStr;
+
+    let urgency: 'due_today' | 'overdue' | 'long_overdue' = 'overdue';
+    if (isDueToday) urgency = 'due_today';
+    else if (daysOverdue > 30) urgency = 'long_overdue';
+
+    recoveryItems.push({
+      claimId: claim.id,
+      invoiceId: claim.id,
+      invoiceNumber: `CLAIM-${claim.id.slice(0, 8).toUpperCase()}`,
+      studentUserId: claim.user_id,
+      membershipId: member?.id || claim.user_id,
+      studentName: noteData.studentName || member?.name || 'Player',
+      studentEmail: noteData.studentEmail || member?.email || '',
+      phone: claim.payer_phone || member?.phone,
+      batchName: member?.batchName || 'General Squad',
+      totalAmount: amount,
+      paidAmount: 0,
+      balanceAmount: amount,
+      dueDate,
+      daysOverdue,
+      status: 'pending',
+      urgency,
+    });
+  }
+
+  return recoveryItems.sort((a, b) => b.daysOverdue - a.daysOverdue);
 }

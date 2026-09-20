@@ -74,7 +74,7 @@ describe('StudentMonthlyFeeModal & Banner', () => {
     mockUseStudentFeePayment.mockReturnValue(baseHookState());
   });
 
-  it('renders FamPay QR image and UPI ID in modal', () => {
+  it('renders FamPay QR image and UPI ID in modal', async () => {
     render(
       <StudentMonthlyFeeModal
         open={true}
@@ -87,9 +87,12 @@ describe('StudentMonthlyFeeModal & Banner', () => {
       />,
     );
 
-    expect(screen.getByAltText('FamPay QR Code')).toBeInTheDocument();
+    expect(await screen.findByAltText('FamPay QR Code', {}, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.getByText('7358875632@fam')).toBeInTheDocument();
-    expect(screen.getByText(/Pay via UPI App/i)).toBeInTheDocument();
+    const payLink = screen.getByRole('link', { name: /Pay via UPI App/i });
+    expect(payLink).toBeInTheDocument();
+    expect(payLink).toHaveAttribute('href', expect.stringContaining('pa=7358875632@fam'));
+    expect(payLink.getAttribute('href')).not.toContain('%40');
   });
 
   it('validates registered player name + required screenshot and submits for verification', async () => {

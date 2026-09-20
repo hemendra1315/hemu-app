@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { RefreshCw, AlertCircle, CheckCircle2, ArrowLeft, Check, X } from 'lucide-react';
+import {
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  ArrowLeft,
+  Check,
+  X,
+  CheckCheck,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui';
 import { ErrorState, EmptyState } from '@/components/feedback';
@@ -31,8 +39,16 @@ export default function AttendanceSessionPage() {
   const session = sessionQuery.data;
   const batchPlayersQuery = useBatchPlayers(session?.batchId ?? null, academyId);
 
+  // Ground Mode: Inverted Attendance Logic
+  // Any player without an explicit saved/queued status defaults to 'present'
   const attendanceByPlayer = useMemo(() => {
     const map = new Map<string, AttendanceStatus>();
+    if (batchPlayersQuery.data) {
+      for (const p of batchPlayersQuery.data) {
+        // Ground Mode Default: Present
+        map.set(p.academyMemberId, 'present');
+      }
+    }
     if (attendanceQuery.data) {
       for (const record of attendanceQuery.data) {
         map.set(record.playerId, record.status as AttendanceStatus);
@@ -42,20 +58,20 @@ export default function AttendanceSessionPage() {
       map.set(playerId, item.status as AttendanceStatus);
     }
     return map;
-  }, [attendanceQuery.data, queuedByPlayer]);
+  }, [batchPlayersQuery.data, attendanceQuery.data, queuedByPlayer]);
 
   const handleMark = async (playerId: string, status: AttendanceStatus) => {
     if (!academyId || !sessionId) return;
+
+    // Haptic feedback for tactile ground confirmation
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(30);
+    }
 
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     if (isOffline) {
       await queueAttendance(playerId, status);
-      pushToast({
-        title: 'Saved offline in queue',
-        description: 'Attendance queued locally. Will sync when online.',
-        variant: 'info',
-      });
       return;
     }
 
@@ -71,8 +87,8 @@ export default function AttendanceSessionPage() {
       if (isNetworkErr) {
         await queueAttendance(playerId, status);
         pushToast({
-          title: 'Saved offline (connection lost)',
-          description: 'Network interrupted. Queued locally to sync automatically.',
+          title: 'Saved offline',
+          description: 'Network interrupted. Queued locally to sync.',
           variant: 'info',
         });
       } else {
@@ -85,16 +101,28 @@ export default function AttendanceSessionPage() {
     }
   };
 
+  const handleTogglePlayer = async (playerId: string) => {
+    if (!canManage) return;
+    const currentStatus = attendanceByPlayer.get(playerId) ?? 'present';
+    const nextStatus: AttendanceStatus = currentStatus === 'absent' ? 'present' : 'absent';
+    await handleMark(playerId, nextStatus);
+  };
+
   const handleMarkAllPresent = async () => {
     if (!academyId || !sessionId || !batchPlayersQuery.data?.length) return;
     const playerIds = batchPlayersQuery.data.map((player) => player.academyMemberId);
+
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([30, 50, 30]);
+    }
+
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     if (isOffline) {
       await queueAllPresent(playerIds);
       pushToast({
-        title: 'All players marked present offline',
-        description: 'Queued locally in IndexedDB. Will sync when online.',
+        title: 'All marked present offline',
+        description: 'Queued locally in IndexedDB.',
         variant: 'info',
       });
       return;
@@ -113,7 +141,7 @@ export default function AttendanceSessionPage() {
       if (isNetworkErr) {
         await queueAllPresent(playerIds);
         pushToast({
-          title: 'All players marked present offline (connection lost)',
+          title: 'All marked present offline',
           description: 'Queued locally in IndexedDB.',
           variant: 'info',
         });
@@ -135,10 +163,10 @@ export default function AttendanceSessionPage() {
     if (batchPlayersQuery.data) {
       for (const p of batchPlayersQuery.data) {
         const status = attendanceByPlayer.get(p.academyMemberId);
-        if (status === 'present') {
-          present++;
-        } else if (status === 'absent') {
+        if (status === 'absent') {
           absent++;
+        } else {
+          present++;
         }
       }
     }
@@ -158,12 +186,12 @@ export default function AttendanceSessionPage() {
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-4 pb-24 md:pb-6">
-        <div className="bg-surface-muted/50 border-border-subtle h-20 rounded-xl border" />
-        <div className="bg-surface border-border-subtle h-16 rounded-xl border" />
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-surface border-border-subtle h-14 rounded-xl border" />
+      <div className="animate-pulse space-y-4 pb-28 md:pb-6">
+        <div className="bg-surface-muted/50 border-border-subtle h-20 rounded-2xl border" />
+        <div className="bg-surface border-border-subtle h-16 rounded-2xl border" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="bg-surface border-border-subtle h-16 rounded-2xl border" />
           ))}
         </div>
       </div>
@@ -188,24 +216,29 @@ export default function AttendanceSessionPage() {
   const hasSaveError = markAttendance.isError || markAllPresent.isError;
 
   return (
-    <div className="flex flex-col space-y-4 pb-28 md:pb-6">
-      {/* 1. Header & Context */}
-      <div className="border-border-subtle/40 flex flex-col gap-2 border-b pb-3">
+    <div className="flex flex-col space-y-3.5 pb-32 md:pb-8">
+      {/* 1. Outdoor High-Contrast Header */}
+      <div className="border-border-subtle/80 flex flex-col gap-2.5 border-b pb-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={() => navigate('/sessions')}
-              className="border-border-subtle bg-surface text-fg-muted hover:text-fg hover:bg-surface-muted flex h-9 w-9 items-center justify-center rounded-lg border transition-colors"
+              className="border-border-subtle bg-surface text-fg hover:bg-surface-muted active:bg-surface-muted/80 flex h-11 w-11 items-center justify-center rounded-xl border font-bold shadow-xs transition-colors"
               aria-label="Back to sessions"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="font-heading text-fg text-xl font-extrabold tracking-tight uppercase md:text-2xl">
-                Mark Attendance
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-fg font-heading text-xl font-black tracking-tight uppercase sm:text-2xl">
+                  Ground Roll Call
+                </h1>
+                <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 font-mono text-[11px] font-black text-emerald-700 uppercase dark:text-emerald-300">
+                  Ground Mode
+                </span>
+              </div>
               {session && (
-                <p className="text-fg-muted font-sans text-xs">
+                <p className="text-fg-muted font-sans text-xs font-semibold">
                   {session.title} {session.batch?.name ? `• ${session.batch.name}` : ''}
                 </p>
               )}
@@ -218,44 +251,52 @@ export default function AttendanceSessionPage() {
               size="sm"
               onClick={() => void handleMarkAllPresent()}
               isLoading={markAllPresent.isPending}
-              className="border-border-subtle bg-surface text-fg hover:bg-surface-muted h-9 min-h-[36px] rounded-lg text-xs font-bold"
+              className="h-10 min-h-[40px] shrink-0 rounded-xl border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-black text-emerald-700 hover:bg-emerald-500/20 active:scale-95 dark:text-emerald-300"
             >
-              <Check className="text-success mr-1.5 h-3.5 w-3.5" />
+              <CheckCheck className="mr-1.5 h-4 w-4 text-emerald-600" />
               All Present
             </Button>
           )}
         </div>
 
+        {/* High-Contrast Ground Instruction Banner */}
+        <div className="flex items-center justify-between rounded-xl bg-slate-900 px-3.5 py-2.5 text-white dark:bg-slate-800">
+          <div className="flex items-center gap-2 text-xs font-bold">
+            <span className="flex h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            <span>Default: All Present. Tap ONLY who is absent.</span>
+          </div>
+          <span className="font-mono text-[11px] font-extrabold text-slate-300">
+            {counts.present}/{counts.total} Present
+          </span>
+        </div>
+
         {session && (
-          <div className="text-fg-muted flex flex-wrap items-center gap-2 font-mono text-[11px]">
-            <span className="border-border-subtle/50 bg-surface-container-low rounded border px-2 py-0.5">
+          <div className="text-fg-muted flex flex-wrap items-center gap-2 font-mono text-xs font-bold">
+            <span className="border-border-subtle bg-surface-container-low rounded-lg border px-2.5 py-1">
               {formatDate(session.sessionDate)}
             </span>
-            <span className="border-border-subtle/50 bg-surface-container-low rounded border px-2 py-0.5">
+            <span className="border-border-subtle bg-surface-container-low rounded-lg border px-2.5 py-1">
               {formatTime(session.startAt)} – {formatTime(session.endAt)}
-            </span>
-            <span className="border-primary/20 bg-primary-pale text-primary rounded border px-2 py-0.5 font-bold">
-              {totalPlayers} SQUAD MEMBERS
             </span>
           </div>
         )}
       </div>
 
-      {/* Offline Queue Session Banner */}
+      {/* Offline Queue Notification Banner */}
       {queuedItems.length > 0 && (
-        <div className="flex flex-col items-start justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-amber-900 sm:flex-row sm:items-center dark:text-amber-200">
+        <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/15 p-3.5 text-amber-950 sm:flex-row sm:items-center dark:text-amber-100">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-amber-500/20 p-2 text-amber-600 dark:text-amber-300">
-              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+            <div className="rounded-xl bg-amber-500/25 p-2 text-amber-600 dark:text-amber-300">
+              <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
             </div>
             <div>
-              <p className="font-heading text-xs font-bold uppercase">
+              <p className="font-heading text-xs font-black tracking-wide uppercase">
                 {queuedItems.length === 1
-                  ? '1 update queued offline'
-                  : `${queuedItems.length} updates queued offline`}
+                  ? '1 Roll Call Update Queued Offline'
+                  : `${queuedItems.length} Roll Call Updates Queued Offline`}
               </p>
-              <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
-                IndexedDB queue active. Automatically syncs when online.
+              <p className="text-[11px] font-semibold text-amber-900/90 dark:text-amber-200/90">
+                Ground records safe in offline storage. Auto-syncs on reconnect.
               </p>
             </div>
           </div>
@@ -264,7 +305,7 @@ export default function AttendanceSessionPage() {
             variant="secondary"
             onClick={() => void triggerSync()}
             isLoading={isSyncing}
-            className="h-8 border-amber-500/30 text-xs font-semibold hover:bg-amber-500/20"
+            className="h-9 border-amber-500/40 text-xs font-bold hover:bg-amber-500/20"
           >
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Sync Now
@@ -272,42 +313,42 @@ export default function AttendanceSessionPage() {
         </div>
       )}
 
-      {/* 2. Scorecard Telemetry Strip (3 Columns: Present, Absent, Total) */}
-      <div className="divide-border-subtle border-border-subtle bg-surface grid grid-cols-3 divide-x overflow-hidden rounded-xl border shadow-2xs">
-        <div className="flex flex-col items-center justify-center p-3">
-          <span className="font-heading text-fg-muted text-[10px] font-bold tracking-wider uppercase">
+      {/* 2. Live Ground Scorecard Telemetry Strip */}
+      <div className="divide-border-subtle border-border-subtle bg-surface grid grid-cols-3 divide-x overflow-hidden rounded-2xl border shadow-xs">
+        <div className="flex flex-col items-center justify-center bg-emerald-500/5 p-3">
+          <span className="font-heading text-[11px] font-extrabold tracking-wider text-emerald-800 uppercase dark:text-emerald-300">
             Present
           </span>
-          <span className="text-success mt-0.5 font-mono text-xl font-extrabold">
+          <span className="font-mono text-2xl font-black text-emerald-600 dark:text-emerald-400">
             {counts.present}
           </span>
         </div>
-        <div className="flex flex-col items-center justify-center p-3">
-          <span className="font-heading text-fg-muted text-[10px] font-bold tracking-wider uppercase">
+        <div className="flex flex-col items-center justify-center bg-rose-500/5 p-3">
+          <span className="font-heading text-[11px] font-extrabold tracking-wider text-rose-800 uppercase dark:text-rose-300">
             Absent
           </span>
-          <span className="text-error mt-0.5 font-mono text-xl font-extrabold">
+          <span className="font-mono text-2xl font-black text-rose-600 dark:text-rose-400">
             {counts.absent}
           </span>
         </div>
-        <div className="bg-surface-container-low/40 flex flex-col items-center justify-center p-3">
-          <span className="font-heading text-fg-muted text-[10px] font-bold tracking-wider uppercase">
-            Roster Size
+        <div className="bg-surface-container-low/60 flex flex-col items-center justify-center p-3">
+          <span className="font-heading text-fg-muted text-[11px] font-extrabold tracking-wider uppercase">
+            Total Squad
           </span>
-          <span className="text-fg mt-0.5 font-mono text-xl font-extrabold">{counts.total}</span>
+          <span className="text-fg font-mono text-2xl font-black">{counts.total}</span>
         </div>
       </div>
 
-      {/* 3. Player Attendance List */}
+      {/* 3. 56px Full-Row Tappable Ground Mode Roster */}
       {totalPlayers === 0 ? (
         <EmptyState
           title="No players assigned"
           description="There are no active players assigned to this batch."
         />
       ) : (
-        <div className="divide-border-subtle/50 border-border-subtle bg-surface divide-y overflow-hidden rounded-xl border shadow-2xs">
+        <div className="divide-border-subtle/80 border-border-subtle bg-surface divide-y overflow-hidden rounded-2xl border shadow-xs">
           {batchPlayersQuery.data?.map((player) => {
-            const currentStatus = attendanceByPlayer.get(player.academyMemberId) ?? null;
+            const currentStatus = attendanceByPlayer.get(player.academyMemberId) ?? 'present';
             const queuedItem = queuedByPlayer.get(player.academyMemberId);
             const isPlayerSaving =
               markAttendance.isPending &&
@@ -320,93 +361,79 @@ export default function AttendanceSessionPage() {
               .join('')
               .toUpperCase();
 
-            const isPresent = currentStatus === 'present';
+            const isPresent = currentStatus !== 'absent';
             const isAbsent = currentStatus === 'absent';
 
             return (
               <div
                 key={player.id}
-                className="hover:bg-surface-muted/20 flex items-center justify-between gap-3 p-3.5 transition-colors"
+                role="button"
+                tabIndex={0}
+                onClick={() => void handleTogglePlayer(player.academyMemberId)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    void handleTogglePlayer(player.academyMemberId);
+                  }
+                }}
+                aria-label={`${player.fullName || 'player'}: currently marked ${
+                  isPresent ? 'present' : 'absent'
+                }. Tap to toggle.`}
+                className={`group flex min-h-[58px] cursor-pointer items-center justify-between gap-3 p-3.5 transition-all select-none active:scale-[0.99] ${
+                  isAbsent
+                    ? 'bg-rose-500/10 hover:bg-rose-500/15 dark:bg-rose-950/30'
+                    : 'hover:bg-emerald-500/5'
+                }`}
               >
-                {/* Player Initials + Name */}
-                <div className="flex min-w-0 flex-1 items-center gap-3">
+                {/* Player Identity Block */}
+                <div className="flex min-w-0 flex-1 items-center gap-3.5">
                   <div
-                    className={`font-heading flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-colors ${
+                    className={`font-heading flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-xs font-black transition-colors ${
                       isPresent
-                        ? 'border-success/40 bg-success-pale text-success'
-                        : isAbsent
-                          ? 'border-error/40 bg-error-pale text-error'
-                          : 'border-border-subtle bg-surface-muted text-fg-muted'
+                        ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
+                        : 'border-rose-500/50 bg-rose-500/20 text-rose-800 dark:text-rose-200'
                     }`}
                   >
                     {initials}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-fg truncate font-sans text-sm font-bold">
+                      <span
+                        className={`truncate font-sans text-sm font-extrabold ${
+                          isAbsent ? 'text-rose-900 line-through dark:text-rose-200' : 'text-fg'
+                        }`}
+                      >
                         {player.fullName || player.email}
                       </span>
                       {queuedItem && (
-                        <span className="inline-flex items-center rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-500 uppercase">
+                        <span className="py-0.2 inline-flex items-center rounded-md border border-amber-500/30 bg-amber-500/20 px-1.5 font-mono text-[9px] font-black text-amber-800 uppercase dark:text-amber-200">
                           Queued
                         </span>
                       )}
                     </div>
-                    <span className="text-fg-muted block truncate font-sans text-xs">
+                    <span className="text-fg-muted block truncate font-sans text-xs font-medium">
                       {player.email}
                     </span>
                   </div>
                 </div>
 
-                {/* 2-State High-Speed Action Buttons (Present vs Absent) */}
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    disabled={isPlayerSaving || !canManage}
-                    onClick={async () => {
-                      if (isPresent || isPlayerSaving) return;
-                      await handleMark(player.academyMemberId, 'present');
-                    }}
-                    aria-label={`Mark ${player.fullName || 'player'} present`}
-                    className={`flex h-10 min-w-[76px] items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-bold transition-all ${
-                      isPresent
-                        ? 'border-success bg-success text-white shadow-xs'
-                        : 'border-border-subtle bg-surface text-fg-muted hover:border-success/40 hover:bg-success-pale/30 hover:text-success'
-                    }`}
-                  >
-                    {isPlayerSaving && markAttendance.variables?.status === 'present' ? (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <>
-                        <Check className="h-3.5 w-3.5" />
-                        <span>Present</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPlayerSaving || !canManage}
-                    onClick={async () => {
-                      if (isAbsent || isPlayerSaving) return;
-                      await handleMark(player.academyMemberId, 'absent');
-                    }}
-                    aria-label={`Mark ${player.fullName || 'player'} absent`}
-                    className={`flex h-10 min-w-[76px] items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-bold transition-all ${
-                      isAbsent
-                        ? 'border-error bg-error text-white shadow-xs'
-                        : 'border-border-subtle bg-surface text-fg-muted hover:border-error/40 hover:bg-error-pale/30 hover:text-error'
-                    }`}
-                  >
-                    {isPlayerSaving && markAttendance.variables?.status === 'absent' ? (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <>
-                        <X className="h-3.5 w-3.5" />
-                        <span>Absent</span>
-                      </>
-                    )}
-                  </button>
+                {/* 56px Touch Target Status Badge */}
+                <div className="flex shrink-0 items-center">
+                  {isPlayerSaving ? (
+                    <div className="flex h-11 min-w-[100px] items-center justify-center rounded-xl border border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-transparent dark:border-slate-300" />
+                    </div>
+                  ) : isPresent ? (
+                    <div className="flex h-11 min-w-[100px] items-center justify-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-600 px-3 text-xs font-black tracking-wide text-white uppercase shadow-xs">
+                      <Check className="h-4 w-4 stroke-[3]" />
+                      <span>Present</span>
+                    </div>
+                  ) : (
+                    <div className="flex h-11 min-w-[100px] items-center justify-center gap-1.5 rounded-xl border border-rose-600 bg-rose-600 px-3 text-xs font-black tracking-wide text-white uppercase shadow-xs">
+                      <X className="h-4 w-4 stroke-[3]" />
+                      <span>Absent</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -414,32 +441,40 @@ export default function AttendanceSessionPage() {
         </div>
       )}
 
-      {/* 4. Sticky Status Footer */}
-      <div className="border-border-subtle bg-surface/95 sticky bottom-0 z-30 -mx-4 -mb-4 flex items-center justify-between gap-3 border-t px-4 py-3 shadow-lg backdrop-blur-xs">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+      {/* 4. Sticky Bottom Action Bar (Thumb-Zone Optimized) */}
+      <div className="border-border-subtle bg-surface/98 fixed right-0 bottom-0 left-0 z-40 flex items-center justify-between gap-3 border-t px-4 py-3 shadow-2xl backdrop-blur-md">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {isSaving ? (
             <span className="text-fg-muted flex items-center gap-1.5 font-sans text-xs font-bold">
-              <span className="border-primary h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-t-transparent" />
-              Saving changes...
+              <span className="border-primary h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-t-transparent" />
+              Saving Ground State...
             </span>
           ) : hasSaveError ? (
-            <span className="text-error flex min-w-0 items-center gap-1.5 truncate font-sans text-xs font-bold">
-              <AlertCircle className="text-error h-4 w-4 shrink-0" />
-              Sync failed
+            <span className="flex min-w-0 items-center gap-1.5 truncate font-sans text-xs font-bold text-rose-600 dark:text-rose-400">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Sync Interrupted
             </span>
           ) : (
-            <span className="text-success flex items-center gap-1.5 font-sans text-xs font-bold">
-              <CheckCircle2 className="text-success h-4 w-4 shrink-0" />
-              Attendance Saved
-            </span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+              <div className="leading-tight">
+                <span className="text-fg block text-xs font-black">
+                  {counts.present} Present · {counts.absent} Absent
+                </span>
+                <span className="text-fg-muted block text-[11px] font-medium">
+                  {queuedItems.length > 0 ? 'Saved locally' : 'Live synced'}
+                </span>
+              </div>
+            </div>
           )}
         </div>
+
         <Button
           variant="primary"
           onClick={() => navigate('/sessions')}
-          className="h-10 min-h-[40px] rounded-lg px-5 text-xs font-bold text-white"
+          className="h-12 min-h-[48px] rounded-xl bg-emerald-600 px-6 text-sm font-black text-white shadow-md hover:bg-emerald-700 active:scale-95"
         >
-          Done
+          Confirm Attendance
         </Button>
       </div>
     </div>

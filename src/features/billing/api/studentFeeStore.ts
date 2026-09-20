@@ -4,8 +4,34 @@ import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase/client';
 
 export const FAMPAY_UPI_ID = '7358875632@fam';
+export const FAMPAY_PAYEE_NAME = 'Hemendra';
 export const FAMPAY_UPI_NUMBER = '7358875632';
 export const STUDENT_MONTHLY_FEE_AMOUNT = 200;
+
+/**
+ * Builds the canonical, unified UPI URI used by both the dynamic QR code and the deep-link button.
+ * Note: NPCI UPI specifications require literal '@' in `pa=` (not '%40').
+ */
+export function buildStudentFeeUpiUri(monthLabel: string): string {
+  const note = `CAM Student Pass ${monthLabel}`.trim();
+  const uri = `upi://pay?pa=${FAMPAY_UPI_ID}&pn=${encodeURIComponent(FAMPAY_PAYEE_NAME)}&am=${STUDENT_MONTHLY_FEE_AMOUNT}&cu=INR&tn=${encodeURIComponent(note)}`;
+
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+    // eslint-disable-next-line no-console
+    console.log('UPI URI:', uri);
+  }
+
+  return uri;
+}
+
+export const UPI_TEST_VARIANTS = {
+  variant1_rawBase: `upi://pay?pa=${FAMPAY_UPI_ID}&pn=${encodeURIComponent(FAMPAY_PAYEE_NAME)}`,
+  variant2_withAmount: `upi://pay?pa=${FAMPAY_UPI_ID}&pn=${encodeURIComponent(FAMPAY_PAYEE_NAME)}&am=${STUDENT_MONTHLY_FEE_AMOUNT}&cu=INR`,
+  variant3_withNoteLiteralAt: (monthLabel: string) =>
+    `upi://pay?pa=${FAMPAY_UPI_ID}&pn=${encodeURIComponent(FAMPAY_PAYEE_NAME)}&am=${STUDENT_MONTHLY_FEE_AMOUNT}&cu=INR&tn=${encodeURIComponent(`CAM Student Pass ${monthLabel}`.trim())}`,
+  variant4_withEncodedAt: (monthLabel: string) =>
+    `upi://pay?pa=${encodeURIComponent(FAMPAY_UPI_ID)}&pn=${encodeURIComponent(FAMPAY_PAYEE_NAME)}&am=${STUDENT_MONTHLY_FEE_AMOUNT}&cu=INR&tn=${encodeURIComponent(`CAM Student Pass ${monthLabel}`.trim())}`,
+};
 
 const RECEIPTS_BUCKET = 'payment-receipts';
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour, enough for one admin review session

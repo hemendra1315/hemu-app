@@ -53,6 +53,7 @@ const DrillsPage = lazy(() => import('@/features/drills/pages/DrillsPage'));
 const DrillDetailPage = lazy(() => import('@/features/drills/pages/DrillDetailPage'));
 const StatsPage = lazy(() => import('@/features/stats/pages/StatsPage'));
 const AcademySettingsPage = lazy(() => import('@/features/academies/pages/AcademySettingsPage'));
+const FeeRecoveryInboxPage = lazy(() => import('@/features/billing/pages/FeeRecoveryInboxPage'));
 const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage'));
 const NotificationsPage = lazy(() =>
   import('@/features/notifications/pages/NotificationsPage').then((m) => ({
@@ -140,6 +141,9 @@ export const router = createBrowserRouter([
                     children: [
                       { path: '/dashboard', element: <OwnerDashboardPage /> },
                       { path: '/owner', element: <OwnerDashboardPage /> },
+                      { path: '/billing', element: <FeeRecoveryInboxPage /> },
+                      { path: '/billing/recovery', element: <FeeRecoveryInboxPage /> },
+                      { path: '/fees', element: <FeeRecoveryInboxPage /> },
                       { path: '/settings', element: <AcademySettingsPage /> },
                       { path: '/settings/academy', element: <AcademySettingsPage /> },
                     ],

@@ -17,6 +17,8 @@ import {
 // ============================================================
 
 export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
+  const todayStr = new Date().toISOString().split('T')[0] ?? '';
+
   const [
     playersResult,
     coachesResult,
@@ -30,14 +32,18 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
     topBattersResult,
     topBowlersResult,
     topFieldersResult,
-    academyRecordsResult,
     todaySessionsResult,
+    academyRecordsResult,
+    unassignedPlayersResult,
+    todayAbsencesResult,
+    platformTodayPaymentsResult,
+    platformPendingClaimsResult,
   ] = await Promise.all([
     // Total active players
     unwrap<any[]>(
       (supabase as any)
         .from('academy_members')
-        .select('id')
+        .select('id, user_id')
         .eq('academy_id', academyId)
         .eq('role', 'player')
         .eq('status', 'active'),
@@ -50,11 +56,15 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .eq('role', 'coach')
         .eq('status', 'active'),
-    ),
+    ).catch(() => []),
     // Total batches (no status column on batches table)
-    unwrap<any[]>((supabase as any).from('batches').select('id').eq('academy_id', academyId)),
+    unwrap<any[]>((supabase as any).from('batches').select('id').eq('academy_id', academyId)).catch(
+      () => [],
+    ),
     // Total matches
-    unwrap<any[]>((supabase as any).from('matches').select('id').eq('academy_id', academyId)),
+    unwrap<any[]>((supabase as any).from('matches').select('id').eq('academy_id', academyId)).catch(
+      () => [],
+    ),
     // Attendance records (join through training_sessions for session_date, last 6 months)
     unwrap<any[]>(
       (supabase as any)
@@ -67,7 +77,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
             .toISOString()
             .split('T')[0],
         ),
-    ),
+    ).catch(() => []),
     // Sessions this week
     unwrap<any[]>(
       (supabase as any)
@@ -82,7 +92,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
           'session_date',
           new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         ),
-    ),
+    ).catch(() => []),
     // Recent matches
     unwrap<any[]>(
       (supabase as any)
@@ -91,7 +101,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .order('match_date', { ascending: false })
         .limit(5),
-    ),
+    ).catch(() => []),
     // Upcoming sessions
     unwrap<any[]>(
       (supabase as any)
@@ -104,7 +114,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .gte('session_date', new Date().toISOString().split('T')[0])
         .order('session_date', { ascending: true })
         .limit(5),
-    ),
+    ).catch(() => []),
     // Recent activity
     unwrap<any[]>(
       (supabase as any)
@@ -113,7 +123,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .order('created_at', { ascending: false })
         .limit(10),
-    ),
+    ).catch(() => []),
     // Top batters
     unwrap<any[]>(
       (supabase as any)
@@ -124,7 +134,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .order('batting_runs', { ascending: false })
         .limit(5),
-    ),
+    ).catch(() => []),
     // Top bowlers
     unwrap<any[]>(
       (supabase as any)
@@ -135,7 +145,7 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .order('bowling_wickets', { ascending: false })
         .limit(5),
-    ),
+    ).catch(() => []),
     // Top fielders
     unwrap<any[]>(
       (supabase as any)
@@ -146,8 +156,8 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .order('fielding_catches', { ascending: false })
         .limit(5),
-    ),
-    // Today\'s Sessions
+    ).catch(() => []),
+    // Today's Sessions
     unwrap<any[]>(
       (supabase as any)
         .from('training_sessions')
@@ -155,10 +165,10 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
           'id, title, session_date, start_at, end_at, batch_id, coach_id, status, batches (name, player_count:batch_members(count)), academy_members!training_sessions_coach_id_fkey(id, profiles!academy_members_user_id_fkey(full_name)), attendance_count:attendance(count)',
         )
         .eq('academy_id', academyId)
-        .eq('session_date', new Date().toISOString().split('T')[0])
+        .eq('session_date', todayStr)
         .neq('status', 'cancelled')
         .order('start_at', { ascending: true }),
-    ),
+    ).catch(() => []),
     // Academy records
     unwrap<any[]>(
       (supabase as any)
@@ -167,6 +177,38 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
         .eq('academy_id', academyId)
         .order('achieved_at', { ascending: false })
         .limit(10),
+    ).catch(() => []),
+    // 15. Unassigned active players (players without batch)
+    unwrap<any[]>(
+      (supabase as any)
+        .from('academy_members')
+        .select('id, user_id, batch_members(id)')
+        .eq('academy_id', academyId)
+        .eq('role', 'player')
+        .eq('status', 'active'),
+    ),
+    // 16. Today's Absences
+    unwrap<any[]>(
+      (supabase as any)
+        .from('attendance')
+        .select('id, player_id, session:training_sessions!inner(session_date)')
+        .eq('academy_id', academyId)
+        .eq('status', 'absent')
+        .eq('session.session_date', todayStr),
+    ),
+    // 17. Platform Subscription Payments (Today's Collections)
+    unwrap<any[]>(
+      (supabase as any)
+        .from('platform_subscription_payments')
+        .select('id, user_id, amount_paise, paid_on, created_at')
+        .gte('paid_on', todayStr),
+    ),
+    // 18. Platform Subscription Claims (Pending / Overdue Fees)
+    unwrap<any[]>(
+      (supabase as any)
+        .from('platform_subscription_claims')
+        .select('id, user_id, period_month, note, status, created_at')
+        .eq('status', 'pending'),
     ),
   ]);
 
@@ -174,6 +216,48 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
   const totalCoaches = coachesResult.length;
   const totalBatches = batchesResult.length;
   const totalMatches = matchesResult.length;
+
+  const academyUserIds = new Set((playersResult ?? []).map((m: any) => m.user_id).filter(Boolean));
+
+  // Compute Financial Action Metrics from live platform subscription tables
+  const todayCollections = (platformTodayPaymentsResult ?? []).reduce((sum: number, p: any) => {
+    if (academyUserIds.size > 0 && p.user_id && !academyUserIds.has(p.user_id)) {
+      return sum;
+    }
+    return sum + Number(p.amount_paise || 0) / 100;
+  }, 0);
+
+  let overdueAmount = 0;
+  const overdueMemberships = new Set<string>();
+
+  // Calculate Overdue amounts from pending platform claims
+  for (const claim of platformPendingClaimsResult ?? []) {
+    let noteData: Record<string, any> = {};
+    if (claim.note) {
+      try {
+        noteData = JSON.parse(claim.note);
+      } catch {
+        noteData = {};
+      }
+    }
+
+    if (noteData.academyId && noteData.academyId !== academyId) {
+      continue;
+    }
+    if (!noteData.academyId && academyUserIds.size > 0 && !academyUserIds.has(claim.user_id)) {
+      continue;
+    }
+
+    const amt = typeof noteData.amount === 'number' ? noteData.amount : 200;
+    overdueAmount += amt;
+    overdueMemberships.add(claim.user_id || claim.id);
+  }
+
+  const unassignedPlayersCount = (unassignedPlayersResult ?? []).filter(
+    (m: any) => !m.batch_members || m.batch_members.length === 0,
+  ).length;
+
+  const absentTodayCount = (todayAbsencesResult ?? []).length;
 
   const totalAttendance = attendanceResult.length;
   const attendedAttendance = attendanceResult.filter((a: any) => a.status === 'present').length;
@@ -314,6 +398,11 @@ export async function fetchOwnerDashboardAnalytics(academyId: UUID) {
     totalCoaches,
     totalBatches,
     totalMatches,
+    todayCollections,
+    overdueAmount,
+    overdueCount: overdueMemberships.size,
+    unassignedPlayersCount,
+    absentTodayCount,
     attendancePercentage,
     sessionsThisWeek,
     recentMatches,
